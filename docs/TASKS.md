@@ -70,10 +70,10 @@ produce identical sequences.
 - [x] 2.5 Explosion logic incl. deterministic adjacent-rubble selection and
       the 6-cell simultaneous-explosion cap
 - [x] 2.6 Rubble placement/clearing rules
-- [ ] 2.7 Freeze power-up
-- [ ] 2.8 Defuse power-up
-- [ ] 2.9 Revive power-up
-- [ ] 2.10 Edge-case tests: saving a `1`-timer piece, multiple simultaneous
+- [x] 2.7 Freeze power-up
+- [x] 2.8 Defuse power-up
+- [x] 2.9 Revive power-up
+- [x] 2.10 Edge-case tests: saving a `1`-timer piece, multiple simultaneous
       expirations, freeze/defuse/revive interactions
 
 **Acceptance:** all specified resolution rules pass; multiple expirations

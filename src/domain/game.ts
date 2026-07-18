@@ -14,6 +14,12 @@ import {
   DEFUSE_BONUS_BASE,
   DEFUSE_BONUS_PER_REMAINING_TURN,
   EXPLOSION_SCORE_PENALTY,
+  FREEZE_PLACEMENTS,
+  MAX_REWARDED_DEFUSES_PER_RUN,
+  MAX_REWARDED_FREEZES_PER_RUN,
+  REVIVE_HAND_CATEGORIES,
+  REVIVE_TIMER_BONUS,
+  REVIVE_TIMER_CAP,
   TIMER_WARNING_VALUES,
 } from "../config/balance";
 
@@ -148,21 +154,29 @@ export function placePiece(
     }
   }
 
-  // Decrement timers that existed before this placement (never the new piece).
-  const decremented: Record<string, ActiveTimedPiece> = {};
-  for (const [id, timer] of Object.entries(activeTimers)) {
-    if (id === pieceId) {
-      decremented[id] = timer;
-      continue;
+  // Decrement timers that existed before this placement (never the new
+  // piece). An active freeze skips the decrement and consumes one freeze
+  // placement instead (BUILD_SPEC.md §6.10 step 9).
+  let freezeTurnsRemaining = state.freezeTurnsRemaining;
+  if (freezeTurnsRemaining > 0) {
+    freezeTurnsRemaining -= 1;
+    events.push({ type: "freezeConsumed", placementsRemaining: freezeTurnsRemaining });
+  } else {
+    const decremented: Record<string, ActiveTimedPiece> = {};
+    for (const [id, timer] of Object.entries(activeTimers)) {
+      if (id === pieceId) {
+        decremented[id] = timer;
+        continue;
+      }
+      const remainingTurns = timer.remainingTurns - 1;
+      decremented[id] = { ...timer, remainingTurns };
+      events.push({ type: "timerChanged", pieceId: id, remainingTurns });
+      if (TIMER_WARNING_VALUES.includes(remainingTurns)) {
+        events.push({ type: "timerWarning", pieceId: id, remainingTurns });
+      }
     }
-    const remainingTurns = timer.remainingTurns - 1;
-    decremented[id] = { ...timer, remainingTurns };
-    events.push({ type: "timerChanged", pieceId: id, remainingTurns });
-    if (TIMER_WARNING_VALUES.includes(remainingTurns)) {
-      events.push({ type: "timerWarning", pieceId: id, remainingTurns });
-    }
+    activeTimers = decremented;
   }
-  activeTimers = decremented;
 
   // Resolve every expired piece as one simultaneous, non-recursive
   // explosion phase. Explosion-created rubble never triggers a line clear.
@@ -210,6 +224,7 @@ export function placePiece(
     rngState,
     handRefills,
     activeTimers,
+    freezeTurnsRemaining,
     score,
     combo: comboAfterExplosions,
     bestCombo: Math.max(state.bestCombo, nextCombo),
@@ -224,6 +239,136 @@ export function placePiece(
   };
 
   // Check whether any current hand piece can fit.
+  if (isGameOver(nextState.grid, nextState.hand)) {
+    nextState.status = "gameOver";
+    events.push({ type: "gameOver" });
+  }
+
+  return { ok: true, state: nextState, events };
+}
+
+/** Rewarded freeze: hold all timers for the next FREEZE_PLACEMENTS
+ *  successful placements (BUILD_SPEC.md §6.16). */
+export function activateFreeze(state: GameState, now: number): TurnResult {
+  if (
+    state.status !== "playing" ||
+    state.rewardedFreezeUses >= MAX_REWARDED_FREEZES_PER_RUN ||
+    state.freezeTurnsRemaining > 0
+  ) {
+    return reject(state);
+  }
+
+  const nextState: GameState = {
+    ...state,
+    freezeTurnsRemaining: FREEZE_PLACEMENTS,
+    rewardedFreezeUses: state.rewardedFreezeUses + 1,
+    lastUpdatedAt: now,
+  };
+  return {
+    ok: true,
+    state: nextState,
+    events: [{ type: "freezeActivated", placementsRemaining: FREEZE_PLACEMENTS }],
+  };
+}
+
+/** Rewarded defuse: permanently defuse the active piece with the lowest
+ *  remaining timer; ties resolve to the earliest placement
+ *  (BUILD_SPEC.md §6.17). Cells stay on the board as normal untimed blocks. */
+export function applyRewardedDefuse(state: GameState, now: number): TurnResult {
+  const timers = Object.values(state.activeTimers);
+  if (
+    state.status !== "playing" ||
+    state.rewardedDefuseUses >= MAX_REWARDED_DEFUSES_PER_RUN ||
+    timers.length === 0
+  ) {
+    return reject(state);
+  }
+
+  const target = timers.reduce((lowest, timer) =>
+    timer.remainingTurns < lowest.remainingTurns ||
+    (timer.remainingTurns === lowest.remainingTurns && timer.placedOnTurn < lowest.placedOnTurn)
+      ? timer
+      : lowest,
+  );
+
+  const grid = state.grid.map((row) =>
+    row.map((cell): typeof cell =>
+      cell.kind === "timed" && cell.pieceInstanceId === target.id
+        ? { kind: "normal", colorId: cell.colorId }
+        : cell,
+    ),
+  );
+  const activeTimers = Object.fromEntries(
+    Object.entries(state.activeTimers).filter(([id]) => id !== target.id),
+  );
+
+  const nextState: GameState = {
+    ...state,
+    grid,
+    activeTimers,
+    rewardedDefuseUses: state.rewardedDefuseUses + 1,
+    piecesDefused: state.piecesDefused + 1,
+    lastUpdatedAt: now,
+  };
+  return {
+    ok: true,
+    state: nextState,
+    events: [{ type: "defuseActivated", pieceId: target.id }],
+  };
+}
+
+/** Rewarded revive: one per run, only from the game-over state
+ *  (BUILD_SPEC.md §6.15). A failed or cancelled reward must simply never
+ *  call this — rejected calls return the input state untouched. */
+export function applyRevive(state: GameState, now: number): TurnResult {
+  if (state.status !== "gameOver" || state.reviveUsed) {
+    return reject(state);
+  }
+
+  const events: GameEvent[] = [];
+
+  // Remove all rubble.
+  const grid = state.grid.map((row) =>
+    row.map((cell): typeof cell => (cell.kind === "rubble" ? { kind: "empty" } : cell)),
+  );
+
+  // Add moves to every active timer, capped.
+  const activeTimers = Object.fromEntries(
+    Object.entries(state.activeTimers).map(([id, timer]) => [
+      id,
+      {
+        ...timer,
+        remainingTurns: Math.min(timer.remainingTurns + REVIVE_TIMER_BONUS, REVIVE_TIMER_CAP),
+      },
+    ]),
+  );
+
+  // Replace the hand with small/medium pieces.
+  const refill = generateHand(state.rngState, {
+    refillIndex: state.handRefills,
+    categories: REVIVE_HAND_CATEGORIES,
+  });
+
+  events.push({ type: "reviveApplied" });
+  events.push({ type: "handRefilled", handIds: refill.hand.map((piece) => piece.handId) });
+  if (state.combo !== 0) {
+    events.push({ type: "comboChanged", combo: 0 });
+  }
+
+  const nextState: GameState = {
+    ...state,
+    grid,
+    activeTimers,
+    hand: refill.hand,
+    rngState: refill.nextRngState,
+    handRefills: state.handRefills + 1,
+    combo: 0,
+    reviveUsed: true,
+    status: "playing",
+    lastUpdatedAt: now,
+  };
+
+  // The board may still be unplayable if it is packed with normal blocks.
   if (isGameOver(nextState.grid, nextState.hand)) {
     nextState.status = "gameOver";
     events.push({ type: "gameOver" });

@@ -54,3 +54,16 @@ export const EXPLOSION_ADJACENT_RUBBLE_MAX_PER_PIECE = 4;
 
 /** Max adjacent rubble added across all expirations in one turn. */
 export const EXPLOSION_ADJACENT_RUBBLE_MAX_PER_TURN = 6;
+
+/** Successful placements a freeze lasts for (BUILD_SPEC.md §6.16). */
+export const FREEZE_PLACEMENTS = 2;
+
+export const MAX_REWARDED_FREEZES_PER_RUN = 2;
+
+export const MAX_REWARDED_DEFUSES_PER_RUN = 2;
+
+export const REVIVE_TIMER_BONUS = 2;
+
+export const REVIVE_TIMER_CAP = 9;
+
+export const REVIVE_HAND_CATEGORIES: readonly ShapeCategory[] = ["small", "medium"];

@@ -12,4 +12,8 @@ export type GameEvent =
   | { type: "scoreChanged"; delta: number; score: number }
   | { type: "comboChanged"; combo: number }
   | { type: "handRefilled"; handIds: string[] }
+  | { type: "freezeActivated"; placementsRemaining: number }
+  | { type: "freezeConsumed"; placementsRemaining: number }
+  | { type: "defuseActivated"; pieceId: string }
+  | { type: "reviveApplied" }
   | { type: "gameOver" };

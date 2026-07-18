@@ -313,3 +313,25 @@ piece (each emits "one explosion animation" per §6.12 and each is
 independently the player's loss), with the score still floored at zero
 after summing the whole turn's delta. Two simultaneous expirations
 therefore cost 100. Combo resets once regardless of explosion count.
+
+## 2026-07-18 — Power-up domain semantics not pinned down by BUILD_SPEC.md
+
+Three small gaps resolved while implementing §6.15–§6.17; none change the
+player-facing rules, only edge behavior:
+
+1. **Freeze cannot be re-activated while active.** §6.16 allows two
+   rewarded freezes per run but doesn't address stacking. Activating during
+   an active freeze would waste a rewarded use (it would only top the
+   counter back up to 2), so `activateFreeze` rejects while
+   `freezeTurnsRemaining > 0`. The UI simply shouldn't offer it mid-freeze.
+2. **Rewarded defuse ties break on earliest placement.** §6.17 requires
+   deterministic tie resolution without naming a rule. Chosen: lowest
+   `placedOnTurn` (the oldest piece), which is stable, explainable, and
+   independent of object-key ordering.
+3. **Rewarded defuse counts toward `piecesDefused` but scores nothing.**
+   §6.17 grants no bonus points (unlike a line-clear defuse, §7.5), but the
+   piece is genuinely defused, so it increments the stat that feeds the
+   Bolts formula (§8.1). Revive re-checks game over after restoring the
+   board: a run can, in principle, still be dead if the board is packed
+   with normal blocks — the engine reports `gameOver` again rather than
+   pretending the revive helped.
