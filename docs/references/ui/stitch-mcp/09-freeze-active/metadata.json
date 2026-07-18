@@ -1,0 +1,35 @@
+{
+  "stitchProjectId": "4472195625883229066",
+  "stitchScreenId": "973fddeede9c4503862e1f7e562e5cb5",
+  "screenTitle": "Gameplay - Freeze Timers Active",
+  "retrievalTimestamp": "2026-07-17T22:18:15.155Z",
+  "files": [
+    {
+      "localFilename": "screen.png",
+      "fileType": "image/png",
+      "originalHostedUrl": "https://lh3.googleusercontent.com/aida/AP1WRLveXMWlC5bnK9bvb...(redacted-token)",
+      "sizeBytes": 33130,
+      "sha256": "634c6aed66828661bfe22c17bfa42f3f27de7104f18fae51ad2b11e981a47add",
+      "retrievalStatus": "success",
+      "notes": "Stitch-rendered screenshot of the approved screen."
+    },
+    {
+      "localFilename": "source.html",
+      "fileType": "text/html",
+      "originalHostedUrl": "https://contribution.usercontent.google.com/download...(redacted-token)",
+      "sizeBytes": 19019,
+      "sha256": "c0602a097113becb93c5a609e5e094f20db71c16c21143005c8b7f9a19f9a359",
+      "retrievalStatus": "success",
+      "notes": "Raw Stitch-generated HTML (Tailwind CDN script + Google Fonts links + inline <style> blocks). Reference only — not executed, not imported into the app."
+    },
+    {
+      "localFilename": "styles.css",
+      "fileType": "text/css",
+      "originalHostedUrl": "(extracted locally from source.html <style> blocks; not a separately hosted file)",
+      "sizeBytes": 1198,
+      "sha256": "597af55fea73e6f99cdb50b60b04709f379501aae7956cdcdae41fa66b3a0339",
+      "retrievalStatus": "success",
+      "notes": "Concatenation of the <style> blocks found in source.html, for easier diffing."
+    }
+  ]
+}

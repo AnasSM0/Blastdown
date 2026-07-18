@@ -1,0 +1,35 @@
+{
+  "stitchProjectId": "4472195625883229066",
+  "stitchScreenId": "07e42f1c67374e4f9b7ec63e058f754f",
+  "screenTitle": "Gameplay - Second Chance Revive",
+  "retrievalTimestamp": "2026-07-17T22:18:15.155Z",
+  "files": [
+    {
+      "localFilename": "screen.png",
+      "fileType": "image/png",
+      "originalHostedUrl": "https://lh3.googleusercontent.com/aida/AP1WRLu7UOW7vITDnYiXx...(redacted-token)",
+      "sizeBytes": 27414,
+      "sha256": "0a46f1cbfc329fd785eb1241aa6bc503fe977cbab206c8d13f1d30491c8e6061",
+      "retrievalStatus": "success",
+      "notes": "Stitch-rendered screenshot of the approved screen."
+    },
+    {
+      "localFilename": "source.html",
+      "fileType": "text/html",
+      "originalHostedUrl": "https://contribution.usercontent.google.com/download...(redacted-token)",
+      "sizeBytes": 16430,
+      "sha256": "22ae88f2de66257fdb5f92a5b88beab595cd129b1f3a93d425a51fab5c01c1b9",
+      "retrievalStatus": "success",
+      "notes": "Raw Stitch-generated HTML (Tailwind CDN script + Google Fonts links + inline <style> blocks). Reference only — not executed, not imported into the app."
+    },
+    {
+      "localFilename": "styles.css",
+      "fileType": "text/css",
+      "originalHostedUrl": "(extracted locally from source.html <style> blocks; not a separately hosted file)",
+      "sizeBytes": 1856,
+      "sha256": "34556046d03ebf67f1fb63aa5428e0266af8a5c7293ab9a0d2462f8ca17b9631",
+      "retrievalStatus": "success",
+      "notes": "Concatenation of the <style> blocks found in source.html, for easier diffing."
+    }
+  ]
+}

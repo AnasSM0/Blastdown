@@ -1,0 +1,35 @@
+{
+  "stitchProjectId": "4472195625883229066",
+  "stitchScreenId": "12afe7227bc24664a2c12edae16bf555",
+  "screenTitle": "Gameplay - Selection & Preview Interaction",
+  "retrievalTimestamp": "2026-07-17T22:18:15.155Z",
+  "files": [
+    {
+      "localFilename": "screen.png",
+      "fileType": "image/png",
+      "originalHostedUrl": "https://lh3.googleusercontent.com/aida/AP1WRLsYSb1IlFGJeWtvK...(redacted-token)",
+      "sizeBytes": 23850,
+      "sha256": "d4d447ab2c311809274d74b9d8e094134e7ab7c2e2658205a9d59e3b11a57553",
+      "retrievalStatus": "success",
+      "notes": "Stitch-rendered screenshot of the approved screen."
+    },
+    {
+      "localFilename": "source.html",
+      "fileType": "text/html",
+      "originalHostedUrl": "https://contribution.usercontent.google.com/download...(redacted-token)",
+      "sizeBytes": 13516,
+      "sha256": "e821c80a8c6443dd3d7f3e70a57389269d8283e26e881e068957b231c5c4366b",
+      "retrievalStatus": "success",
+      "notes": "Raw Stitch-generated HTML (Tailwind CDN script + Google Fonts links + inline <style> blocks). Reference only — not executed, not imported into the app."
+    },
+    {
+      "localFilename": "styles.css",
+      "fileType": "text/css",
+      "originalHostedUrl": "(extracted locally from source.html <style> blocks; not a separately hosted file)",
+      "sizeBytes": 2292,
+      "sha256": "35261cfe8edebc3700909f5bad7e3cd901778a46f8c4f4f3e7c4e5626685c3ca",
+      "retrievalStatus": "success",
+      "notes": "Concatenation of the <style> blocks found in source.html, for easier diffing."
+    }
+  ]
+}

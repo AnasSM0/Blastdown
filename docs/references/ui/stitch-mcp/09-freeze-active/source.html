@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Freeze Timers - Neon Reactor</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary": "#dfb7ff",
+                        "tertiary-fixed-dim": "#ffba20",
+                        "secondary-fixed": "#f1daff",
+                        "tertiary": "#fff4e8",
+                        "primary-container": "#00f0ff",
+                        "on-background": "#dae2fd",
+                        "primary": "#dbfcff",
+                        "surface-container-highest": "#2d3449",
+                        "on-secondary-fixed": "#2d004f",
+                        "on-primary": "#00363a",
+                        "surface-container-low": "#131b2e",
+                        "on-tertiary-fixed": "#271900",
+                        "inverse-surface": "#dae2fd",
+                        "primary-fixed": "#7df4ff",
+                        "surface-container-high": "#222a3d",
+                        "outline-variant": "#3b494b",
+                        "error-container": "#93000a",
+                        "surface-container-lowest": "#060e20",
+                        "on-primary-container": "#006970",
+                        "tertiary-container": "#ffd386",
+                        "surface": "#0b1326",
+                        "on-surface": "#dae2fd",
+                        "secondary-container": "#9d05ff",
+                        "tertiary-fixed": "#ffdea8",
+                        "on-error": "#690005",
+                        "on-primary-fixed-variant": "#004f54",
+                        "on-secondary-fixed-variant": "#6b00b0",
+                        "surface-dim": "#0b1326",
+                        "on-tertiary": "#412d00",
+                        "error": "#ffb4ab",
+                        "outline": "#849495",
+                        "on-secondary": "#4b007e",
+                        "surface-tint": "#00dbe9",
+                        "on-secondary-container": "#f7e6ff",
+                        "background": "#0b1326",
+                        "on-primary-fixed": "#002022",
+                        "on-surface-variant": "#b9cacb",
+                        "on-tertiary-fixed-variant": "#5e4200",
+                        "secondary-fixed-dim": "#dfb7ff",
+                        "surface-variant": "#2d3449",
+                        "surface-container": "#171f33",
+                        "primary-fixed-dim": "#00dbe9",
+                        "on-error-container": "#ffdad6",
+                        "on-tertiary-container": "#7d5800",
+                        "surface-bright": "#31394d",
+                        "inverse-on-surface": "#283044",
+                        "inverse-primary": "#006970",
+                        "graphite": "#2D2D35"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "container-padding": "20px",
+                        "stack-xs": "4px",
+                        "section-gap": "32px",
+                        "grid-gutter": "2px",
+                        "stack-sm": "8px",
+                        "grid-cell": "40px",
+                        "grid-cell-md": "48px"
+                    },
+                    "fontFamily": {
+                        "label-caps": ["Geist"],
+                        "button-text": ["Geist"],
+                        "timer-mono": ["JetBrains Mono"],
+                        "score-display-mobile": ["JetBrains Mono"],
+                        "body-standard": ["Geist"],
+                        "score-display": ["JetBrains Mono"]
+                    },
+                    "fontSize": {
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "600" }],
+                        "button-text": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "600" }],
+                        "timer-mono": ["24px", { "lineHeight": "32px", "fontWeight": "500" }],
+                        "score-display-mobile": ["36px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "body-standard": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "score-display": ["48px", { "lineHeight": "48px", "letterSpacing": "-0.05em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #050505; color: #dae2fd; }
+        
+        .bg-surface-low { background-color: #0F172A; }
+        
+        .block-glass {
+            background-color: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            position: relative;
+        }
+        
+        .block-cyan { border: 1px solid #00f0ff; box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.2); }
+        .block-purple { border: 1px solid #dfb7ff; box-shadow: inset 0 0 10px rgba(223, 183, 255, 0.2); }
+        .block-amber { border: 1px solid #ffba20; box-shadow: inset 0 0 10px rgba(255, 186, 32, 0.2); }
+        .block-ghost { border: 1px dashed #00f0ff; background-color: rgba(0, 240, 255, 0.05); }
+
+        .glow-cyan { box-shadow: 0 0 12px rgba(0, 240, 255, 0.4); }
+        
+        .cell-border { border: 1px solid #2D2D35; }
+        
+        .frozen-badge {
+            border: 1px solid #00f0ff;
+            box-shadow: 0 0 4px rgba(0, 240, 255, 0.5), inset 0 0 4px rgba(0, 240, 255, 0.3);
+            background-color: rgba(0, 240, 255, 0.1);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="flex flex-col h-screen font-body-standard overflow-hidden select-none">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-container-padding h-16 docked full-width top-0 bg-surface dark:bg-surface text-tertiary-fixed-dim dark:text-tertiary-fixed-dim flat no shadows shrink-0 z-10">
+<button class="hover:opacity-80 scale-95 transition-transform">
+<span class="material-symbols-outlined text-outline" style="font-variation-settings: 'FILL' 0;">trophy</span>
+</button>
+<h1 class="font-score-display-mobile text-score-display-mobile tracking-tighter text-tertiary-fixed-dim">0000</h1>
+<button class="hover:opacity-80 scale-95 transition-transform">
+<span class="material-symbols-outlined text-outline" style="font-variation-settings: 'FILL' 0;">pause</span>
+</button>
+</header>
+<!-- Main Game Area -->
+<main class="flex-1 flex flex-col items-center justify-center p-4 relative z-0">
+<!-- Frame Background simulating the device casing -->
+<div class="absolute inset-0 -z-10 bg-[url('placeholder')] bg-cover bg-center opacity-30 mix-blend-overlay" data-alt="Dark, metallic sci-fi paneling with subtle etched lines and recessed geometric patterns. Deep charcoal grey and black tones. Matte finish with very faint edge highlights suggesting premium industrial design. Futuristic but restrained."></div>
+<!-- The Core (8x8 Grid) -->
+<div class="bg-surface-low p-2 rounded-xl border border-graphite shadow-2xl relative mb-8">
+<div class="grid grid-cols-8 grid-rows-8 gap-0">
+<!-- Row 1 -->
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-ghost rounded flex items-center justify-center glow-cyan relative z-10">
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-ghost rounded border-l-0"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-ghost rounded border-l-0"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<!-- Row 2 -->
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-purple block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-secondary">2</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-amber block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-tertiary-fixed-dim">5</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-ghost rounded border-t-0 flex items-center justify-center">
+<span class="font-timer-mono text-primary-fixed opacity-50">T</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<!-- Row 3 -->
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-purple block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-secondary">0</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-purple block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-secondary">8</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-amber block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-tertiary-fixed-dim">3</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-amber block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-tertiary-fixed-dim">0</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<!-- Row 4 -->
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-cyan block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-primary-fixed">0</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-cyan block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-primary-fixed">0</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-amber block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-tertiary-fixed-dim">0</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-cyan block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-primary-fixed">2</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-cyan block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-primary-fixed">0</span>
+</div>
+<!-- Row 5 -->
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-purple block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-secondary">6</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-purple block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-secondary">2</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-amber block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-tertiary-fixed-dim">1</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-amber block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-tertiary-fixed-dim">2</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-cyan block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-primary-fixed">3</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<!-- Row 6 -->
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-purple block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-secondary">4</span>
+<!-- Frozen Timer Badge -->
+<div class="absolute inset-1 frozen-badge rounded flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-[10px] text-primary-fixed" style="font-variation-settings: 'FILL' 1;">pause</span>
+</div>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-cyan block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-primary-fixed">3</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-cyan block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-primary-fixed">4</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-purple block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-secondary">4</span>
+<!-- Frozen Timer Badge -->
+<div class="absolute inset-1 frozen-badge rounded flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-[10px] text-primary-fixed" style="font-variation-settings: 'FILL' 1;">pause</span>
+</div>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-cyan block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-primary-fixed">4</span>
+</div>
+<!-- Row 7 -->
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-purple block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-secondary">5</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-cyan block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-primary-fixed">4</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-amber block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-tertiary-fixed-dim">0</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-purple block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-secondary">7</span>
+</div>
+<!-- Row 8 -->
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-cyan block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-primary-fixed">4</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-amber block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-tertiary-fixed-dim">0</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-cyan block-glass rounded flex items-center justify-center relative glow-cyan z-10">
+<span class="font-timer-mono text-primary-fixed">3</span>
+</div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 cell-border block-purple block-glass rounded flex items-center justify-center relative">
+<span class="font-timer-mono text-secondary">4</span>
+</div>
+</div>
+</div>
+<!-- The Tray (Next Pieces) -->
+<div class="flex gap-4 items-center justify-center mb-8">
+<!-- Piece 1 -->
+<div class="grid grid-cols-2 grid-rows-2 gap-grid-gutter opacity-80 scale-75">
+<div class="w-8 h-8 block-cyan block-glass rounded border-b-0 border-r-0"></div>
+<div class="w-8 h-8 block-cyan block-glass rounded border-b-0 border-l-0"></div>
+<div class="w-8 h-8 block-cyan block-glass rounded border-t-0 border-r-0"></div>
+<div class="w-8 h-8 block-cyan block-glass rounded border-t-0 border-l-0"></div>
+</div>
+<!-- Piece 2 (Active T) -->
+<div class="grid grid-cols-3 grid-rows-2 gap-grid-gutter scale-90 opacity-100 glow-cyan">
+<div class="w-8 h-8"></div>
+<div class="w-8 h-8 block-cyan block-glass rounded border-b-0"></div>
+<div class="w-8 h-8"></div>
+<div class="w-8 h-8 block-cyan block-glass rounded border-r-0"></div>
+<div class="w-8 h-8 block-cyan block-glass rounded border-t-0 border-l-0 border-r-0"></div>
+<div class="w-8 h-8 block-cyan block-glass rounded border-l-0"></div>
+</div>
+<!-- Piece 3 -->
+<div class="grid grid-cols-1 grid-rows-3 gap-grid-gutter opacity-80 scale-75">
+<div class="w-8 h-8 block-purple block-glass rounded border-b-0"></div>
+<div class="w-8 h-8 block-purple block-glass rounded border-t-0 border-b-0"></div>
+<div class="w-8 h-8 block-purple block-glass rounded border-t-0"></div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Power-ups) -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-center gap-section-gap pb-10 bg-transparent text-primary-fixed dark:text-primary-fixed font-label-caps text-label-caps flat no shadows shrink-0">
+<!-- Active Freeze Control -->
+<div class="flex flex-col items-center gap-2">
+<span class="font-label-caps text-primary-fixed opacity-90 animate-pulse">2 MOVES</span>
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full p-stack-sm ring-2 ring-primary glow-cyan Active: scale-90 duration-100 w-14 h-14 transition-all">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">ac_unit</span>
+</button>
+</div>
+<!-- Inactive Control -->
+<div class="flex flex-col items-center gap-2 justify-end">
+<button class="flex flex-col items-center justify-center text-outline border border-outline-variant rounded-full p-stack-sm hover:bg-surface-container-highest transition-colors w-12 h-12">
+<span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 0;">bolt</span>
+</button>
+</div>
+</nav>
+</body></html>

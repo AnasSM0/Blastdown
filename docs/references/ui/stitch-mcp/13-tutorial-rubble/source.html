@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>BlastDown - Tutorial</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Config -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary": "#4b007e",
+                    "on-error-container": "#ffdad6",
+                    "inverse-on-surface": "#283044",
+                    "tertiary-fixed": "#ffdea8",
+                    "on-primary-fixed": "#002022",
+                    "surface-bright": "#31394d",
+                    "secondary-fixed-dim": "#dfb7ff",
+                    "on-secondary-fixed": "#2d004f",
+                    "surface": "#0b1326",
+                    "surface-container-lowest": "#060e20",
+                    "error-container": "#93000a",
+                    "surface-dim": "#0b1326",
+                    "on-tertiary-fixed": "#271900",
+                    "secondary-fixed": "#f1daff",
+                    "on-error": "#690005",
+                    "outline": "#849495",
+                    "on-tertiary-fixed-variant": "#5e4200",
+                    "on-tertiary-container": "#7d5800",
+                    "primary": "#dbfcff",
+                    "on-surface": "#dae2fd",
+                    "primary-fixed": "#7df4ff",
+                    "on-primary-container": "#006970",
+                    "tertiary-container": "#ffd386",
+                    "primary-container": "#00f0ff",
+                    "surface-container-highest": "#2d3449",
+                    "secondary-container": "#9d05ff",
+                    "inverse-primary": "#006970",
+                    "primary-fixed-dim": "#00dbe9",
+                    "surface-container": "#171f33",
+                    "on-background": "#dae2fd",
+                    "tertiary": "#fff4e8",
+                    "surface-tint": "#00dbe9",
+                    "outline-variant": "#3b494b",
+                    "on-secondary-fixed-variant": "#6b00b0",
+                    "tertiary-fixed-dim": "#ffba20",
+                    "background": "#0b1326",
+                    "error": "#ffb4ab",
+                    "surface-variant": "#2d3449",
+                    "surface-container-high": "#222a3d",
+                    "inverse-surface": "#dae2fd",
+                    "secondary": "#dfb7ff",
+                    "on-secondary-container": "#f7e6ff",
+                    "on-tertiary": "#412d00",
+                    "on-primary-fixed-variant": "#004f54",
+                    "on-surface-variant": "#b9cacb",
+                    "on-primary": "#00363a",
+                    "surface-container-low": "#131b2e"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "grid-cell": "40px",
+                    "stack-xs": "4px",
+                    "stack-sm": "8px",
+                    "container-padding": "20px",
+                    "grid-gutter": "2px",
+                    "section-gap": "32px"
+            },
+            "fontFamily": {
+                    "timer-mono": ["JetBrains Mono"],
+                    "button-text": ["Geist"],
+                    "body-standard": ["Geist"],
+                    "score-display-mobile": ["JetBrains Mono"],
+                    "score-display": ["JetBrains Mono"],
+                    "label-caps": ["Geist"]
+            },
+            "fontSize": {
+                    "timer-mono": ["24px", {"lineHeight": "32px", "fontWeight": "500"}],
+                    "button-text": ["14px", {"lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                    "body-standard": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "score-display-mobile": ["36px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "score-display": ["48px", {"lineHeight": "48px", "letterSpacing": "-0.05em", "fontWeight": "700"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "600"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Neon Inward Depth & Glassmorphism */
+        .neon-block {
+            background-color: rgba(0, 240, 255, 0.15);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 240, 255, 0.8);
+            box-shadow: inset 0 0 12px rgba(0, 240, 255, 0.3), 0 0 8px rgba(0, 240, 255, 0.2);
+        }
+
+        /* Rubble Styling */
+        .rubble-block {
+            background: repeating-linear-gradient(
+                -45deg,
+                theme('colors.surface-container-high'),
+                theme('colors.surface-container-high') 4px,
+                theme('colors.surface-variant') 4px,
+                theme('colors.surface-variant') 8px
+            );
+            border: 1px solid theme('colors.outline');
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.9);
+            position: relative;
+        }
+        .rubble-block::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, transparent 30%, rgba(0,0,0,0.6) 100%);
+        }
+
+        .grid-container {
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface h-screen w-full overflow-hidden flex flex-col items-center justify-between py-section-gap px-container-padding font-body-standard text-body-standard relative select-none">
+<!-- Top Status / Tutorial Indicator -->
+<header class="w-full max-w-md flex justify-between items-center z-10 pt-4">
+<div class="flex items-center gap-stack-sm text-tertiary-fixed-dim">
+<span class="material-symbols-outlined text-xl">school</span>
+<span class="font-timer-mono text-timer-mono tracking-widest text-sm opacity-80">TUTORIAL 5/5</span>
+</div>
+<div class="font-label-caps text-label-caps text-outline uppercase tracking-[0.2em]">
+            Rubble
+        </div>
+</header>
+<!-- Main Game Area -->
+<main class="flex-1 w-full max-w-md flex flex-col items-center justify-center relative z-10 w-full mt-8">
+<!-- The Reactor Core Grid (8x8) -->
+<div class="w-full aspect-square max-w-[360px] bg-outline-variant p-[1px] grid grid-cols-8 grid-rows-8 gap-[1px] rounded-lg grid-container relative">
+<!-- Generate 64 cells via script for precise layout according to prompt rules -->
+<!-- 
+                 Rule: 3-block L-shape rubble. Let's place at (2,2), (3,2), (3,3). 
+                 Rule: Row passing through rubble is 7/8 filled. Row 2 will be 7/8 filled.
+                 Index math: Row 2 is indices 16-23. Rubble at index 18. Normal at 16,17, 19,20,21,22,23.
+                 Rubble L-shape: indices 18, 26, 27.
+            -->
+<script>
+                const gridContainer = document.currentScript.parentElement;
+                for (let i = 0; i < 64; i++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'w-full h-full bg-surface-container-lowest relative';
+                    
+                    // Row 2 (indices 16-23) - 7/8 filled
+                    if (i >= 16 && i <= 23 && i !== 18) {
+                        cell.className = 'w-full h-full relative neon-block';
+                    }
+                    // Rubble L-Shape (indices 18, 26, 27)
+                    else if (i === 18 || i === 26 || i === 27) {
+                        cell.className = 'w-full h-full relative rubble-block flex items-center justify-center';
+                        // Add a subtle crack/texture icon for emphasis
+                        const icon = document.createElement('span');
+                        icon.className = 'material-symbols-outlined text-outline/40 text-[20px] absolute z-10';
+                        icon.textContent = 'texture';
+                        cell.appendChild(icon);
+                    }
+
+                    gridContainer.appendChild(cell);
+                }
+            </script>
+</div>
+<!-- Instruction Text -->
+<div class="mt-section-gap text-center w-full">
+<h2 class="font-body-standard text-[18px] text-inverse-surface tracking-wide drop-shadow-md">
+                Clear rubble to repair the board
+            </h2>
+<p class="font-label-caps text-label-caps text-outline mt-stack-sm">
+                Complete a line next to rubble to break it
+            </p>
+</div>
+<!-- The Tray (Empty for this tutorial step to focus on the board) -->
+<div class="w-full h-24 mt-stack-sm flex items-center justify-center gap-stack-sm">
+<!-- Ghosted tray indicators -->
+<div class="w-16 h-16 border border-outline-variant/30 rounded-DEFAULT bg-surface-container-lowest/50"></div>
+<div class="w-16 h-16 border border-outline-variant/30 rounded-DEFAULT bg-surface-container-lowest/50"></div>
+<div class="w-16 h-16 border border-outline-variant/30 rounded-DEFAULT bg-surface-container-lowest/50"></div>
+</div>
+</main>
+<!-- Bottom Action -->
+<footer class="w-full max-w-md pb-8 z-10">
+<button class="w-full bg-primary-container text-on-primary-container font-button-text text-button-text uppercase py-4 rounded-DEFAULT shadow-[0_0_20px_theme(colors.primary-container)] hover:scale-[0.98] hover:shadow-[0_0_30px_theme(colors.primary-container)] transition-all duration-200 flex items-center justify-center gap-2 group relative overflow-hidden">
+<div class="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<span class="tracking-widest relative z-10">FINISH TUTORIAL</span>
+<span class="material-symbols-outlined relative z-10">check_circle</span>
+</button>
+</footer>
+<!-- Background Atmospheric Glow -->
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-[radial-gradient(circle_at_center,theme(colors.surface-container-high)_0%,theme(colors.background)_60%)] -z-10 opacity-50 pointer-events-none"></div>
+</body></html>

@@ -1,0 +1,35 @@
+{
+  "stitchProjectId": "4472195625883229066",
+  "stitchScreenId": "3a1272645f4444a5983f09133915c60d",
+  "screenTitle": "Gameplay - Defuse Action Preview",
+  "retrievalTimestamp": "2026-07-17T22:18:15.155Z",
+  "files": [
+    {
+      "localFilename": "screen.png",
+      "fileType": "image/png",
+      "originalHostedUrl": "https://lh3.googleusercontent.com/aida/AP1WRLvz2iUob6Fw9CvRr...(redacted-token)",
+      "sizeBytes": 21273,
+      "sha256": "037860181bd35f7f5cfb038c3c628cd71b7221b69697b7a403e2efe966957f91",
+      "retrievalStatus": "success",
+      "notes": "Stitch-rendered screenshot of the approved screen."
+    },
+    {
+      "localFilename": "source.html",
+      "fileType": "text/html",
+      "originalHostedUrl": "https://contribution.usercontent.google.com/download...(redacted-token)",
+      "sizeBytes": 13618,
+      "sha256": "64e6d1e98c1989214ac9f32ca09e32a58804d451e5b78622352d3d795b12a4bf",
+      "retrievalStatus": "success",
+      "notes": "Raw Stitch-generated HTML (Tailwind CDN script + Google Fonts links + inline <style> blocks). Reference only — not executed, not imported into the app."
+    },
+    {
+      "localFilename": "styles.css",
+      "fileType": "text/css",
+      "originalHostedUrl": "(extracted locally from source.html <style> blocks; not a separately hosted file)",
+      "sizeBytes": 2292,
+      "sha256": "35261cfe8edebc3700909f5bad7e3cd901778a46f8c4f4f3e7c4e5626685c3ca",
+      "retrievalStatus": "success",
+      "notes": "Concatenation of the <style> blocks found in source.html, for easier diffing."
+    }
+  ]
+}

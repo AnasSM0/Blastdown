@@ -1,0 +1,31 @@
+body { background-color: #050505; color: #dae2fd; }
+        
+        .bg-surface-low { background-color: #0F172A; }
+        
+        .block-glass {
+            background-color: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            position: relative;
+        }
+        
+        .block-cyan { border: 1px solid #00f0ff; box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.2); }
+        .block-purple { border: 1px solid #dfb7ff; box-shadow: inset 0 0 10px rgba(223, 183, 255, 0.2); }
+        .block-amber { border: 1px solid #ffba20; box-shadow: inset 0 0 10px rgba(255, 186, 32, 0.2); }
+        .block-ghost { border: 1px dashed #00f0ff; background-color: rgba(0, 240, 255, 0.05); }
+
+        .glow-cyan { box-shadow: 0 0 12px rgba(0, 240, 255, 0.4); }
+        
+        .cell-border { border: 1px solid #2D2D35; }
+        
+        .frozen-badge {
+            border: 1px solid #00f0ff;
+            box-shadow: 0 0 4px rgba(0, 240, 255, 0.5), inset 0 0 4px rgba(0, 240, 255, 0.3);
+            background-color: rgba(0, 240, 255, 0.1);
+        }
+
+/* --- next <style> block --- */
+
+body {
+      min-height: max(884px, 100dvh);
+    }

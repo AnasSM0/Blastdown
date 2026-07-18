@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>BlastDown Tutorial - Defuse</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary": "#4b007e",
+                        "on-error-container": "#ffdad6",
+                        "inverse-on-surface": "#283044",
+                        "tertiary-fixed": "#ffdea8",
+                        "on-primary-fixed": "#002022",
+                        "surface-bright": "#31394d",
+                        "secondary-fixed-dim": "#dfb7ff",
+                        "on-secondary-fixed": "#2d004f",
+                        "surface": "#0b1326",
+                        "surface-container-lowest": "#060e20",
+                        "error-container": "#93000a",
+                        "surface-dim": "#0b1326",
+                        "on-tertiary-fixed": "#271900",
+                        "secondary-fixed": "#f1daff",
+                        "on-error": "#690005",
+                        "outline": "#849495",
+                        "on-tertiary-fixed-variant": "#5e4200",
+                        "on-tertiary-container": "#7d5800",
+                        "primary": "#dbfcff",
+                        "on-surface": "#dae2fd",
+                        "primary-fixed": "#7df4ff",
+                        "on-primary-container": "#006970",
+                        "tertiary-container": "#ffd386",
+                        "primary-container": "#00f0ff",
+                        "surface-container-highest": "#2d3449",
+                        "secondary-container": "#9d05ff",
+                        "inverse-primary": "#006970",
+                        "primary-fixed-dim": "#00dbe9",
+                        "surface-container": "#171f33",
+                        "on-background": "#dae2fd",
+                        "tertiary": "#fff4e8",
+                        "surface-tint": "#00dbe9",
+                        "outline-variant": "#3b494b",
+                        "on-secondary-fixed-variant": "#6b00b0",
+                        "tertiary-fixed-dim": "#ffba20",
+                        "background": "#0b1326",
+                        "error": "#ffb4ab",
+                        "surface-variant": "#2d3449",
+                        "surface-container-high": "#222a3d",
+                        "inverse-surface": "#dae2fd",
+                        "secondary": "#dfb7ff",
+                        "on-secondary-container": "#f7e6ff",
+                        "on-tertiary": "#412d00",
+                        "on-primary-fixed-variant": "#004f54",
+                        "on-surface-variant": "#b9cacb",
+                        "on-primary": "#00363a",
+                        "surface-container-low": "#131b2e"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "grid-cell": "40px",
+                        "stack-xs": "4px",
+                        "stack-sm": "8px",
+                        "container-padding": "20px",
+                        "grid-gutter": "2px",
+                        "section-gap": "32px"
+                    },
+                    "fontFamily": {
+                        "timer-mono": ["JetBrains Mono"],
+                        "button-text": ["Geist"],
+                        "body-standard": ["Geist"],
+                        "score-display-mobile": ["JetBrains Mono"],
+                        "score-display": ["JetBrains Mono"],
+                        "label-caps": ["Geist"]
+                    },
+                    "fontSize": {
+                        "timer-mono": ["24px", { "lineHeight": "32px", "fontWeight": "500" }],
+                        "button-text": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "600" }],
+                        "body-standard": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "score-display-mobile": ["36px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "score-display": ["48px", { "lineHeight": "48px", "letterSpacing": "-0.05em", "fontWeight": "700" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .grid-bg {
+            background-color: #0F172A; /* Requested in prompt for grid container */
+        }
+        .grid-border {
+            border-color: #2D2D35; /* Graphite */
+        }
+        
+        .pulse-red {
+            animation: pulseRed 1s infinite alternate;
+        }
+        @keyframes pulseRed {
+            0% { box-shadow: inset 0 0 0 1px #FF003D, 0 0 10px rgba(255, 0, 61, 0.5); border-color: #FF003D; }
+            100% { box-shadow: inset 0 0 0 1px #FF003D, 0 0 20px rgba(255, 0, 61, 0.9); border-color: #FF003D; }
+        }
+
+        .row-highlight {
+            background-color: rgba(0, 240, 255, 0.15); /* primary-container with opacity */
+            box-shadow: inset 0 0 0 1px #00f0ff;
+        }
+        
+        .glow-cyan {
+            box-shadow: inset 0 0 0 1px #00f0ff, 0 0 12px rgba(0, 240, 255, 0.6);
+            background-color: rgba(255,255,255,0.1);
+            backdrop-filter: blur(16px);
+        }
+        
+        .glass-purple {
+            background-color: rgba(255,255,255,0.1);
+            backdrop-filter: blur(16px);
+            box-shadow: inset 0 0 0 1px #dfb7ff; /* secondary-fixed-dim */
+        }
+        
+        .glass-red {
+            background-color: rgba(255,255,255,0.1);
+            backdrop-filter: blur(16px);
+            /* Red handled by pulse-red */
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-[#050505] text-on-surface h-screen w-screen overflow-hidden flex flex-col items-center">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-container-padding h-16 bg-surface dark:bg-surface text-tertiary-fixed-dim font-score-display-mobile text-score-display-mobile docked full-width top-0 z-50">
+<div class="hover:opacity-80 scale-95 transition-transform cursor-pointer">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">trophy</span>
+</div>
+<div class="text-tertiary-fixed-dim font-score-display-mobile text-score-display-mobile font-bold tracking-tight">0000</div>
+<div class="hover:opacity-80 scale-95 transition-transform cursor-pointer">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">pause</span>
+</div>
+</header>
+<!-- Main Game Area -->
+<main class="flex-1 flex flex-col items-center justify-center w-full max-w-md px-container-padding pb-24">
+<!-- Instruction Text -->
+<div class="mb-section-gap text-center font-body-standard text-body-standard text-on-surface-variant max-w-[280px]">
+            Clear every cell before it reaches zero
+        </div>
+<!-- The Core Grid (8x8) -->
+<div class="grid-bg p-grid-gutter rounded border border-grid-border relative">
+<!-- Row Highlight Overlay -->
+<div class="absolute top-[210px] left-grid-gutter right-grid-gutter h-[40px] row-highlight pointer-events-none rounded-sm z-10"></div>
+<div class="grid grid-cols-8 grid-rows-8 gap-grid-gutter">
+<!-- Generate 64 cells -->
+<script>
+                    for(let i=0; i<64; i++) {
+                        // Cell rendering logic
+                        let cellClasses = "w-[40px] h-[40px] border border-grid-border rounded-sm relative z-0";
+                        let innerContent = "";
+                        
+                        const row = Math.floor(i/8);
+                        const col = i%8;
+
+                        // Place purple I-piece (horizontal, length 3) at row 5, cols 3,4,5
+                        // One of them is a red timer block
+                        if(row === 5) {
+                            if (col === 3) {
+                                cellClasses = "w-[40px] h-[40px] rounded-sm relative z-20 glass-purple";
+                            } else if (col === 4) {
+                                cellClasses = "w-[40px] h-[40px] rounded-sm relative z-20 glass-red pulse-red flex items-center justify-center";
+                                innerContent = `<span class="font-timer-mono text-timer-mono text-[#FF003D]">1</span>`;
+                            } else if (col === 5) {
+                                cellClasses = "w-[40px] h-[40px] rounded-sm relative z-20 glass-purple";
+                            }
+                        }
+
+                        document.write(`<div class="${cellClasses}">${innerContent}</div>`);
+                    }
+                </script>
+</div>
+</div>
+<!-- The Tray -->
+<div class="mt-section-gap w-full flex justify-center gap-section-gap h-24 items-center">
+<!-- Tray slot 1 -->
+<div class="w-16 h-16 flex items-center justify-center">
+<!-- Empty or different piece -->
+</div>
+<!-- Tray slot 2 - Selected Cyan Piece -->
+<div class="w-16 h-16 flex items-center justify-center relative -translate-y-4 transition-transform">
+<div class="w-[40px] h-[40px] glow-cyan rounded-sm"></div>
+</div>
+<!-- Tray slot 3 -->
+<div class="w-16 h-16 flex items-center justify-center">
+<!-- Empty or different piece -->
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Hidden on this screen as it's a focused tutorial flow, as per Semantic Shell Mandate) -->
+</body></html>

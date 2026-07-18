@@ -1,0 +1,35 @@
+{
+  "stitchProjectId": "4472195625883229066",
+  "stitchScreenId": "20c68f329e964445b901d1306f888753",
+  "screenTitle": "Developer Handoff - Neon Reactor Minimal",
+  "retrievalTimestamp": "2026-07-17T22:18:15.155Z",
+  "files": [
+    {
+      "localFilename": "screen.png",
+      "fileType": "image/png",
+      "originalHostedUrl": "https://lh3.googleusercontent.com/aida/AP1WRLtl1clYet0J7mKHp...(redacted-token)",
+      "sizeBytes": 54287,
+      "sha256": "57097764168ccf225aeee413d8c227127f01700d4b5e0d978b66ebb28a2d05c4",
+      "retrievalStatus": "success",
+      "notes": "Stitch-rendered screenshot of the approved screen."
+    },
+    {
+      "localFilename": "source.html",
+      "fileType": "text/html",
+      "originalHostedUrl": "https://contribution.usercontent.google.com/download...(redacted-token)",
+      "sizeBytes": 17683,
+      "sha256": "f985f552670ee3cab53b2f7d37f2dcd60cee6ce2faec983d457ceed37d65b33a",
+      "retrievalStatus": "success",
+      "notes": "Raw Stitch-generated HTML (Tailwind CDN script + Google Fonts links + inline <style> blocks). Reference only — not executed, not imported into the app."
+    },
+    {
+      "localFilename": "styles.css",
+      "fileType": "text/css",
+      "originalHostedUrl": "(extracted locally from source.html <style> blocks; not a separately hosted file)",
+      "sizeBytes": 1598,
+      "sha256": "0a1375391f5153fdf227cedf76131597ba5ec835cf86a30fbf85a0f4b3be7973",
+      "retrievalStatus": "success",
+      "notes": "Concatenation of the <style> blocks found in source.html, for easier diffing."
+    }
+  ]
+}

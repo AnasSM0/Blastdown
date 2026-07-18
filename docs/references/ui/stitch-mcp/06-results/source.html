@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>BlastDown - Final Results</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "outline-variant": "#3b494b",
+                        "on-primary-fixed-variant": "#004f54",
+                        "on-primary-container": "#006970",
+                        "inverse-surface": "#dae2fd",
+                        "on-tertiary-container": "#7d5800",
+                        "tertiary": "#fff4e8",
+                        "on-secondary-fixed-variant": "#6b00b0",
+                        "on-error": "#690005",
+                        "surface-tint": "#00dbe9",
+                        "on-secondary-fixed": "#2d004f",
+                        "primary-fixed": "#7df4ff",
+                        "error": "#ffb4ab",
+                        "surface-container-lowest": "#060e20",
+                        "surface": "#0b1326",
+                        "inverse-on-surface": "#283044",
+                        "secondary-container": "#9d05ff",
+                        "tertiary-fixed": "#ffdea8",
+                        "outline": "#849495",
+                        "on-surface": "#dae2fd",
+                        "surface-container-highest": "#2d3449",
+                        "on-secondary": "#4b007e",
+                        "surface-variant": "#2d3449",
+                        "on-tertiary": "#412d00",
+                        "surface-container": "#171f33",
+                        "primary-container": "#00f0ff",
+                        "primary": "#dbfcff",
+                        "on-primary": "#00363a",
+                        "secondary": "#dfb7ff",
+                        "inverse-primary": "#006970",
+                        "on-tertiary-fixed-variant": "#5e4200",
+                        "error-container": "#93000a",
+                        "tertiary-container": "#ffd386",
+                        "on-error-container": "#ffdad6",
+                        "tertiary-fixed-dim": "#ffba20",
+                        "surface-container-high": "#222a3d",
+                        "primary-fixed-dim": "#00dbe9",
+                        "surface-dim": "#0b1326",
+                        "surface-container-low": "#131b2e",
+                        "surface-bright": "#31394d",
+                        "secondary-fixed": "#f1daff",
+                        "on-surface-variant": "#b9cacb",
+                        "background": "#050505", /* Overridden based on instructions "matte black" */
+                        "on-primary-fixed": "#002022",
+                        "secondary-fixed-dim": "#dfb7ff",
+                        "on-tertiary-fixed": "#271900",
+                        "on-background": "#dae2fd",
+                        "on-secondary-container": "#f7e6ff",
+                        "graphite": "#2D2D35",
+                        "neon-orange": "#FF6B00",
+                        "neon-cyan": "#00F0FF",
+                        "neon-red": "#FF003D"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "container-padding": "20px",
+                        "stack-xs": "4px",
+                        "stack-sm": "8px",
+                        "grid-cell": "40px",
+                        "section-gap": "32px",
+                        "grid-gutter": "2px"
+                    },
+                    "fontFamily": {
+                        "timer-mono": ["JetBrains Mono"],
+                        "button-text": ["Geist"],
+                        "score-display-mobile": ["JetBrains Mono"],
+                        "label-caps": ["Geist"],
+                        "body-standard": ["Geist"],
+                        "score-display": ["JetBrains Mono"]
+                    },
+                    "fontSize": {
+                        "timer-mono": ["24px", { "lineHeight": "32px", "fontWeight": "500" }],
+                        "button-text": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "600" }],
+                        "score-display-mobile": ["36px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "600" }],
+                        "body-standard": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "score-display": ["64px", { "lineHeight": "64px", "letterSpacing": "-0.05em", "fontWeight": "800" }] /* Tweaked for larger display */
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #050505;
+            color: #dae2fd;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Ambient Background Grid Pattern */
+        .bg-grid-pattern {
+            background-size: 40px 40px;
+            background-image:
+                linear-gradient(to right, rgba(45, 45, 53, 0.1) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(45, 45, 53, 0.1) 1px, transparent 1px);
+        }
+
+        /* Typography & Glows */
+        .text-glow-orange {
+            text-shadow: 0 0 16px rgba(255, 107, 0, 0.5);
+        }
+
+        .neon-border-cyan {
+            box-shadow: inset 0 0 0 1px #00F0FF, 0 0 12px rgba(0, 240, 255, 0.3);
+        }
+        
+        .neon-border-subtle {
+             box-shadow: inset 0 0 0 1px rgba(132, 148, 149, 0.3);
+        }
+
+        /* Custom Scrollbar for stats if needed on very small devices */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2D2D35;
+            border-radius: 4px;
+        }
+        
+        /* Animations */
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: inset 0 0 0 1px #00F0FF, 0 0 8px rgba(0, 240, 255, 0.2); }
+            50% { box-shadow: inset 0 0 0 1px #00F0FF, 0 0 16px rgba(0, 240, 255, 0.5); }
+        }
+        .animate-pulse-glow {
+            animation: pulse-glow 2s infinite;
+        }
+
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-grid-pattern">
+<!-- Top Navigation Anchor (as required by JSON for top-level screens, though stylized for this context) -->
+<header class="fixed top-0 flex justify-between items-center w-full px-container-padding h-16 z-50 bg-transparent">
+<button aria-label="Go Back" class="text-tertiary-fixed-dim hover:opacity-80 scale-95 transition-transform">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">arrow_back</span>
+</button>
+<div class="font-score-display-mobile text-score-display-mobile text-tertiary-fixed-dim hidden md:block">0000</div>
+<button aria-label="Settings" class="text-tertiary-fixed-dim hover:opacity-80 scale-95 transition-transform">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">settings</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="w-full max-w-md px-container-padding relative z-10 flex flex-col items-center justify-center min-h-screen py-20">
+<!-- Central Panel -->
+<div class="w-full bg-[#0F172A] border border-graphite rounded-xl relative overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.8)] backdrop-blur-md flex flex-col">
+<!-- Panel Inner Top Accent -->
+<div class="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary-container to-transparent opacity-50"></div>
+<div class="p-8 flex flex-col items-center">
+<!-- Title -->
+<h1 class="font-label-caps text-label-caps text-outline tracking-[0.2em] mb-stack-sm uppercase">Run Complete</h1>
+<!-- Main Score Area -->
+<div class="relative flex flex-col items-center justify-center my-section-gap w-full">
+<!-- 'NEW BEST' Badge -->
+<div class="absolute -top-6 bg-surface-container-highest border border-outline-variant px-3 py-1 rounded-full flex items-center gap-1 z-10">
+<span class="material-symbols-outlined text-[14px] text-tertiary-fixed-dim" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-caps text-[10px] text-tertiary-fixed-dim tracking-wider">NEW BEST</span>
+</div>
+<!-- Score -->
+<div class="font-score-display text-score-display text-neon-orange text-glow-orange leading-none relative">
+                        14,200
+                        <!-- subtle decorative brackets -->
+<span class="absolute -left-4 top-1/2 -translate-y-1/2 text-outline-variant text-3xl font-light opacity-50">[</span>
+<span class="absolute -right-4 top-1/2 -translate-y-1/2 text-outline-variant text-3xl font-light opacity-50">]</span>
+</div>
+</div>
+<!-- Divider -->
+<div class="w-full h-[1px] bg-graphite my-stack-sm"></div>
+<!-- Statistics List -->
+<div class="w-full flex flex-col gap-stack-sm py-stack-sm">
+<div class="flex justify-between items-center py-2">
+<span class="font-body-standard text-body-standard text-on-surface-variant">Best Combo</span>
+<span class="font-timer-mono text-[18px] font-medium text-neon-cyan">x12</span>
+</div>
+<div class="flex justify-between items-center py-2">
+<span class="font-body-standard text-body-standard text-on-surface-variant">Lines Cleared</span>
+<span class="font-timer-mono text-[18px] font-medium text-neon-cyan">48</span>
+</div>
+<div class="flex justify-between items-center py-2">
+<span class="font-body-standard text-body-standard text-on-surface-variant">Pieces Defused</span>
+<span class="font-timer-mono text-[18px] font-medium text-neon-cyan">156</span>
+</div>
+<div class="flex justify-between items-center py-2">
+<span class="font-body-standard text-body-standard text-on-surface-variant">Explosions</span>
+<span class="font-timer-mono text-[18px] font-medium text-neon-red">22</span>
+</div>
+<div class="flex justify-between items-center py-2">
+<span class="font-body-standard text-body-standard text-on-surface-variant">Rubble Cleared</span>
+<span class="font-timer-mono text-[18px] font-medium text-neon-cyan">89</span>
+</div>
+<div class="flex justify-between items-center py-2 bg-surface-container-highest -mx-8 px-8 mt-2 rounded-sm border-y border-outline-variant/30">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary-fixed-dim" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="font-body-standard text-body-standard text-on-surface-variant font-semibold">Bolts Earned</span>
+</div>
+<span class="font-timer-mono text-[20px] font-bold text-tertiary-fixed-dim">+350</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Call to Actions -->
+<div class="w-full mt-section-gap flex flex-col gap-stack-sm">
+<!-- Secondary/Rewarded Action -->
+<button class="w-full py-3 px-4 rounded-lg bg-surface border border-outline-variant flex items-center justify-center gap-2 hover:bg-surface-container-highest transition-colors active:scale-95 duration-100">
+<span class="material-symbols-outlined text-tertiary-fixed-dim text-[20px]" style="font-variation-settings: 'FILL' 0;">play_circle</span>
+<span class="font-button-text text-button-text text-on-surface">DOUBLE BOLTS</span>
+</button>
+<!-- Primary Action -->
+<button class="w-full py-4 px-6 rounded-lg bg-[rgba(0,240,255,0.1)] neon-border-cyan animate-pulse-glow flex items-center justify-center gap-2 backdrop-blur-sm hover:bg-[rgba(0,240,255,0.15)] transition-colors active:scale-95 duration-100 mt-2">
+<span class="font-button-text text-[18px] text-primary-container tracking-wider font-bold">PLAY AGAIN</span>
+<span class="material-symbols-outlined text-primary-container" style="font-variation-settings: 'FILL' 1;">replay</span>
+</button>
+<!-- Tertiary Action -->
+<button class="w-full py-3 mt-2 text-outline hover:text-on-surface transition-colors font-button-text text-button-text active:scale-95 duration-100">
+                HOME
+            </button>
+</div>
+</main>
+<!-- Bottom Navigation Shell (Suppressed based on logic for transactional/dead-end screens) -->
+<!-- The BottomNavBar is intentionally excluded here as this is a linear "Success/Confirmation" splash screen (Run Complete). Hiding the shell prioritizes the content canvas. -->
+<script>
+        // Simple JS for button micro-interactions (visual feedback beyond CSS active state)
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('touchstart', () => {
+                btn.style.transform = 'scale(0.96)';
+            }, {passive: true});
+            
+            btn.addEventListener('touchend', () => {
+                btn.style.transform = 'scale(1)';
+            }, {passive: true});
+            
+            btn.addEventListener('touchcancel', () => {
+                btn.style.transform = 'scale(1)';
+            }, {passive: true});
+        });
+    </script>
+</body></html>

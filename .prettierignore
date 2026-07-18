@@ -1,0 +1,14 @@
+node_modules
+.expo
+dist
+web-build
+coverage
+package-lock.json
+
+# Authoritative external spec document; must not be reformatted.
+BUILD_SPEC.md
+
+# Frozen Stitch UI reference snapshot — raw retrieved files with recorded
+# SHA-256 checksums in metadata.json/manifest.json. Must not be reformatted
+# (would invalidate the checksums that make this a stable provenance record).
+docs/references/ui/stitch-mcp/

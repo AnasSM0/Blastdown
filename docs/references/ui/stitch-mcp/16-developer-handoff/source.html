@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>BlastDown Handoff Specification</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&amp;family=Geist:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary": "#412d00",
+                        "surface-dim": "#0b1326",
+                        "surface": "#0b1326",
+                        "on-secondary-container": "#f7e6ff",
+                        "inverse-surface": "#dae2fd",
+                        "on-surface": "#dae2fd",
+                        "tertiary": "#fff4e8",
+                        "secondary-container": "#9d05ff",
+                        "outline": "#849495",
+                        "secondary-fixed": "#f1daff",
+                        "secondary": "#dfb7ff",
+                        "on-error-container": "#ffdad6",
+                        "surface-variant": "#2d3449",
+                        "tertiary-container": "#ffd386",
+                        "primary-fixed": "#7df4ff",
+                        "inverse-primary": "#006970",
+                        "error-container": "#93000a",
+                        "on-primary-fixed-variant": "#004f54",
+                        "surface-container-high": "#222a3d",
+                        "primary-container": "#00f0ff",
+                        "on-secondary": "#4b007e",
+                        "surface-container": "#171f33",
+                        "tertiary-fixed-dim": "#ffba20",
+                        "on-background": "#dae2fd",
+                        "background": "#0b1326",
+                        "on-primary-container": "#006970",
+                        "on-primary": "#00363a",
+                        "on-tertiary-fixed": "#271900",
+                        "primary": "#dbfcff",
+                        "inverse-on-surface": "#283044",
+                        "primary-fixed-dim": "#00dbe9",
+                        "surface-tint": "#00dbe9",
+                        "on-error": "#690005",
+                        "error": "#ffb4ab",
+                        "surface-container-lowest": "#060e20",
+                        "surface-bright": "#31394d",
+                        "on-primary-fixed": "#002022",
+                        "surface-container-low": "#131b2e",
+                        "on-secondary-fixed-variant": "#6b00b0",
+                        "outline-variant": "#3b494b",
+                        "secondary-fixed-dim": "#dfb7ff",
+                        "tertiary-fixed": "#ffdea8",
+                        "on-tertiary-fixed-variant": "#5e4200",
+                        "on-surface-variant": "#b9cacb",
+                        "on-secondary-fixed": "#2d004f",
+                        "surface-container-highest": "#2d3449",
+                        "on-tertiary-container": "#7d5800"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "section-gap": "32px",
+                        "grid-gutter": "2px",
+                        "stack-xs": "4px",
+                        "grid-cell": "40px",
+                        "container-padding": "20px",
+                        "stack-sm": "8px"
+                    },
+                    "fontFamily": {
+                        "timer-mono": ["JetBrains Mono"],
+                        "score-display-mobile": ["JetBrains Mono"],
+                        "body-standard": ["Geist"],
+                        "button-text": ["Geist"],
+                        "score-display": ["JetBrains Mono"],
+                        "label-caps": ["Geist"]
+                    },
+                    "fontSize": {
+                        "timer-mono": ["24px", { "lineHeight": "32px", "fontWeight": "500" }],
+                        "score-display-mobile": ["36px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "body-standard": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "button-text": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "600" }],
+                        "score-display": ["48px", { "lineHeight": "48px", "letterSpacing": "-0.05em", "fontWeight": "700" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        body {
+            background-color: #050505; /* Main appBackground */
+            color: #dae2fd;
+        }
+
+        .neon-border {
+            position: relative;
+        }
+        .neon-border::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border: 1px solid currentColor;
+            border-radius: inherit;
+            pointer-events: none;
+            opacity: 0.5;
+        }
+
+        /* Glassmorphism utility for blocks */
+        .glass-block {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid;
+            position: relative;
+        }
+        
+        .glow-cyan {
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.5);
+            border-color: #00F0FF;
+        }
+        
+        .glow-purple {
+            box-shadow: 0 0 12px rgba(157, 5, 255, 0.5);
+            border-color: #9D05FF;
+        }
+
+        .glow-amber {
+            box-shadow: 0 0 12px rgba(255, 186, 32, 0.5);
+            border-color: #FFBA20;
+        }
+
+        /* Tech grid background pattern */
+        .tech-pattern {
+            background-image: 
+                linear-gradient(to right, rgba(45, 45, 53, 0.1) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(45, 45, 53, 0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="font-body-standard text-body-standard tech-pattern min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-surface flex justify-between items-center w-full px-container-padding h-16 docked full-width top-0 z-50">
+<div class="flex items-center hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined text-tertiary-fixed-dim dark:text-tertiary-fixed-dim mr-2 text-2xl">trophy</span>
+<span class="font-score-display-mobile text-score-display-mobile text-tertiary-fixed-dim dark:text-tertiary-fixed-dim tracking-tight">HANDOFF</span>
+</div>
+<div class="font-label-caps text-label-caps text-on-surface-variant flex gap-4">
+<span class="bg-surface-variant px-3 py-1 rounded text-primary-container neon-border">v1.2.0</span>
+<span class="bg-surface-variant px-3 py-1 rounded">Dev Specs</span>
+</div>
+<button class="hover:opacity-80 scale-95 transition-transform text-tertiary-fixed-dim dark:text-tertiary-fixed-dim">
+<span class="material-symbols-outlined text-2xl">settings</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow p-section-gap container mx-auto grid grid-cols-1 xl:grid-cols-12 gap-8 pb-32">
+<!-- Header Title Section -->
+<div class="col-span-full border-b border-surface-variant pb-6 mb-2">
+<h1 class="font-score-display text-score-display text-primary-container mb-2 glow-cyan drop-shadow-md inline-block">BLASTDOWN</h1>
+<p class="text-on-surface-variant text-lg max-w-2xl">Technical implementation specification for the BlastDown game engine and UI components. Strictly adhere to these tokens to maintain the 'Sophisticated Digitalism' aesthetic.</p>
+</div>
+<!-- Section 1: Color Tokens -->
+<section class="col-span-full xl:col-span-8 bg-surface-container-low rounded-xl p-6 border border-outline-variant">
+<div class="flex items-center gap-2 mb-6 border-b border-surface-variant pb-2">
+<span class="material-symbols-outlined text-primary-container">palette</span>
+<h2 class="font-timer-mono text-timer-mono text-on-surface">1. COLOR TOKENS</h2>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+<!-- Swatch macro -->
+<div class="bg-surface rounded-lg p-3 border border-outline-variant hover:border-primary-container transition-colors group">
+<div class="w-full h-12 rounded bg-[#050505] mb-2 border border-outline-variant"></div>
+<p class="font-button-text text-button-text text-on-surface">appBackground</p>
+<p class="font-label-caps text-label-caps text-on-surface-variant group-hover:text-primary-container">#050505</p>
+</div>
+<div class="bg-surface rounded-lg p-3 border border-outline-variant hover:border-primary-container transition-colors group">
+<div class="w-full h-12 rounded bg-surface mb-2 border border-outline-variant"></div>
+<p class="font-button-text text-button-text text-on-surface">surfaceBg</p>
+<p class="font-label-caps text-label-caps text-on-surface-variant group-hover:text-primary-container">#0B1326</p>
+</div>
+<div class="bg-surface rounded-lg p-3 border border-outline-variant hover:border-primary-container transition-colors group">
+<div class="w-full h-12 rounded bg-[#0F172A] mb-2 border border-outline-variant"></div>
+<p class="font-button-text text-button-text text-on-surface">boardBg</p>
+<p class="font-label-caps text-label-caps text-on-surface-variant group-hover:text-primary-container">#0F172A</p>
+</div>
+<div class="bg-surface rounded-lg p-3 border border-outline-variant hover:border-primary-container transition-colors group">
+<div class="w-full h-12 rounded bg-[#2D2D35] mb-2 border border-outline-variant"></div>
+<p class="font-button-text text-button-text text-on-surface">boardFrame</p>
+<p class="font-label-caps text-label-caps text-on-surface-variant group-hover:text-primary-container">#2D2D35</p>
+</div>
+<!-- Block Colors -->
+<div class="bg-surface rounded-lg p-3 border border-outline-variant hover:border-primary-container transition-colors group">
+<div class="w-full h-12 rounded bg-primary-container mb-2 glow-cyan"></div>
+<p class="font-button-text text-button-text text-on-surface">cyanBlock</p>
+<p class="font-label-caps text-label-caps text-on-surface-variant group-hover:text-primary-container">#00F0FF</p>
+</div>
+<div class="bg-surface rounded-lg p-3 border border-outline-variant hover:border-primary-container transition-colors group">
+<div class="w-full h-12 rounded bg-secondary-container mb-2 glow-purple"></div>
+<p class="font-button-text text-button-text text-on-surface">purpleBlock</p>
+<p class="font-label-caps text-label-caps text-on-surface-variant group-hover:text-primary-container">#9D05FF</p>
+</div>
+<div class="bg-surface rounded-lg p-3 border border-outline-variant hover:border-primary-container transition-colors group">
+<div class="w-full h-12 rounded bg-tertiary-fixed-dim mb-2 glow-amber"></div>
+<p class="font-button-text text-button-text text-on-surface">amberBlock</p>
+<p class="font-label-caps text-label-caps text-on-surface-variant group-hover:text-primary-container">#FFBA20</p>
+</div>
+<div class="bg-surface rounded-lg p-3 border border-outline-variant hover:border-primary-container transition-colors group">
+<div class="w-full h-12 rounded bg-[#FF6B00] mb-2 border border-outline-variant"></div>
+<p class="font-button-text text-button-text text-on-surface">scoreOrange</p>
+<p class="font-label-caps text-label-caps text-on-surface-variant group-hover:text-primary-container">#FF6B00</p>
+</div>
+</div>
+</section>
+<!-- Section 2: Layout Tokens -->
+<section class="col-span-full xl:col-span-4 bg-surface-container-low rounded-xl p-6 border border-outline-variant flex flex-col">
+<div class="flex items-center gap-2 mb-6 border-b border-surface-variant pb-2">
+<span class="material-symbols-outlined text-primary-container">grid_on</span>
+<h2 class="font-timer-mono text-timer-mono text-on-surface">2. LAYOUT</h2>
+</div>
+<ul class="space-y-4 flex-grow">
+<li class="flex justify-between items-center border-b border-surface-variant pb-2 border-opacity-50">
+<span class="text-on-surface-variant">Base Viewport</span>
+<span class="font-timer-mono text-primary-container text-sm">390x844</span>
+</li>
+<li class="flex justify-between items-center border-b border-surface-variant pb-2 border-opacity-50">
+<span class="text-on-surface-variant">Screen Padding</span>
+<span class="font-timer-mono text-primary-container text-sm">20px</span>
+</li>
+<li class="flex justify-between items-center border-b border-surface-variant pb-2 border-opacity-50">
+<span class="text-on-surface-variant">Board Width</span>
+<span class="font-timer-mono text-primary-container text-sm">350px (1:1)</span>
+</li>
+<li class="flex justify-between items-center border-b border-surface-variant pb-2 border-opacity-50">
+<span class="text-on-surface-variant">Cell Size</span>
+<span class="font-timer-mono text-primary-container text-sm">40px</span>
+</li>
+<li class="flex justify-between items-center border-b border-surface-variant pb-2 border-opacity-50">
+<span class="text-on-surface-variant">Grid Gutter</span>
+<span class="font-timer-mono text-primary-container text-sm">2px</span>
+</li>
+<li class="flex justify-between items-center pb-2">
+<span class="text-on-surface-variant">Frame Thickness</span>
+<span class="font-timer-mono text-primary-container text-sm">2px</span>
+</li>
+</ul>
+</section>
+<!-- Section 4: Component States -->
+<section class="col-span-full bg-surface-container-low rounded-xl p-6 border border-outline-variant">
+<div class="flex items-center gap-2 mb-6 border-b border-surface-variant pb-2">
+<span class="material-symbols-outlined text-primary-container">widgets</span>
+<h2 class="font-timer-mono text-timer-mono text-on-surface">4. COMPONENT STATES (THE TRAY)</h2>
+</div>
+<div class="flex flex-wrap gap-8 justify-center p-8 bg-[#0F172A] rounded-lg border border-[#2D2D35] inner-glow relative">
+<!-- Empty Grid Preview -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-20 h-20 grid grid-cols-2 gap-1 p-1 bg-[#2D2D35] rounded">
+<div class="bg-[#131B2E] w-full h-full rounded-sm"></div>
+<div class="bg-[#131B2E] w-full h-full rounded-sm"></div>
+<div class="bg-[#131B2E] w-full h-full rounded-sm"></div>
+<div class="bg-[#131B2E] w-full h-full rounded-sm"></div>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">Empty Matrix</span>
+</div>
+<!-- Cyan Block -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-20 h-20 flex items-center justify-center">
+<div class="w-10 h-10 glass-block text-primary-container glow-cyan rounded flex items-center justify-center font-timer-mono text-lg">
+                            1
+                        </div>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">Cyan Node</span>
+</div>
+<!-- Purple Block connected -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-20 h-20 flex items-center justify-center relative">
+<!-- Horizontal connection -->
+<div class="w-20 h-10 glass-block text-secondary-container glow-purple rounded flex items-center justify-center font-timer-mono text-lg relative z-10">
+                            2
+                        </div>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">Connected</span>
+</div>
+<!-- Power-up Inactive -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-20 h-20 flex items-center justify-center">
+<div class="w-12 h-12 rounded-full border border-[#2D2D35] bg-transparent flex items-center justify-center text-outline-variant">
+<span class="material-symbols-outlined">bolt</span>
+</div>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">Inactive Power</span>
+</div>
+<!-- Power-up Active -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-20 h-20 flex items-center justify-center">
+<div class="w-12 h-12 rounded-full bg-primary-container glow-cyan flex items-center justify-center text-[#050505]">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">Charged Power</span>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-center gap-section-gap pb-10 bg-transparent pointer-events-none md:hidden">
+<!-- Replicated from JSON for Mobile layout integrity -->
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full p-stack-sm ring-1 ring-primary scale-90 duration-100 pointer-events-auto">
+<span class="material-symbols-outlined text-2xl">ac_unit</span>
+</button>
+<button class="flex flex-col items-center justify-center text-outline border border-outline-variant rounded-full p-stack-sm hover:bg-surface-container-highest transition-colors pointer-events-auto">
+<span class="material-symbols-outlined text-2xl">bolt</span>
+</button>
+</nav>
+</body></html>

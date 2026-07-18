@@ -1,0 +1,43 @@
+.grid-bg {
+            background-color: #0F172A; /* Requested in prompt for grid container */
+        }
+        .grid-border {
+            border-color: #2D2D35; /* Graphite */
+        }
+        
+        .pulse-red {
+            animation: pulseRed 1s infinite alternate;
+        }
+        @keyframes pulseRed {
+            0% { box-shadow: inset 0 0 0 1px #FF003D, 0 0 10px rgba(255, 0, 61, 0.5); border-color: #FF003D; }
+            100% { box-shadow: inset 0 0 0 1px #FF003D, 0 0 20px rgba(255, 0, 61, 0.9); border-color: #FF003D; }
+        }
+
+        .row-highlight {
+            background-color: rgba(0, 240, 255, 0.15); /* primary-container with opacity */
+            box-shadow: inset 0 0 0 1px #00f0ff;
+        }
+        
+        .glow-cyan {
+            box-shadow: inset 0 0 0 1px #00f0ff, 0 0 12px rgba(0, 240, 255, 0.6);
+            background-color: rgba(255,255,255,0.1);
+            backdrop-filter: blur(16px);
+        }
+        
+        .glass-purple {
+            background-color: rgba(255,255,255,0.1);
+            backdrop-filter: blur(16px);
+            box-shadow: inset 0 0 0 1px #dfb7ff; /* secondary-fixed-dim */
+        }
+        
+        .glass-red {
+            background-color: rgba(255,255,255,0.1);
+            backdrop-filter: blur(16px);
+            /* Red handled by pulse-red */
+        }
+
+/* --- next <style> block --- */
+
+body {
+      min-height: max(884px, 100dvh);
+    }

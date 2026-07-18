@@ -1,0 +1,35 @@
+{
+  "stitchProjectId": "4472195625883229066",
+  "stitchScreenId": "15c8212f1ece4e1d992306a1af1fe90a",
+  "screenTitle": "Tutorial - Countdown Mechanics",
+  "retrievalTimestamp": "2026-07-17T22:18:15.155Z",
+  "files": [
+    {
+      "localFilename": "screen.png",
+      "fileType": "image/png",
+      "originalHostedUrl": "https://lh3.googleusercontent.com/aida/AP1WRLtRLGmrGkzTHhS5H...(redacted-token)",
+      "sizeBytes": 19250,
+      "sha256": "0068d3f9e263c0caecc0855f41d0d4376ec653b212dc497e99033ee1012064e6",
+      "retrievalStatus": "success",
+      "notes": "Stitch-rendered screenshot of the approved screen."
+    },
+    {
+      "localFilename": "source.html",
+      "fileType": "text/html",
+      "originalHostedUrl": "https://contribution.usercontent.google.com/download...(redacted-token)",
+      "sizeBytes": 8615,
+      "sha256": "04093730c9539b7ab93586004217feeb0c6fa96decf22827b5a8f9fda02d4eef",
+      "retrievalStatus": "success",
+      "notes": "Raw Stitch-generated HTML (Tailwind CDN script + Google Fonts links + inline <style> blocks). Reference only — not executed, not imported into the app."
+    },
+    {
+      "localFilename": "styles.css",
+      "fileType": "text/css",
+      "originalHostedUrl": "(extracted locally from source.html <style> blocks; not a separately hosted file)",
+      "sizeBytes": 518,
+      "sha256": "edf0004b1e3168f9da9f61224d1d5643e6b30b58d06e7b0d9be8fb2b5e47aa16",
+      "retrievalStatus": "success",
+      "notes": "Concatenation of the <style> blocks found in source.html, for easier diffing."
+    }
+  ]
+}

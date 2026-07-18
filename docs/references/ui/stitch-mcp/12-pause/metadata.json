@@ -1,0 +1,35 @@
+{
+  "stitchProjectId": "4472195625883229066",
+  "stitchScreenId": "423814e93f61437aaf299f425335cd75",
+  "screenTitle": "Pause Overlay",
+  "retrievalTimestamp": "2026-07-17T22:18:15.155Z",
+  "files": [
+    {
+      "localFilename": "screen.png",
+      "fileType": "image/png",
+      "originalHostedUrl": "https://lh3.googleusercontent.com/aida/AP1WRLu4uVMqcLZUpCAq0...(redacted-token)",
+      "sizeBytes": 20890,
+      "sha256": "be48d50fc0001574d12dc33fff11eff866fd53ac53ea1e9fe798816f41b93bfc",
+      "retrievalStatus": "success",
+      "notes": "Stitch-rendered screenshot of the approved screen."
+    },
+    {
+      "localFilename": "source.html",
+      "fileType": "text/html",
+      "originalHostedUrl": "https://contribution.usercontent.google.com/download...(redacted-token)",
+      "sizeBytes": 15570,
+      "sha256": "def44f95da8fcd3964aff410a7d5a2d286f25db0a24b0ba890103bca43da8123",
+      "retrievalStatus": "success",
+      "notes": "Raw Stitch-generated HTML (Tailwind CDN script + Google Fonts links + inline <style> blocks). Reference only — not executed, not imported into the app."
+    },
+    {
+      "localFilename": "styles.css",
+      "fileType": "text/css",
+      "originalHostedUrl": "(extracted locally from source.html <style> blocks; not a separately hosted file)",
+      "sizeBytes": 2510,
+      "sha256": "c176e5e75580edcb8643dec12a76c24d9baa7a6fce0263c5c687fd905b453f9c",
+      "retrievalStatus": "success",
+      "notes": "Concatenation of the <style> blocks found in source.html, for easier diffing."
+    }
+  ]
+}

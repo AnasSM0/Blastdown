@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>BlastDown - Paused</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-surface-variant": "#b9cacb",
+                    "background": "#0b1326",
+                    "secondary-fixed": "#f1daff",
+                    "on-primary-fixed": "#002022",
+                    "on-secondary-container": "#f7e6ff",
+                    "secondary-fixed-dim": "#dfb7ff",
+                    "on-tertiary-fixed": "#271900",
+                    "on-background": "#dae2fd",
+                    "primary-fixed-dim": "#00dbe9",
+                    "surface-dim": "#0b1326",
+                    "surface-container-low": "#131b2e",
+                    "surface-bright": "#31394d",
+                    "tertiary-container": "#ffd386",
+                    "on-error-container": "#ffdad6",
+                    "tertiary-fixed-dim": "#ffba20",
+                    "surface-container-high": "#222a3d",
+                    "on-tertiary": "#412d00",
+                    "surface-container": "#171f33",
+                    "primary-container": "#00f0ff",
+                    "secondary": "#dfb7ff",
+                    "inverse-primary": "#006970",
+                    "primary": "#dbfcff",
+                    "on-primary": "#00363a",
+                    "error-container": "#93000a",
+                    "on-tertiary-fixed-variant": "#5e4200",
+                    "surface-variant": "#2d3449",
+                    "secondary-container": "#9d05ff",
+                    "outline": "#849495",
+                    "tertiary-fixed": "#ffdea8",
+                    "surface-container-highest": "#2d3449",
+                    "on-surface": "#dae2fd",
+                    "on-secondary": "#4b007e",
+                    "on-error": "#690005",
+                    "surface-tint": "#00dbe9",
+                    "on-secondary-fixed": "#2d004f",
+                    "primary-fixed": "#7df4ff",
+                    "error": "#ffb4ab",
+                    "surface-container-lowest": "#060e20",
+                    "surface": "#0b1326",
+                    "inverse-on-surface": "#283044",
+                    "inverse-surface": "#dae2fd",
+                    "outline-variant": "#3b494b",
+                    "on-primary-fixed-variant": "#004f54",
+                    "on-primary-container": "#006970",
+                    "on-tertiary-container": "#7d5800",
+                    "on-secondary-fixed-variant": "#6b00b0",
+                    "tertiary": "#fff4e8"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "container-padding": "20px",
+                    "stack-xs": "4px",
+                    "stack-sm": "8px",
+                    "grid-cell": "40px",
+                    "section-gap": "32px",
+                    "grid-gutter": "2px"
+            },
+            "fontFamily": {
+                    "score-display": [
+                            "JetBrains Mono"
+                    ],
+                    "body-standard": [
+                            "Geist"
+                    ],
+                    "label-caps": [
+                            "Geist"
+                    ],
+                    "timer-mono": [
+                            "JetBrains Mono"
+                    ],
+                    "button-text": [
+                            "Geist"
+                    ],
+                    "score-display-mobile": [
+                            "JetBrains Mono"
+                    ]
+            },
+            "fontSize": {
+                    "score-display": [
+                            "48px",
+                            {
+                                    "lineHeight": "48px",
+                                    "letterSpacing": "-0.05em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "body-standard": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "label-caps": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.1em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "timer-mono": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "button-text": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "letterSpacing": "0.02em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "score-display-mobile": [
+                            "36px",
+                            {
+                                    "lineHeight": "36px",
+                                    "fontWeight": "700"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+        /* Custom styles for the futuristic arcade aesthetic */
+        body {
+            background-color: #050505; /* Matte black base */
+        }
+        
+        .bg-gameboard {
+            /* Simulated background image - this would normally be {{DATA:SCREEN:SCREEN_24}} */
+            background-image: linear-gradient(to bottom, rgba(11, 19, 38, 0.8), rgba(11, 19, 38, 0.9)), repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(45, 45, 53, 0.3) 39px, rgba(45, 45, 53, 0.3) 40px), repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(45, 45, 53, 0.3) 39px, rgba(45, 45, 53, 0.3) 40px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+        }
+
+        .glass-panel {
+            background: rgba(23, 31, 51, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 219, 233, 0.2); /* Subtle cyan border */
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5), 0 10px 30px rgba(0, 0, 0, 0.8);
+        }
+
+        .neon-glow-primary {
+            box-shadow: 0 0 12px rgba(0, 219, 233, 0.4);
+        }
+
+        .neon-glow-accent {
+            box-shadow: 0 0 12px rgba(255, 186, 32, 0.4); /* Tertiary fixed dim (orange-ish) */
+        }
+
+        .text-glow-accent {
+            text-shadow: 0 0 8px rgba(255, 186, 32, 0.6);
+        }
+
+        /* Custom Toggle Switch Styles */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #00dbe9;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #00dbe9;
+        }
+        .toggle-checkbox:checked + .toggle-label:after {
+            transform: translateX(100%);
+            border-color: white;
+        }
+        .toggle-label {
+            width: 3rem;
+            height: 1.5rem;
+            background-color: #2d3449; /* surface-variant */
+            border-radius: 9999px;
+            position: relative;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            border: 1px solid #3b494b; /* outline-variant */
+        }
+        .toggle-label:after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 1.25rem;
+            height: 1.25rem;
+            background-color: #dae2fd; /* on-surface */
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body-standard text-body-standard text-on-surface h-screen w-screen overflow-hidden flex items-center justify-center">
+<!-- Gameplay Background (Darkened) -->
+<div class="absolute inset-0 bg-gameboard z-0 flex flex-col items-center justify-center pointer-events-none">
+<!-- Mock 8x8 Grid for visual context -->
+<div class="grid grid-cols-8 gap-[1px] bg-[#2D2D35] p-[1px] opacity-20">
+<!-- Generate 64 cells -->
+<script>
+                for(let i=0; i<64; i++) {
+                    document.write('<div class="w-[40px] h-[40px] bg-[#0F172A]"></div>');
+                }
+            </script>
+</div>
+</div>
+<!-- Pause Overlay -->
+<div class="absolute inset-0 bg-black/60 backdrop-blur-sm z-10"></div>
+<!-- Central Pause Panel -->
+<div class="relative z-20 w-full max-w-sm mx-auto glass-panel rounded-xl p-8 flex flex-col items-center gap-8 animate-[scaleIn_0.2s_ease-out]">
+<!-- Header -->
+<div class="text-center">
+<h1 class="font-score-display-mobile text-score-display-mobile text-primary-fixed-dim tracking-widest uppercase">Paused</h1>
+<div class="h-px w-24 mx-auto bg-gradient-to-r from-transparent via-primary-fixed-dim to-transparent mt-2 opacity-50"></div>
+</div>
+<!-- Primary Action -->
+<button class="w-full relative group overflow-hidden rounded-lg bg-surface-container-high border border-primary-fixed-dim p-[1px] neon-glow-primary transition-transform active:scale-95">
+<div class="absolute inset-0 bg-primary-fixed-dim/10 group-hover:bg-primary-fixed-dim/20 transition-colors"></div>
+<div class="relative flex items-center justify-center gap-3 py-4 px-6 bg-surface-container-high rounded-md">
+<span class="material-symbols-outlined text-tertiary-fixed-dim" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+<span class="font-button-text text-button-text text-tertiary-fixed-dim tracking-wider uppercase text-glow-accent">Resume</span>
+</div>
+</button>
+<!-- Settings Grid -->
+<div class="w-full flex flex-col gap-4 bg-surface-container-low border border-outline-variant p-4 rounded-lg">
+<!-- Sound Toggle -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3 text-on-surface-variant">
+<span class="material-symbols-outlined">volume_up</span>
+<span class="font-label-caps text-label-caps uppercase">Sound Effects</span>
+</div>
+<div class="relative inline-block w-12 align-middle select-none transition duration-200 ease-in">
+<input checked="" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer opacity-0 z-10" id="toggle-sound" name="toggle-sound" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-surface-variant cursor-pointer" for="toggle-sound"></label>
+</div>
+</div>
+<div class="h-px w-full bg-outline-variant/50"></div>
+<!-- Music Toggle -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3 text-on-surface-variant">
+<span class="material-symbols-outlined">music_note</span>
+<span class="font-label-caps text-label-caps uppercase">Music</span>
+</div>
+<div class="relative inline-block w-12 align-middle select-none transition duration-200 ease-in">
+<input checked="" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer opacity-0 z-10" id="toggle-music" name="toggle-music" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-surface-variant cursor-pointer" for="toggle-music"></label>
+</div>
+</div>
+<div class="h-px w-full bg-outline-variant/50"></div>
+<!-- Haptics Toggle -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3 text-on-surface-variant">
+<span class="material-symbols-outlined">vibration</span>
+<span class="font-label-caps text-label-caps uppercase">Haptics</span>
+</div>
+<div class="relative inline-block w-12 align-middle select-none transition duration-200 ease-in">
+<input checked="" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer opacity-0 z-10" id="toggle-haptics" name="toggle-haptics" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-surface-variant cursor-pointer" for="toggle-haptics"></label>
+</div>
+</div>
+<div class="h-px w-full bg-outline-variant/50"></div>
+<!-- Reduced Motion Toggle -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3 text-on-surface-variant">
+<span class="material-symbols-outlined">animation</span>
+<span class="font-label-caps text-label-caps uppercase">Reduced Motion</span>
+</div>
+<div class="relative inline-block w-12 align-middle select-none transition duration-200 ease-in">
+<input class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer opacity-0 z-10" id="toggle-motion" name="toggle-motion" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-surface-variant cursor-pointer" for="toggle-motion"></label>
+</div>
+</div>
+</div>
+<!-- Secondary Actions -->
+<div class="w-full flex gap-4 mt-2">
+<button class="flex-1 flex flex-col items-center justify-center gap-2 py-3 bg-surface-container-highest border border-outline-variant rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-bright hover:border-outline transition-colors active:scale-95">
+<span class="material-symbols-outlined">replay</span>
+<span class="font-label-caps text-label-caps">Restart</span>
+</button>
+<button class="flex-1 flex flex-col items-center justify-center gap-2 py-3 bg-surface-container-highest border border-outline-variant rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-bright hover:border-outline transition-colors active:scale-95">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-caps text-label-caps">Home</span>
+</button>
+</div>
+</div>
+<script>
+        // Simple scale-in animation keyframes for Tailwind
+        tailwind.config.theme.extend.keyframes = {
+            scaleIn: {
+                '0%': { transform: 'scale(0.95)', opacity: '0' },
+                '100%': { transform: 'scale(1)', opacity: '1' },
+            }
+        };
+        
+        // Add minimal interactivity for toggles (visual only since CSS handles state, this just adds a subtle click effect)
+        document.querySelectorAll('.toggle-checkbox').forEach(toggle => {
+            toggle.addEventListener('change', (e) => {
+                const label = e.target.nextElementSibling;
+                label.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    label.style.transform = 'scale(1)';
+                }, 100);
+            });
+        });
+    </script>
+</body></html>

@@ -1,0 +1,44 @@
+{
+  "stitchProjectId": "4472195625883229066",
+  "stitchScreenId": "405dffa567df43a5960bed056de259ce",
+  "screenTitle": "Game Over - Revive & Continue",
+  "retrievalTimestamp": "2026-07-17T22:18:15.155Z",
+  "files": [
+    {
+      "localFilename": "screen.png",
+      "fileType": "image/png",
+      "originalHostedUrl": "https://lh3.googleusercontent.com/aida/AP1WRLuXE2ns_Bz38-KZE...(redacted-token)",
+      "sizeBytes": 21223,
+      "sha256": "dad5ba9be403de549bfb5e4fa5fab58291dfea1d54e29ee715ccb1b74dc88c31",
+      "retrievalStatus": "success",
+      "notes": "Stitch-rendered screenshot of the approved screen."
+    },
+    {
+      "localFilename": "source.html",
+      "fileType": "text/html",
+      "originalHostedUrl": "https://contribution.usercontent.google.com/download...(redacted-token)",
+      "sizeBytes": 9958,
+      "sha256": "27369ae120f2e5ee08180b7c6cd62f38c901f75806a2b88434a8e7686bf3a936",
+      "retrievalStatus": "success",
+      "notes": "Raw Stitch-generated HTML (Tailwind CDN script + Google Fonts links + inline <style> blocks). Reference only — not executed, not imported into the app."
+    },
+    {
+      "localFilename": "styles.css",
+      "fileType": "text/css",
+      "originalHostedUrl": "(extracted locally from source.html <style> blocks; not a separately hosted file)",
+      "sizeBytes": 376,
+      "sha256": "2629f4bced8a5d74e08b866a31dbd4881ceff4fa9fab38e3024f4a26bed1c3ce",
+      "retrievalStatus": "success",
+      "notes": "Concatenation of the <style> blocks found in source.html, for easier diffing."
+    },
+    {
+      "localFilename": "assets/background.jpg",
+      "fileType": "image/jpeg",
+      "originalHostedUrl": "(see source.html <img> reference; googleusercontent CDN, token redacted)",
+      "sizeBytes": 10298,
+      "sha256": "9f498c62e918719f043267f0266bcff5e9015b8eeb51c39ade3fa7532e355a0e",
+      "retrievalStatus": "success",
+      "notes": "Background image referenced by an <img> tag in source.html."
+    }
+  ]
+}

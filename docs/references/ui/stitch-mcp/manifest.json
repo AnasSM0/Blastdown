@@ -1,0 +1,217 @@
+{
+  "stitchProjectId": "4472195625883229066",
+  "stitchProjectTitle": "BlastDown Puzzle UI Design",
+  "snapshotCreated": "2026-07-17T22:18:15.155Z",
+  "designTheme": "Tactile Logic (LIGHT mode, Geist font) — per project design system; individual screens use varied visual treatments (see audit)",
+  "totalScreens": 16,
+  "screens": [
+    {
+      "order": 1,
+      "folder": "01-selection-preview",
+      "stitchScreenId": "12afe7227bc24664a2c12edae16bf555",
+      "title": "Gameplay - Selection & Preview Interaction",
+      "localPaths": {
+        "screenshot": "01-selection-preview/screen.png",
+        "html": "01-selection-preview/source.html",
+        "css": "01-selection-preview/styles.css",
+        "metadata": "01-selection-preview/metadata.json",
+        "assets": null
+      }
+    },
+    {
+      "order": 2,
+      "folder": "02-invalid-placement",
+      "stitchScreenId": "df01c1a2dbb54c9392d2b88079f0d516",
+      "title": "Gameplay - Invalid Placement Preview",
+      "localPaths": {
+        "screenshot": "02-invalid-placement/screen.png",
+        "html": "02-invalid-placement/source.html",
+        "css": "02-invalid-placement/styles.css",
+        "metadata": "02-invalid-placement/metadata.json",
+        "assets": null
+      }
+    },
+    {
+      "order": 3,
+      "folder": "03-critical-countdown",
+      "stitchScreenId": "cd0a83bda0b447e2b539a771c5270ec0",
+      "title": "Gameplay - Critical State (Countdown 1)",
+      "localPaths": {
+        "screenshot": "03-critical-countdown/screen.png",
+        "html": "03-critical-countdown/source.html",
+        "css": "03-critical-countdown/styles.css",
+        "metadata": "03-critical-countdown/metadata.json",
+        "assets": null
+      }
+    },
+    {
+      "order": 4,
+      "folder": "04-defuse-animation",
+      "stitchScreenId": "19a579071a9f4b10bf501a6f2113bd14",
+      "title": "Gameplay - Defuse Animation",
+      "localPaths": {
+        "screenshot": "04-defuse-animation/screen.png",
+        "html": "04-defuse-animation/source.html",
+        "css": "04-defuse-animation/styles.css",
+        "metadata": "04-defuse-animation/metadata.json",
+        "assets": null
+      }
+    },
+    {
+      "order": 5,
+      "folder": "05-defuse-success",
+      "stitchScreenId": "71e151ea6120478892041f1316b3c281",
+      "title": "Gameplay - Defuse Success",
+      "localPaths": {
+        "screenshot": "05-defuse-success/screen.png",
+        "html": "05-defuse-success/source.html",
+        "css": "05-defuse-success/styles.css",
+        "metadata": "05-defuse-success/metadata.json",
+        "assets": null
+      }
+    },
+    {
+      "order": 6,
+      "folder": "06-results",
+      "stitchScreenId": "f2f914b13be9490d83a7e2cb26001cba",
+      "title": "Final Results - Run Complete",
+      "localPaths": {
+        "screenshot": "06-results/screen.png",
+        "html": "06-results/source.html",
+        "css": "06-results/styles.css",
+        "metadata": "06-results/metadata.json",
+        "assets": null
+      }
+    },
+    {
+      "order": 7,
+      "folder": "07-defuse-action",
+      "stitchScreenId": "3a1272645f4444a5983f09133915c60d",
+      "title": "Gameplay - Defuse Action Preview",
+      "localPaths": {
+        "screenshot": "07-defuse-action/screen.png",
+        "html": "07-defuse-action/source.html",
+        "css": "07-defuse-action/styles.css",
+        "metadata": "07-defuse-action/metadata.json",
+        "assets": null
+      }
+    },
+    {
+      "order": 8,
+      "folder": "08-game-over-revive",
+      "stitchScreenId": "405dffa567df43a5960bed056de259ce",
+      "title": "Game Over - Revive & Continue",
+      "localPaths": {
+        "screenshot": "08-game-over-revive/screen.png",
+        "html": "08-game-over-revive/source.html",
+        "css": "08-game-over-revive/styles.css",
+        "metadata": "08-game-over-revive/metadata.json",
+        "assets": "08-game-over-revive/assets/"
+      }
+    },
+    {
+      "order": 9,
+      "folder": "09-freeze-active",
+      "stitchScreenId": "973fddeede9c4503862e1f7e562e5cb5",
+      "title": "Gameplay - Freeze Timers Active",
+      "localPaths": {
+        "screenshot": "09-freeze-active/screen.png",
+        "html": "09-freeze-active/source.html",
+        "css": "09-freeze-active/styles.css",
+        "metadata": "09-freeze-active/metadata.json",
+        "assets": null
+      }
+    },
+    {
+      "order": 10,
+      "folder": "10-second-chance",
+      "stitchScreenId": "07e42f1c67374e4f9b7ec63e058f754f",
+      "title": "Gameplay - Second Chance Revive",
+      "localPaths": {
+        "screenshot": "10-second-chance/screen.png",
+        "html": "10-second-chance/source.html",
+        "css": "10-second-chance/styles.css",
+        "metadata": "10-second-chance/metadata.json",
+        "assets": null
+      }
+    },
+    {
+      "order": 11,
+      "folder": "11-home",
+      "stitchScreenId": "e3cfcb7dddc44bdd845987c9c75db495",
+      "title": "Home Screen - Neon Reactor Minimal",
+      "localPaths": {
+        "screenshot": "11-home/screen.png",
+        "html": "11-home/source.html",
+        "css": "11-home/styles.css",
+        "metadata": "11-home/metadata.json",
+        "assets": null
+      }
+    },
+    {
+      "order": 12,
+      "folder": "12-pause",
+      "stitchScreenId": "423814e93f61437aaf299f425335cd75",
+      "title": "Pause Overlay",
+      "localPaths": {
+        "screenshot": "12-pause/screen.png",
+        "html": "12-pause/source.html",
+        "css": "12-pause/styles.css",
+        "metadata": "12-pause/metadata.json",
+        "assets": null
+      }
+    },
+    {
+      "order": 13,
+      "folder": "13-tutorial-rubble",
+      "stitchScreenId": "5ce73c24057f499a880f0ba687803a88",
+      "title": "Tutorial - Clearing Rubble",
+      "localPaths": {
+        "screenshot": "13-tutorial-rubble/screen.png",
+        "html": "13-tutorial-rubble/source.html",
+        "css": "13-tutorial-rubble/styles.css",
+        "metadata": "13-tutorial-rubble/metadata.json",
+        "assets": null
+      }
+    },
+    {
+      "order": 14,
+      "folder": "14-tutorial-defuse",
+      "stitchScreenId": "28798208ef1c427eba655d90a7808319",
+      "title": "Tutorial - Defuse Strategy",
+      "localPaths": {
+        "screenshot": "14-tutorial-defuse/screen.png",
+        "html": "14-tutorial-defuse/source.html",
+        "css": "14-tutorial-defuse/styles.css",
+        "metadata": "14-tutorial-defuse/metadata.json",
+        "assets": null
+      }
+    },
+    {
+      "order": 15,
+      "folder": "15-tutorial-countdown",
+      "stitchScreenId": "15c8212f1ece4e1d992306a1af1fe90a",
+      "title": "Tutorial - Countdown Mechanics",
+      "localPaths": {
+        "screenshot": "15-tutorial-countdown/screen.png",
+        "html": "15-tutorial-countdown/source.html",
+        "css": "15-tutorial-countdown/styles.css",
+        "metadata": "15-tutorial-countdown/metadata.json",
+        "assets": null
+      }
+    },
+    {
+      "order": 16,
+      "folder": "16-developer-handoff",
+      "stitchScreenId": "20c68f329e964445b901d1306f888753",
+      "title": "Developer Handoff - Neon Reactor Minimal",
+      "localPaths": {
+        "screenshot": "16-developer-handoff/screen.png",
+        "html": "16-developer-handoff/source.html",
+        "css": "16-developer-handoff/styles.css",
+        "metadata": "16-developer-handoff/metadata.json",
+        "assets": null
+      }
+    }
+  ]
+}

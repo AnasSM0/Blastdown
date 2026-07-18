@@ -1,0 +1,35 @@
+{
+  "stitchProjectId": "4472195625883229066",
+  "stitchScreenId": "f2f914b13be9490d83a7e2cb26001cba",
+  "screenTitle": "Final Results - Run Complete",
+  "retrievalTimestamp": "2026-07-17T22:18:15.155Z",
+  "files": [
+    {
+      "localFilename": "screen.png",
+      "fileType": "image/png",
+      "originalHostedUrl": "https://lh3.googleusercontent.com/aida/AP1WRLtAkzXnBAqpt2znq...(redacted-token)",
+      "sizeBytes": 31053,
+      "sha256": "0e74d2962cbec363ebddfe4e53e3e9349b57ec7c5677faf461dd6220621eea85",
+      "retrievalStatus": "success",
+      "notes": "Stitch-rendered screenshot of the approved screen."
+    },
+    {
+      "localFilename": "source.html",
+      "fileType": "text/html",
+      "originalHostedUrl": "https://contribution.usercontent.google.com/download...(redacted-token)",
+      "sizeBytes": 13979,
+      "sha256": "947670f7775f1402d40229bb965120d21e7ac7216993156813c4e67ade6dc2c2",
+      "retrievalStatus": "success",
+      "notes": "Raw Stitch-generated HTML (Tailwind CDN script + Google Fonts links + inline <style> blocks). Reference only — not executed, not imported into the app."
+    },
+    {
+      "localFilename": "styles.css",
+      "fileType": "text/css",
+      "originalHostedUrl": "(extracted locally from source.html <style> blocks; not a separately hosted file)",
+      "sizeBytes": 1630,
+      "sha256": "9c27a3304b2125f1f242580afbb8b5181a1d347a9c1d3da481b8db577c66add8",
+      "retrievalStatus": "success",
+      "notes": "Concatenation of the <style> blocks found in source.html, for easier diffing."
+    }
+  ]
+}

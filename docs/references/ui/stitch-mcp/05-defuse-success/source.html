@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>BlastDown - Defuse State</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-tint": "#00dbe9",
+                        "on-surface-variant": "#b9cacb",
+                        "on-primary-fixed": "#002022",
+                        "inverse-primary": "#006970",
+                        "tertiary-fixed-dim": "#ffba20",
+                        "primary-fixed": "#7df4ff",
+                        "outline": "#849495",
+                        "on-secondary-fixed": "#2d004f",
+                        "primary-container": "#00f0ff",
+                        "secondary-container": "#9d05ff",
+                        "on-secondary-container": "#f7e6ff",
+                        "inverse-surface": "#dae2fd",
+                        "outline-variant": "#3b494b",
+                        "on-error-container": "#ffdad6",
+                        "surface-dim": "#0b1326",
+                        "surface-bright": "#31394d",
+                        "on-tertiary": "#412d00",
+                        "tertiary-fixed": "#ffdea8",
+                        "tertiary-container": "#ffd386",
+                        "secondary": "#dfb7ff",
+                        "on-primary-container": "#006970",
+                        "secondary-fixed": "#f1daff",
+                        "on-tertiary-fixed-variant": "#5e4200",
+                        "on-primary-fixed-variant": "#004f54",
+                        "on-background": "#dae2fd",
+                        "error": "#ffb4ab",
+                        "primary": "#dbfcff",
+                        "inverse-on-surface": "#283044",
+                        "surface-container-high": "#222a3d",
+                        "error-container": "#93000a",
+                        "tertiary": "#fff4e8",
+                        "surface": "#0b1326",
+                        "surface-container-low": "#131b2e",
+                        "surface-container-lowest": "#060e20",
+                        "on-tertiary-fixed": "#271900",
+                        "on-error": "#690005",
+                        "secondary-fixed-dim": "#dfb7ff",
+                        "surface-variant": "#2d3449",
+                        "surface-container-highest": "#2d3449",
+                        "on-secondary-fixed-variant": "#6b00b0",
+                        "primary-fixed-dim": "#00dbe9",
+                        "on-surface": "#dae2fd",
+                        "on-secondary": "#4b007e",
+                        "background": "#0b1326",
+                        "on-primary": "#00363a",
+                        "surface-container": "#171f33",
+                        "on-tertiary-container": "#7d5800"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    spacing: {
+                        "section-gap": "32px",
+                        "stack-xs": "4px",
+                        "grid-cell": "40px",
+                        "container-padding": "20px",
+                        "stack-sm": "8px",
+                        "grid-gutter": "2px"
+                    },
+                    fontFamily: {
+                        "timer-mono": ["JetBrains Mono"],
+                        "button-text": ["Geist"],
+                        "score-display": ["JetBrains Mono"],
+                        "label-caps": ["Geist"],
+                        "score-display-mobile": ["JetBrains Mono"],
+                        "body-standard": ["Geist"]
+                    },
+                    fontSize: {
+                        "timer-mono": ["24px", { "lineHeight": "32px", "fontWeight": "500" }],
+                        "button-text": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "600" }],
+                        "score-display": ["48px", { "lineHeight": "48px", "letterSpacing": "-0.05em", "fontWeight": "700" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "600" }],
+                        "score-display-mobile": ["36px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "body-standard": ["16px", { "lineHeight": "24px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #050505; /* Deep matte black base override for reactor feel */
+        }
+        
+        /* Inner Glows & Glassmorphism */
+        .glass-block {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+        
+        .glow-primary {
+            box-shadow: inset 0 0 12px rgba(0, 240, 255, 0.3), 0 0 8px rgba(0, 240, 255, 0.2);
+        }
+        
+        .glow-secondary {
+            box-shadow: inset 0 0 12px rgba(157, 5, 255, 0.3);
+        }
+
+        /* Defuse Animation Sequence */
+        @keyframes sweepIllumination {
+            0% { background-color: rgba(0, 240, 255, 0.1); border-color: rgba(0, 240, 255, 0.5); }
+            30% { background-color: rgba(255, 255, 255, 0.8); border-color: #fff; box-shadow: 0 0 20px #00f0ff, inset 0 0 20px #00f0ff; transform: scale(1.05); z-index: 10; }
+            100% { background-color: rgba(0, 240, 255, 0.2); border-color: #00f0ff; box-shadow: 0 0 10px #00f0ff; transform: scale(1); z-index: 10; }
+        }
+
+        @keyframes dissolveParticle {
+            0% { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg); }
+            100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0.2) rotate(90deg); }
+        }
+
+        @keyframes crackAndShrink {
+            0% { transform: scale(1); filter: brightness(1) saturate(1); box-shadow: 0 0 10px #9d05ff; }
+            40% { transform: scale(1.2) rotate(5deg); filter: brightness(2) saturate(2); box-shadow: 0 0 30px #00f0ff; border-color: #00f0ff; color: #00f0ff; }
+            100% { transform: scale(0); opacity: 0; filter: brightness(3); }
+        }
+
+        @keyframes floatFeedback {
+            0% { opacity: 0; transform: translate(-50%, 20px) scale(0.8); }
+            20% { opacity: 1; transform: translate(-50%, -10px) scale(1.1); text-shadow: 0 0 15px #00f0ff, 0 0 30px #fff; }
+            80% { opacity: 1; transform: translate(-50%, -30px) scale(1); text-shadow: 0 0 10px #00f0ff; }
+            100% { opacity: 0; transform: translate(-50%, -40px) scale(0.9); }
+        }
+
+        @keyframes scoreBump {
+            0% { transform: scale(1); color: #ffba20; text-shadow: none; }
+            50% { transform: scale(1.1); color: #fff; text-shadow: 0 0 20px #ffba20; }
+            100% { transform: scale(1); color: #ffba20; text-shadow: 0 0 8px rgba(255, 186, 32, 0.5); }
+        }
+
+        /* Class Assignments */
+        .defusing-cell {
+            animation: sweepIllumination 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            position: relative;
+        }
+
+        .cracking-badge {
+            animation: crackAndShrink 0.5s ease-in forwards;
+            transition: border-color 0.3s ease;
+        }
+
+        .floating-feedback {
+            position: absolute;
+            left: 50%;
+            top: 45%; /* Positioned near row 5 */
+            pointer-events: none;
+            z-index: 50;
+            animation: floatFeedback 1.5s ease-out forwards;
+            white-space: nowrap;
+        }
+        
+        .score-active {
+            animation: scoreBump 0.5s ease-out forwards;
+        }
+
+        .particle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background-color: #00f0ff;
+            border-radius: 1px;
+            pointer-events: none;
+            animation: dissolveParticle 0.8s ease-out forwards;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="text-on-surface flex flex-col h-screen w-full max-w-md mx-auto overflow-hidden relative font-body-standard">
+<!-- HUD / TopAppBar Customization -->
+<header class="flex justify-between items-center w-full px-container-padding h-24 pt-8 z-20 shrink-0">
+<div class="flex flex-col items-start w-24">
+<span class="font-label-caps text-label-caps text-outline tracking-widest">BEST</span>
+<span class="font-timer-mono text-timer-mono text-on-surface-variant opacity-80">14,200</span>
+</div>
+<div class="flex flex-col items-center flex-1">
+<span class="font-score-display-mobile text-score-display-mobile text-tertiary-fixed-dim tracking-tighter score-active">4,320</span>
+</div>
+<div class="flex justify-end w-24">
+<button class="text-outline hover:text-primary-fixed transition-colors p-2 scale-95 hover:scale-100">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 0;">pause</span>
+</button>
+</div>
+</header>
+<!-- Floating Feedback Label -->
+<div class="floating-feedback font-button-text text-button-text text-white">
+        DEFUSED +70
+    </div>
+<!-- Main Game Area -->
+<main class="flex-1 flex flex-col items-center justify-center px-container-padding relative w-full z-10">
+<!-- The Core (8x8 Grid) -->
+<div class="w-full aspect-square bg-surface-container-low border border-outline-variant p-2 rounded-xl relative shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]">
+<div class="grid grid-cols-8 grid-rows-8 gap-grid-gutter w-full h-full relative" id="grid-container">
+<!-- Grid Cells injected via JS for brevity and precise layout, except the target row -->
+</div>
+</div>
+<!-- Combo Indicator -->
+<div class="mt-6 flex items-center justify-center gap-2 text-primary-container">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+<span class="font-label-caps text-label-caps tracking-widest font-bold">COMBO x3</span>
+</div>
+<!-- The Tray -->
+<div class="w-full mt-auto mb-12 flex justify-center items-center gap-4 px-8">
+<!-- Slot 1: Active Piece -->
+<div class="w-16 h-16 rounded-lg border border-secondary-container bg-secondary-container/10 flex items-center justify-center glass-block glow-secondary">
+<div class="w-8 h-8 bg-secondary-container rounded-sm shadow-[0_0_10px_#9d05ff]"></div>
+</div>
+<!-- Slot 2: Empty/Fading (Just placed) -->
+<div class="w-16 h-16 rounded-lg border border-surface-variant bg-surface-container/30 flex items-center justify-center relative overflow-hidden">
+<div class="w-full h-full absolute inset-0 bg-primary-container/20 opacity-0 animate-[ping_1s_ease-out_forwards]"></div>
+<div class="w-2 h-2 rounded-full bg-surface-variant"></div>
+</div>
+<!-- Slot 3: Active Piece -->
+<div class="w-16 h-16 rounded-lg border border-primary-container bg-primary-container/10 flex items-center justify-center glass-block glow-primary">
+<div class="grid grid-cols-2 gap-1">
+<div class="w-3 h-3 bg-primary-container rounded-sm"></div>
+<div class="w-3 h-3 bg-primary-container rounded-sm"></div>
+<div class="w-3 h-3 bg-primary-container rounded-sm"></div>
+<div class="w-3 h-3 bg-transparent"></div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Controls / Powerups -->
+<footer class="w-full pb-8 pt-4 px-container-padding flex justify-between items-center bg-transparent shrink-0">
+<button class="w-12 h-12 rounded-full border border-outline-variant flex items-center justify-center text-outline hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 0;">undo</span>
+</button>
+<button class="w-14 h-14 rounded-full border border-primary-container bg-primary-container/10 flex items-center justify-center text-primary-container shadow-[0_0_15px_rgba(0,240,255,0.2)] hover:bg-primary-container/20 transition-colors">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</button>
+<button class="w-12 h-12 rounded-full border border-outline-variant flex items-center justify-center text-outline hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 0;">swap_horiz</span>
+</button>
+</footer>
+<script>
+        const gridContainer = document.getElementById('grid-container');
+        const rows = 8;
+        const cols = 8;
+        const targetRow = 4; // 5th row (0-indexed)
+
+        // Helper to create basic empty cell
+        const createEmptyCell = () => {
+            const div = document.createElement('div');
+            div.className = 'w-full h-full border border-outline-variant/30 bg-surface-container-lowest/50 rounded-[2px]';
+            return div;
+        };
+
+        // Helper to create occupied block
+        const createBlock = (type) => {
+            const div = document.createElement('div');
+            if (type === 'primary') {
+                div.className = 'w-full h-full border border-primary-container bg-primary-container/20 rounded-[2px] glass-block glow-primary';
+            } else {
+                div.className = 'w-full h-full border border-secondary-container bg-secondary-container/20 rounded-[2px] glass-block glow-secondary';
+            }
+            return div;
+        };
+
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                let cell;
+                
+                if (r === targetRow) {
+                    // THE DEFUSE ROW
+                    cell = document.createElement('div');
+                    cell.className = 'w-full h-full rounded-[2px] defusing-cell flex items-center justify-center overflow-hidden border border-transparent';
+                    
+                    if (c === 3) {
+                        // The newly placed Cyan piece causing the defuse
+                        cell.classList.add('glass-block');
+                        const inner = document.createElement('div');
+                        inner.className = 'w-full h-full bg-primary-container/40 absolute inset-0';
+                        cell.appendChild(inner);
+                    } else if (c === 4) {
+                        // The cracking Purple countdown badge
+                        cell.classList.add('glass-block');
+                        const innerBg = document.createElement('div');
+                        innerBg.className = 'w-full h-full bg-secondary-container/30 absolute inset-0';
+                        cell.appendChild(innerBg);
+                        
+                        const badge = document.createElement('div');
+                        badge.className = 'cracking-badge w-8 h-8 rounded-full border-2 border-error bg-surface-container-lowest flex items-center justify-center z-20 shadow-[0_0_10px_#ffb4ab]';
+                        badge.innerHTML = '<span class="font-timer-mono text-timer-mono text-white text-[16px] leading-none">1</span>';
+                        cell.appendChild(badge);
+                    } else {
+                        // Other blocks in the clearing line
+                        cell.classList.add('glass-block');
+                        const isPrimary = c % 2 === 0;
+                        const inner = document.createElement('div');
+                        inner.className = `w-full h-full absolute inset-0 ${isPrimary ? 'bg-primary-container/20' : 'bg-secondary-container/20'}`;
+                        cell.appendChild(inner);
+                    }
+
+                    // Generate particles for the defusing cell
+                    for(let p=0; p<4; p++) {
+                        const particle = document.createElement('div');
+                        particle.className = 'particle';
+                        // Randomize trajectory and delay
+                        const tx = (Math.random() - 0.5) * 60 + 'px';
+                        const ty = (Math.random() - 1) * 60 + 'px';
+                        const delay = Math.random() * 0.2 + 's';
+                        particle.style.setProperty('--tx', tx);
+                        particle.style.setProperty('--ty', ty);
+                        particle.style.animationDelay = delay;
+                        particle.style.left = (20 + Math.random() * 60) + '%';
+                        particle.style.top = (20 + Math.random() * 60) + '%';
+                        cell.appendChild(particle);
+                    }
+
+                } else {
+                    // Normal random grid population (~60% full)
+                    if (Math.random() > 0.4) {
+                        cell = createBlock(Math.random() > 0.5 ? 'primary' : 'secondary');
+                    } else {
+                        cell = createEmptyCell();
+                    }
+                }
+                
+                gridContainer.appendChild(cell);
+            }
+        }
+    </script>
+</body></html>

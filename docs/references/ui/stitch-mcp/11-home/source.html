@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>BlastDown - Home</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&amp;family=Geist:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-bright": "#31394d",
+                      "surface": "#0b1326",
+                      "surface-container-lowest": "#060e20",
+                      "secondary-fixed-dim": "#dfb7ff",
+                      "secondary-container": "#9d05ff",
+                      "primary": "#dbfcff",
+                      "on-secondary-fixed-variant": "#6b00b0",
+                      "tertiary-fixed-dim": "#ffba20",
+                      "tertiary-container": "#ffd386",
+                      "on-primary-container": "#006970",
+                      "on-primary": "#00363a",
+                      "tertiary": "#fff4e8",
+                      "on-error": "#690005",
+                      "background": "#0b1326",
+                      "on-tertiary-container": "#7d5800",
+                      "tertiary-fixed": "#ffdea8",
+                      "surface-container-low": "#131b2e",
+                      "surface-tint": "#00dbe9",
+                      "surface-container": "#171f33",
+                      "primary-fixed-dim": "#00dbe9",
+                      "primary-container": "#00f0ff",
+                      "on-tertiary-fixed": "#271900",
+                      "on-primary-fixed-variant": "#004f54",
+                      "surface-variant": "#2d3449",
+                      "inverse-primary": "#006970",
+                      "on-secondary-container": "#f7e6ff",
+                      "inverse-surface": "#dae2fd",
+                      "on-tertiary-fixed-variant": "#5e4200",
+                      "on-tertiary": "#412d00",
+                      "surface-container-high": "#222a3d",
+                      "secondary-fixed": "#f1daff",
+                      "on-surface": "#dae2fd",
+                      "on-primary-fixed": "#002022",
+                      "on-error-container": "#ffdad6",
+                      "error": "#ffb4ab",
+                      "inverse-on-surface": "#283044",
+                      "on-background": "#dae2fd",
+                      "error-container": "#93000a",
+                      "surface-dim": "#0b1326",
+                      "on-secondary-fixed": "#2d004f",
+                      "secondary": "#dfb7ff",
+                      "outline-variant": "#3b494b",
+                      "on-secondary": "#4b007e",
+                      "primary-fixed": "#7df4ff",
+                      "surface-container-highest": "#2d3449",
+                      "on-surface-variant": "#b9cacb",
+                      "outline": "#849495"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "stack-xs": "4px",
+                      "stack-sm": "8px",
+                      "section-gap": "32px",
+                      "grid-gutter": "2px",
+                      "grid-cell": "40px",
+                      "container-padding": "20px"
+              },
+              "fontFamily": {
+                      "score-display": [
+                              "JetBrains Mono"
+                      ],
+                      "label-caps": [
+                              "Geist"
+                      ],
+                      "timer-mono": [
+                              "JetBrains Mono"
+                      ],
+                      "score-display-mobile": [
+                              "JetBrains Mono"
+                      ],
+                      "button-text": [
+                              "Geist"
+                      ],
+                      "body-standard": [
+                              "Geist"
+                      ]
+              },
+              "fontSize": {
+                      "score-display": [
+                              "48px",
+                              {
+                                      "lineHeight": "48px",
+                                      "letterSpacing": "-0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-caps": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.1em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "timer-mono": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "score-display-mobile": [
+                              "36px",
+                              {
+                                      "lineHeight": "36px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "button-text": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-standard": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        body {
+            background-color: #050505; /* Main background as per guidelines */
+            background-image: 
+                linear-gradient(to right, #2D2D35 1px, transparent 1px),
+                linear-gradient(to bottom, #2D2D35 1px, transparent 1px);
+            background-size: 40px 40px; /* grid-cell size */
+            background-position: center center;
+        }
+
+        .glass-block {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px);
+            border: 1px solid #00f0ff; /* Neon Inner Stroke - Cyan */
+            box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.2), 0 0 15px rgba(0, 240, 255, 0.3);
+        }
+
+        .glass-block-orange {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px);
+            border: 1px solid #FF6B00; /* Neon Inner Stroke - Orange */
+            box-shadow: inset 0 0 10px rgba(255, 107, 0, 0.2), 0 0 15px rgba(255, 107, 0, 0.3);
+        }
+        
+        .glass-block-purple {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px);
+            border: 1px solid #9d05ff; /* Neon Inner Stroke - Purple */
+            box-shadow: inset 0 0 10px rgba(157, 5, 255, 0.2), 0 0 15px rgba(157, 5, 255, 0.3);
+        }
+
+        .recessed-panel {
+            background-color: #0F172A; /* Grid background as per guidelines */
+            border: 1px solid #2D2D35; /* Graphite outline */
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        .neon-text-cyan {
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.3);
+        }
+        
+        .neon-text-orange {
+            color: #FF6B00;
+            text-shadow: 0 0 10px rgba(255, 107, 0, 0.5), 0 0 20px rgba(255, 107, 0, 0.3);
+        }
+
+        .play-button {
+            background-color: #171f33; /* Dark graphite body */
+            border: 2px solid #FF6B00; /* Glowing orange border */
+            box-shadow: inset 0 0 20px rgba(255, 107, 0, 0.2), 0 0 30px rgba(255, 107, 0, 0.4);
+            transition: all 0.2s ease-in-out;
+        }
+
+        .play-button:hover {
+            box-shadow: inset 0 0 30px rgba(255, 107, 0, 0.4), 0 0 50px rgba(255, 107, 0, 0.6);
+            transform: scale(1.05);
+        }
+
+        .play-button:active {
+            transform: scale(0.95);
+        }
+
+        .hud-panel {
+            background: rgba(11, 19, 38, 0.8); /* surface with opacity */
+            border: 1px solid #2D2D35;
+            backdrop-filter: blur(8px);
+        }
+        
+        /* Floating animations for decorative blocks */
+        @keyframes float1 {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(10deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+        @keyframes float2 {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(15px) rotate(-15deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+        
+        .anim-float-1 { animation: float1 6s ease-in-out infinite; }
+        .anim-float-2 { animation: float2 8s ease-in-out infinite; }
+        .anim-float-3 { animation: float1 7s ease-in-out infinite reverse; }
+
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="text-on-surface min-h-screen flex flex-col items-center justify-between relative overflow-hidden font-body-standard md:text-body-standard">
+<!-- Top App Bar (Shared Component Reference - Suppressed typical nav for linear home flow) -->
+<header class="w-full top-0 px-container-padding pt-grid-unit bg-transparent flat no shadows flex justify-between items-center h-16 z-10 relative mt-4">
+<!-- Settings Button -->
+<button class="p-2 rounded-full border border-outline-variant text-on-surface-variant hover:bg-surface-variant hover:text-primary-container transition-colors focus:outline-none">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings</span>
+</button>
+<!-- Bolts Balance HUD -->
+<div class="hud-panel px-4 py-2 rounded-lg flex items-center space-x-2">
+<span class="font-timer-mono text-timer-mono text-primary-container neon-text-cyan tracking-tight">1,250</span>
+<span class="material-symbols-outlined text-tertiary-fixed-dim" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+</header>
+<!-- Decorative Floating Blocks -->
+<div class="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+<div class="absolute top-1/4 left-1/4 w-10 h-10 rounded glass-block anim-float-1 opacity-60"></div>
+<div class="absolute top-1/3 right-1/4 w-8 h-8 rounded glass-block-orange anim-float-2 opacity-50"></div>
+<div class="absolute bottom-1/4 left-1/3 w-12 h-12 rounded glass-block-purple anim-float-3 opacity-40"></div>
+<div class="absolute bottom-1/3 right-1/3 w-6 h-6 rounded glass-block anim-float-1 opacity-70" style="animation-delay: -2s;"></div>
+</div>
+<!-- Main Content Canvas -->
+<main class="flex-grow flex flex-col items-center justify-center w-full max-w-md px-container-padding z-10 relative space-y-12">
+<!-- Logo Area -->
+<div class="flex flex-col items-center space-y-4">
+<h1 class="font-score-display text-score-display-mobile md:text-score-display text-on-surface tracking-tighter uppercase relative">
+                BLASTD<span class="relative inline-block text-primary-container neon-text-cyan">O<span class="absolute inset-0 flex items-center justify-center text-[0.4em] text-on-primary-container font-bold">1</span></span>WN
+            </h1>
+<!-- Best Score HUD -->
+<div class="hud-panel px-6 py-2 rounded-full border border-outline-variant">
+<span class="font-label-caps text-label-caps text-on-surface-variant mr-2">BEST</span>
+<span class="font-timer-mono text-timer-mono text-on-surface tracking-tight">14,200</span>
+</div>
+</div>
+<!-- Main Action Area -->
+<div class="w-full flex justify-center py-8">
+<button class="play-button w-48 h-48 rounded-full flex flex-col items-center justify-center focus:outline-none focus:ring-4 focus:ring-primary-container focus:ring-opacity-50">
+<span class="material-symbols-outlined text-6xl text-primary-fixed mb-2" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+<span class="font-score-display-mobile text-score-display-mobile text-on-surface tracking-tight">PLAY</span>
+</button>
+</div>
+<!-- Secondary Actions Tray -->
+<div class="recessed-panel rounded-xl p-4 w-full flex justify-around items-center">
+<button class="flex flex-col items-center space-y-2 text-on-surface-variant hover:text-primary-container transition-colors focus:outline-none">
+<div class="w-12 h-12 rounded-full border border-outline-variant flex items-center justify-center bg-surface-container hover:border-primary-container hover:bg-surface-variant transition-all">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">palette</span>
+</div>
+<span class="font-label-caps text-label-caps">THEMES</span>
+</button>
+<button class="flex flex-col items-center space-y-2 text-on-surface-variant hover:text-primary-container transition-colors focus:outline-none">
+<div class="w-12 h-12 rounded-full border border-outline-variant flex items-center justify-center bg-surface-container hover:border-primary-container hover:bg-surface-variant transition-all">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">help_outline</span>
+</div>
+<span class="font-label-caps text-label-caps">HOW TO PLAY</span>
+</button>
+<button class="flex flex-col items-center space-y-2 text-on-surface-variant hover:text-primary-container transition-colors focus:outline-none">
+<div class="w-12 h-12 rounded-full border border-outline-variant flex items-center justify-center bg-surface-container hover:border-primary-container hover:bg-surface-variant transition-all">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">leaderboard</span>
+</div>
+<span class="font-label-caps text-label-caps">RANKS</span>
+</button>
+</div>
+</main>
+<!-- Footer -->
+<footer class="w-full py-6 flex justify-center z-10 relative">
+<a class="font-label-caps text-label-caps text-outline hover:text-on-surface-variant transition-colors" href="#">Privacy Policy</a>
+</footer>
+</body></html>

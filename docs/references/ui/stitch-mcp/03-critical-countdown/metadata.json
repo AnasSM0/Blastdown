@@ -1,0 +1,35 @@
+{
+  "stitchProjectId": "4472195625883229066",
+  "stitchScreenId": "cd0a83bda0b447e2b539a771c5270ec0",
+  "screenTitle": "Gameplay - Critical State (Countdown 1)",
+  "retrievalTimestamp": "2026-07-17T22:18:15.155Z",
+  "files": [
+    {
+      "localFilename": "screen.png",
+      "fileType": "image/png",
+      "originalHostedUrl": "https://lh3.googleusercontent.com/aida/AP1WRLvj_BldiL_2J96ZR...(redacted-token)",
+      "sizeBytes": 42443,
+      "sha256": "fa47a9e33477b978906fd3597324d2b71850589abb02b9765613b3673114dcda",
+      "retrievalStatus": "success",
+      "notes": "Stitch-rendered screenshot of the approved screen."
+    },
+    {
+      "localFilename": "source.html",
+      "fileType": "text/html",
+      "originalHostedUrl": "https://contribution.usercontent.google.com/download...(redacted-token)",
+      "sizeBytes": 21516,
+      "sha256": "4b43b9ad146e358c65bfacd8246640142a25f651fc28a3694e5107d3e501ee6b",
+      "retrievalStatus": "success",
+      "notes": "Raw Stitch-generated HTML (Tailwind CDN script + Google Fonts links + inline <style> blocks). Reference only — not executed, not imported into the app."
+    },
+    {
+      "localFilename": "styles.css",
+      "fileType": "text/css",
+      "originalHostedUrl": "(extracted locally from source.html <style> blocks; not a separately hosted file)",
+      "sizeBytes": 815,
+      "sha256": "5dfb92eab981912ffd77482c0e3982ee529040f00bc4311526d18c92ebcadead",
+      "retrievalStatus": "success",
+      "notes": "Concatenation of the <style> blocks found in source.html, for easier diffing."
+    }
+  ]
+}

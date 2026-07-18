@@ -1,0 +1,88 @@
+body {
+            background-color: #050505; /* Main background as per guidelines */
+            background-image: 
+                linear-gradient(to right, #2D2D35 1px, transparent 1px),
+                linear-gradient(to bottom, #2D2D35 1px, transparent 1px);
+            background-size: 40px 40px; /* grid-cell size */
+            background-position: center center;
+        }
+
+        .glass-block {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px);
+            border: 1px solid #00f0ff; /* Neon Inner Stroke - Cyan */
+            box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.2), 0 0 15px rgba(0, 240, 255, 0.3);
+        }
+
+        .glass-block-orange {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px);
+            border: 1px solid #FF6B00; /* Neon Inner Stroke - Orange */
+            box-shadow: inset 0 0 10px rgba(255, 107, 0, 0.2), 0 0 15px rgba(255, 107, 0, 0.3);
+        }
+        
+        .glass-block-purple {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px);
+            border: 1px solid #9d05ff; /* Neon Inner Stroke - Purple */
+            box-shadow: inset 0 0 10px rgba(157, 5, 255, 0.2), 0 0 15px rgba(157, 5, 255, 0.3);
+        }
+
+        .recessed-panel {
+            background-color: #0F172A; /* Grid background as per guidelines */
+            border: 1px solid #2D2D35; /* Graphite outline */
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        .neon-text-cyan {
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.3);
+        }
+        
+        .neon-text-orange {
+            color: #FF6B00;
+            text-shadow: 0 0 10px rgba(255, 107, 0, 0.5), 0 0 20px rgba(255, 107, 0, 0.3);
+        }
+
+        .play-button {
+            background-color: #171f33; /* Dark graphite body */
+            border: 2px solid #FF6B00; /* Glowing orange border */
+            box-shadow: inset 0 0 20px rgba(255, 107, 0, 0.2), 0 0 30px rgba(255, 107, 0, 0.4);
+            transition: all 0.2s ease-in-out;
+        }
+
+        .play-button:hover {
+            box-shadow: inset 0 0 30px rgba(255, 107, 0, 0.4), 0 0 50px rgba(255, 107, 0, 0.6);
+            transform: scale(1.05);
+        }
+
+        .play-button:active {
+            transform: scale(0.95);
+        }
+
+        .hud-panel {
+            background: rgba(11, 19, 38, 0.8); /* surface with opacity */
+            border: 1px solid #2D2D35;
+            backdrop-filter: blur(8px);
+        }
+        
+        /* Floating animations for decorative blocks */
+        @keyframes float1 {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(10deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+        @keyframes float2 {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(15px) rotate(-15deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+        
+        .anim-float-1 { animation: float1 6s ease-in-out infinite; }
+        .anim-float-2 { animation: float2 8s ease-in-out infinite; }
+        .anim-float-3 { animation: float1 7s ease-in-out infinite reverse; }
+
+/* --- next <style> block --- */
+
+body {
+      min-height: max(884px, 100dvh);
+    }

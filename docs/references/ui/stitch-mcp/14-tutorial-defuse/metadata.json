@@ -1,0 +1,35 @@
+{
+  "stitchProjectId": "4472195625883229066",
+  "stitchScreenId": "28798208ef1c427eba655d90a7808319",
+  "screenTitle": "Tutorial - Defuse Strategy",
+  "retrievalTimestamp": "2026-07-17T22:18:15.155Z",
+  "files": [
+    {
+      "localFilename": "screen.png",
+      "fileType": "image/png",
+      "originalHostedUrl": "https://lh3.googleusercontent.com/aida/AP1WRLuwQyvJHMg63zbQV...(redacted-token)",
+      "sizeBytes": 16008,
+      "sha256": "72ac3ef04ec14b023d8af9e17cc4838ad351faf0b86cd47854330b217a95b032",
+      "retrievalStatus": "success",
+      "notes": "Stitch-rendered screenshot of the approved screen."
+    },
+    {
+      "localFilename": "source.html",
+      "fileType": "text/html",
+      "originalHostedUrl": "https://contribution.usercontent.google.com/download...(redacted-token)",
+      "sizeBytes": 10279,
+      "sha256": "2f92635f079647d1aedd1e2a5cd8cc747efc21a3ce8437e6dfe586bde5473d4b",
+      "retrievalStatus": "success",
+      "notes": "Raw Stitch-generated HTML (Tailwind CDN script + Google Fonts links + inline <style> blocks). Reference only — not executed, not imported into the app."
+    },
+    {
+      "localFilename": "styles.css",
+      "fileType": "text/css",
+      "originalHostedUrl": "(extracted locally from source.html <style> blocks; not a separately hosted file)",
+      "sizeBytes": 1414,
+      "sha256": "b0597becb3a324e78c3b7763e4797892ec9670c97a2c6465aad6041b7de35834",
+      "retrievalStatus": "success",
+      "notes": "Concatenation of the <style> blocks found in source.html, for easier diffing."
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "stitchProjectId": "4472195625883229066",
+  "stitchScreenId": "5ce73c24057f499a880f0ba687803a88",
+  "screenTitle": "Tutorial - Clearing Rubble",
+  "retrievalTimestamp": "2026-07-17T22:18:15.155Z",
+  "files": [
+    {
+      "localFilename": "screen.png",
+      "fileType": "image/png",
+      "originalHostedUrl": "https://lh3.googleusercontent.com/aida/AP1WRLubeYGA-sohfhiCX...(redacted-token)",
+      "sizeBytes": 33089,
+      "sha256": "1429549c95ff2c89414e8978d7394178f333c9bf224beb85bedeff5f91b89af0",
+      "retrievalStatus": "success",
+      "notes": "Stitch-rendered screenshot of the approved screen."
+    },
+    {
+      "localFilename": "source.html",
+      "fileType": "text/html",
+      "originalHostedUrl": "https://contribution.usercontent.google.com/download...(redacted-token)",
+      "sizeBytes": 11046,
+      "sha256": "883343fedbed92857feec76eb7ec40addf2b420514f26440170a467ac59b0a33",
+      "retrievalStatus": "success",
+      "notes": "Raw Stitch-generated HTML (Tailwind CDN script + Google Fonts links + inline <style> blocks). Reference only — not executed, not imported into the app."
+    },
+    {
+      "localFilename": "styles.css",
+      "fileType": "text/css",
+      "originalHostedUrl": "(extracted locally from source.html <style> blocks; not a separately hosted file)",
+      "sizeBytes": 1413,
+      "sha256": "6359d733492a7d195f3ac82d944d11804cfd0abaa5a2de81e7ef32a0bac7e6f1",
+      "retrievalStatus": "success",
+      "notes": "Concatenation of the <style> blocks found in source.html, for easier diffing."
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "stitchProjectId": "4472195625883229066",
+  "stitchScreenId": "df01c1a2dbb54c9392d2b88079f0d516",
+  "screenTitle": "Gameplay - Invalid Placement Preview",
+  "retrievalTimestamp": "2026-07-17T22:18:15.155Z",
+  "files": [
+    {
+      "localFilename": "screen.png",
+      "fileType": "image/png",
+      "originalHostedUrl": "https://lh3.googleusercontent.com/aida/AP1WRLtaYRpAiV8w2CBcx...(redacted-token)",
+      "sizeBytes": 41813,
+      "sha256": "3e498a9ccaa217341376ec80d2300ffdf5a9fbe1ad7848e58117c3395ee612ee",
+      "retrievalStatus": "success",
+      "notes": "Stitch-rendered screenshot of the approved screen."
+    },
+    {
+      "localFilename": "source.html",
+      "fileType": "text/html",
+      "originalHostedUrl": "https://contribution.usercontent.google.com/download...(redacted-token)",
+      "sizeBytes": 17226,
+      "sha256": "56bf6b4e3dcdde0b1d83ee446b0bc7e023763167f5ab5f627bf96e9e329f6809",
+      "retrievalStatus": "success",
+      "notes": "Raw Stitch-generated HTML (Tailwind CDN script + Google Fonts links + inline <style> blocks). Reference only — not executed, not imported into the app."
+    },
+    {
+      "localFilename": "styles.css",
+      "fileType": "text/css",
+      "originalHostedUrl": "(extracted locally from source.html <style> blocks; not a separately hosted file)",
+      "sizeBytes": 1335,
+      "sha256": "c9a026ee65693610cf50e99ac2510147dd1316f1983682b0d07fbc5611a7a604",
+      "retrievalStatus": "success",
+      "notes": "Concatenation of the <style> blocks found in source.html, for easier diffing."
+    }
+  ]
+}

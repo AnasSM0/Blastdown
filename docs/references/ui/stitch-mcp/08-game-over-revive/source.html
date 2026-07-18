@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>BlastDown - Game Over</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#dbfcff",
+                        "background": "#0b1326",
+                        "on-tertiary-fixed": "#271900",
+                        "on-secondary-fixed-variant": "#6b00b0",
+                        "on-background": "#dae2fd",
+                        "surface-container-lowest": "#060e20",
+                        "outline": "#849495",
+                        "on-surface-variant": "#b9cacb",
+                        "primary-fixed-dim": "#00dbe9",
+                        "tertiary": "#fff4e8",
+                        "on-tertiary-fixed-variant": "#5e4200",
+                        "on-primary-container": "#006970",
+                        "on-tertiary-container": "#7d5800",
+                        "tertiary-fixed": "#ffdea8",
+                        "inverse-on-surface": "#283044",
+                        "tertiary-fixed-dim": "#ffba20",
+                        "on-secondary-fixed": "#2d004f",
+                        "on-error": "#690005",
+                        "surface": "#0b1326",
+                        "inverse-primary": "#006970",
+                        "secondary-fixed-dim": "#dfb7ff",
+                        "secondary": "#dfb7ff",
+                        "primary-container": "#00f0ff",
+                        "inverse-surface": "#dae2fd",
+                        "tertiary-container": "#ffd386",
+                        "error": "#ffb4ab",
+                        "surface-container-high": "#222a3d",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-low": "#131b2e",
+                        "on-secondary-container": "#f7e6ff",
+                        "surface-tint": "#00dbe9",
+                        "surface-variant": "#2d3449",
+                        "error-container": "#93000a",
+                        "surface-container": "#171f33",
+                        "secondary-fixed": "#f1daff",
+                        "outline-variant": "#3b494b",
+                        "on-primary-fixed-variant": "#004f54",
+                        "on-surface": "#dae2fd",
+                        "primary-fixed": "#7df4ff",
+                        "on-tertiary": "#412d00",
+                        "secondary-container": "#9d05ff",
+                        "surface-dim": "#0b1326",
+                        "surface-container-highest": "#2d3449",
+                        "surface-bright": "#31394d",
+                        "on-secondary": "#4b007e",
+                        "on-primary-fixed": "#002022",
+                        "on-primary": "#00363a"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    spacing: {
+                        "container-padding": "20px",
+                        "stack-xs": "4px",
+                        "grid-cell": "40px",
+                        "stack-sm": "8px",
+                        "section-gap": "32px",
+                        "grid-gutter": "2px"
+                    },
+                    fontFamily: {
+                        "button-text": ["Geist"],
+                        "timer-mono": ["JetBrains Mono"],
+                        "body-standard": ["Geist"],
+                        "score-display-mobile": ["JetBrains Mono"],
+                        "score-display": ["JetBrains Mono"],
+                        "label-caps": ["Geist"]
+                    },
+                    fontSize: {
+                        "button-text": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "600" }],
+                        "timer-mono": ["24px", { "lineHeight": "32px", "fontWeight": "500" }],
+                        "body-standard": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "score-display-mobile": ["36px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "score-display": ["48px", { "lineHeight": "48px", "letterSpacing": "-0.05em", "fontWeight": "700" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .bg-pattern-dots {
+            background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 16px 16px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body-standard min-h-screen flex flex-col items-center justify-center overflow-hidden antialiased selection:bg-primary-container selection:text-on-primary-container">
+<!-- Background Environment (Failed Gameplay State) -->
+<div class="fixed inset-0 z-0 w-full h-full pointer-events-none">
+<!-- Render the failed gameplay board as the base layer -->
+<img alt="" class="w-full h-full object-cover opacity-60 mix-blend-luminosity brightness-75" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD4di5qQ8ClSRavEN6jwsrzv-QoCC8MV6nl0Hb36rgJzkoXZd4qEjc-xqyJ1nYm_2JxuS1IK0Z-UyqaoUjMQRDhhtJzWeLV05RCIbIHMHM4CZ3dY-w7TsYqpZ4Q0nGoL9eEUFsbdt80txdZYcKDaS8GmwMnlye7W6X0zEGnsk9JQoRYeUxmqWgineeLkUMcT3B6pMS3uZ_u2dJtdLTIDp6UI-Bq9m0DZzYjsIUVkHNsBbfIh7WzJS44hlSJW6O_sq9VMrRbL9W-5_Y"/>
+<!-- Heavy translucent black overlay to push background back and focus on modal -->
+<div class="absolute inset-0 bg-background/85 backdrop-blur-[6px]"></div>
+<!-- Subtle technical grid overlay for "reactor" aesthetic -->
+<div class="absolute inset-0 bg-pattern-dots opacity-40 mix-blend-overlay"></div>
+</div>
+<!-- Main Content Area (Modal) -->
+<main class="relative z-10 w-full max-w-sm px-container-padding flex flex-col items-center justify-center h-full">
+<!-- sleek, graphite-colored modal panel -->
+<div class="w-full bg-surface-container-high border border-outline-variant rounded-xl p-section-gap flex flex-col items-center shadow-[inset_0_2px_10px_rgba(255,255,255,0.02),0_20px_40px_rgba(0,0,0,0.5)] relative overflow-hidden">
+<!-- Inner subtle glow top edge -->
+<div class="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+<!-- Header -->
+<h1 class="font-label-caps text-label-caps text-outline tracking-widest mb-stack-xs">RUN OVER</h1>
+<!-- Score Display -->
+<div class="flex flex-col items-center justify-center w-full mb-stack-sm relative">
+<!-- Glowing digital font for final score -->
+<span class="font-score-display-mobile text-score-display-mobile text-tertiary-fixed-dim drop-shadow-[0_0_15px_rgba(255,186,32,0.6)] tabular-nums tracking-tighter">
+                    8,450
+                </span>
+</div>
+<!-- Best Status -->
+<div class="font-label-caps text-[10px] text-on-surface-variant tracking-widest opacity-80 mb-section-gap">
+                BEST: <span class="tabular-nums">14,200</span>
+</div>
+<!-- Structural Divider -->
+<div class="w-full h-[1px] bg-gradient-to-r from-transparent via-outline-variant/40 to-transparent mb-section-gap"></div>
+<!-- Actions Container -->
+<div class="w-full flex flex-col gap-stack-sm items-center">
+<!-- Primary Action: Cyan-glow Repair Button -->
+<button class="group w-full relative flex items-center justify-center gap-stack-sm py-4 rounded-lg bg-primary-container/10 border border-primary-fixed/40 text-primary-fixed font-button-text text-button-text shadow-[inset_0_0_15px_rgba(0,240,255,0.1),0_0_20px_rgba(0,240,255,0.15)] hover:bg-primary-container/20 hover:border-primary-fixed/60 hover:shadow-[inset_0_0_20px_rgba(0,240,255,0.2),0_0_30px_rgba(0,240,255,0.25)] transition-all duration-300 active:scale-[0.98] overflow-hidden">
+<!-- Button inner highlight -->
+<div class="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none"></div>
+<span class="material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform duration-300" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+<span class="tracking-wide">REPAIR &amp; CONTINUE</span>
+</button>
+<!-- Supporting Description -->
+<p class="font-label-caps text-[9px] text-outline tracking-widest text-center mt-stack-xs opacity-70">
+                    CLEAR RUBBLE <span class="text-outline-variant px-1 mx-[2px] opacity-50">•</span> ADD +2 MOVES <span class="text-outline-variant px-1 mx-[2px] opacity-50">•</span> NEW PIECES
+                </p>
+<!-- Secondary Action: End Run -->
+<button class="mt-section-gap w-full py-3 text-center font-button-text text-button-text text-on-surface-variant opacity-60 hover:opacity-100 hover:text-on-surface transition-colors duration-200 active:scale-[0.98]">
+                    END RUN
+                </button>
+</div>
+</div>
+</main>
+</body></html>
