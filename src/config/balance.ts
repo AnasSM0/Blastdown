@@ -27,3 +27,22 @@ export const MULTI_LINE_MULTIPLIERS: readonly {
 export const COMBO_MULTIPLIER_STEP = 0.25;
 
 export const COMBO_MULTIPLIER_CAP = 3;
+
+/** Starting countdown by run turn (BUILD_SPEC.md §6.9). Scanned for the
+ *  highest minTurn <= turn, so keep entries sorted descending. */
+export const TIMED_COUNTDOWN_TIERS: readonly {
+  minTurn: number;
+  countdown: number;
+}[] = [
+  { minTurn: 76, countdown: 4 },
+  { minTurn: 41, countdown: 5 },
+  { minTurn: 16, countdown: 6 },
+  { minTurn: 1, countdown: 7 },
+];
+
+export const DEFUSE_BONUS_BASE = 25;
+
+export const DEFUSE_BONUS_PER_REMAINING_TURN = 10;
+
+/** Remaining-turn values that emit a timerWarning event (BUILD_SPEC.md §6.11). */
+export const TIMER_WARNING_VALUES: readonly number[] = [2, 1];

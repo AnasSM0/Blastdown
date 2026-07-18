@@ -177,8 +177,9 @@ describe("placePiece — classic resolution", () => {
     expect(result.state.linesCleared).toBe(1);
     expect(result.state.combo).toBe(1);
     expect(result.state.bestCombo).toBe(1);
-    // placement 1 + line 100 * 1 (single line) * 1.25 (combo 1) = 126
-    expect(result.state.score).toBe(126);
+    // placement 1 + line 100 * 1 (single line) * 1.25 (combo 1) = 126,
+    // + the placed single defusing itself in the clear (25 + 10 * 7) = 95.
+    expect(result.state.score).toBe(221);
     expect(eventTypes(result.events)).toContain("linesCleared");
     expect(eventTypes(result.events)).toContain("comboChanged");
   });

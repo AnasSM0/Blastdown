@@ -60,11 +60,13 @@ produce identical sequences.
 
 **Owner: Claude Code**
 
-- [ ] 2.1 Timed piece instances + central balance config
+- [x] 2.1 Timed piece instances + central balance config
       (`src/config/balance.ts`)
-- [ ] 2.2 Turn-resolution order (the 17 steps in `docs/ARCHITECTURE.md`)
-- [ ] 2.3 Defuse detection + defuse bonus scoring
-- [ ] 2.4 Timer warning events (caution/warning/urgent thresholds)
+- [x] 2.2 Turn-resolution order (the 17 steps in `docs/ARCHITECTURE.md`)
+      — classic + timed/defuse steps done; explosion steps (10–11) land
+      with 2.5, freeze step (9) with 2.7
+- [x] 2.3 Defuse detection + defuse bonus scoring
+- [x] 2.4 Timer warning events (caution/warning/urgent thresholds)
 - [ ] 2.5 Explosion logic incl. deterministic adjacent-rubble selection and
       the 6-cell simultaneous-explosion cap
 - [ ] 2.6 Rubble placement/clearing rules

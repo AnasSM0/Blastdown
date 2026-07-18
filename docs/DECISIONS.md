@@ -293,3 +293,13 @@ This engine build session uses milestones 1A/1B/1C/2A/2B/2C. Mapping onto
 subset of 2.2 (turn resolution without timers) + event output, 2A ≈
 2.1–2.4, 2B ≈ 2.5–2.6, 2C ≈ 2.7–2.10. `docs/TASKS.md` checkboxes remain
 the canonical completion record.
+
+## 2026-07-18 — Newly placed pieces may defuse themselves in the same turn
+
+`BUILD_SPEC.md` §6.10 steps 5–6 ("identify timed pieces with no remaining
+cells, award defuse bonuses") exclude nothing, so a piece whose own
+placement completes lines covering all of its cells is defused immediately
+at its full starting countdown (bonus `25 + 10 × countdown`). This rewards
+deliberately finishing a line with the final piece and keeps the defuse
+rule uniform — no special case for the just-placed piece. Covered by an
+explicit test in `__tests__/domain/timedPieces.test.ts`.

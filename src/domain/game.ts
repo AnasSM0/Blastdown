@@ -1,4 +1,4 @@
-import type { GameState } from "./gameTypes";
+import type { ActiveTimedPiece, GameState } from "./gameTypes";
 import type { GameEvent } from "./events";
 import { createEmptyBoard } from "./board";
 import { createInitialRngState } from "./seededRandom";
@@ -8,6 +8,12 @@ import { applyPlacement, isValidPlacement, type CellPosition } from "./placement
 import { clearLines, detectCompletedLines } from "./lineClearing";
 import { calculateTurnScore } from "./scoring";
 import { isGameOver } from "./gameOver";
+import { countSurvivingCells, startingCountdownForTurn } from "./timers";
+import {
+  DEFUSE_BONUS_BASE,
+  DEFUSE_BONUS_PER_REMAINING_TURN,
+  TIMER_WARNING_VALUES,
+} from "../config/balance";
 
 export const GAME_STATE_VERSION = 1;
 
@@ -77,14 +83,27 @@ export function placePiece(
   }
 
   const events: GameEvent[] = [];
+  const turnNumber = state.turn + 1;
 
-  // Place the new piece.
+  // Place the new piece as a timed piece instance.
+  const pieceId = `piece-${turnNumber}`;
   const placedCells: CellPosition[] = shape.cells.map((cell) => ({
     row: origin.row + cell.row,
     column: origin.column + cell.column,
   }));
-  let grid = applyPlacement(state.grid, shape, origin, handPiece.colorId);
-  events.push({ type: "piecePlaced", handId, cells: placedCells });
+  let grid = applyPlacement(state.grid, shape, origin, handPiece.colorId, pieceId);
+  events.push({ type: "piecePlaced", handId, pieceId, cells: placedCells });
+
+  let activeTimers: Record<string, ActiveTimedPiece> = {
+    ...state.activeTimers,
+    [pieceId]: {
+      id: pieceId,
+      shapeId: shape.id,
+      remainingTurns: startingCountdownForTurn(turnNumber),
+      placedOnTurn: turnNumber,
+      colorId: handPiece.colorId,
+    },
+  };
 
   // Detect and clear completed lines.
   const { rows, columns } = detectCompletedLines(grid);
@@ -94,14 +113,49 @@ export function placePiece(
     events.push({ type: "linesCleared", rows, columns });
   }
 
+  // Identify fully cleared timed pieces and award defuse bonuses
+  // before any timer decrement, so a piece at 1 can be saved this turn.
+  let defuseBonusTotal = 0;
+  let piecesDefusedThisTurn = 0;
+  if (clearedLineCount > 0) {
+    for (const timer of Object.values(activeTimers)) {
+      if (countSurvivingCells(grid, timer.id) === 0) {
+        const bonus = DEFUSE_BONUS_BASE + DEFUSE_BONUS_PER_REMAINING_TURN * timer.remainingTurns;
+        defuseBonusTotal += bonus;
+        piecesDefusedThisTurn += 1;
+        events.push({ type: "pieceDefused", pieceId: timer.id, bonus });
+        activeTimers = Object.fromEntries(
+          Object.entries(activeTimers).filter(([id]) => id !== timer.id),
+        );
+      }
+    }
+  }
+
+  // Decrement timers that existed before this placement (never the new piece).
+  const decremented: Record<string, ActiveTimedPiece> = {};
+  for (const [id, timer] of Object.entries(activeTimers)) {
+    if (id === pieceId) {
+      decremented[id] = timer;
+      continue;
+    }
+    const remainingTurns = timer.remainingTurns - 1;
+    decremented[id] = { ...timer, remainingTurns };
+    events.push({ type: "timerChanged", pieceId: id, remainingTurns });
+    if (TIMER_WARNING_VALUES.includes(remainingTurns)) {
+      events.push({ type: "timerWarning", pieceId: id, remainingTurns });
+    }
+  }
+  activeTimers = decremented;
+
   // Score and combo.
   const { scoreDelta, nextCombo } = calculateTurnScore({
     cellsPlaced: shape.cells.length,
     linesCleared: clearedLineCount,
     previousCombo: state.combo,
   });
-  const score = state.score + scoreDelta;
-  events.push({ type: "scoreChanged", delta: scoreDelta, score });
+  const totalScoreDelta = scoreDelta + defuseBonusTotal;
+  const score = state.score + totalScoreDelta;
+  events.push({ type: "scoreChanged", delta: totalScoreDelta, score });
   if (nextCombo !== state.combo) {
     events.push({ type: "comboChanged", combo: nextCombo });
   }
@@ -127,11 +181,13 @@ export function placePiece(
     hand,
     rngState,
     handRefills,
+    activeTimers,
     score,
     combo: nextCombo,
     bestCombo: Math.max(state.bestCombo, nextCombo),
-    turn: state.turn + 1,
+    turn: turnNumber,
     piecesPlaced: state.piecesPlaced + 1,
+    piecesDefused: state.piecesDefused + piecesDefusedThisTurn,
     linesCleared: state.linesCleared + clearedLineCount,
     lastUpdatedAt: now,
   };

@@ -30,6 +30,7 @@ export function applyPlacement(
   shape: ShapeDefinition,
   origin: CellPosition,
   colorId: string,
+  pieceInstanceId?: string,
 ): GridCell[][] {
   if (!isValidPlacement(grid, shape, origin)) {
     throw new Error("Cannot apply an invalid placement");
@@ -39,7 +40,10 @@ export function applyPlacement(
   for (const cell of shape.cells) {
     const row = origin.row + cell.row;
     const column = origin.column + cell.column;
-    nextGrid[row][column] = { kind: "normal", colorId };
+    nextGrid[row][column] =
+      pieceInstanceId === undefined
+        ? { kind: "normal", colorId }
+        : { kind: "timed", pieceInstanceId, colorId };
   }
   return nextGrid;
 }
