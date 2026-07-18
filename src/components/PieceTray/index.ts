@@ -1,0 +1,1 @@
+export { PieceTray } from "./PieceTray";
