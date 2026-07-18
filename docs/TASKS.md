@@ -38,17 +38,17 @@ passes, documentation exists.
 
 **Owner: Claude Code**
 
-- [ ] 1.1 Define `GameState`/`GridCell`/`ActiveTimedPiece`/`HandPiece` types
+- [x] 1.1 Define `GameState`/`GridCell`/`ActiveTimedPiece`/`HandPiece` types
       in `src/domain/gameTypes.ts` (per `BUILD_SPEC.md` §14)
-- [ ] 1.2 Define the 12-shape catalog in `src/domain/shapes.ts`
-- [ ] 1.3 Implement seeded PRNG in `src/domain/seededRandom.ts`
-- [ ] 1.4 Implement placement validation/application in
+- [x] 1.2 Define the 12-shape catalog in `src/domain/shapes.ts`
+- [x] 1.3 Implement seeded PRNG in `src/domain/seededRandom.ts`
+- [x] 1.4 Implement placement validation/application in
       `src/domain/placement.ts`
-- [ ] 1.5 Implement line detection/clearing in `src/domain/lineClearing.ts`
-- [ ] 1.6 Implement weighted-bag hand generation
-- [ ] 1.7 Implement game-over detection in `src/domain/gameOver.ts`
-- [ ] 1.8 Implement base scoring in `src/domain/scoring.ts`
-- [ ] 1.9 Unit tests for all of the above in `__tests__/domain/`
+- [x] 1.5 Implement line detection/clearing in `src/domain/lineClearing.ts`
+- [x] 1.6 Implement weighted-bag hand generation
+- [x] 1.7 Implement game-over detection in `src/domain/gameOver.ts`
+- [x] 1.8 Implement base scoring in `src/domain/scoring.ts`
+- [x] 1.9 Unit tests for all of the above in `__tests__/domain/`
 
 **Acceptance:** a classic block-placement game (no timers yet) works fully
 through tests; no UI dependency inside `src/domain/`; identical seeds
