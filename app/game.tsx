@@ -1,23 +1,47 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-// Placeholder route. Gameplay UI is implemented in Phase 3 (see docs/TASKS.md).
+import { ScoreHeader } from "../src/components/ScoreHeader";
+import { colors, radius, spacing } from "../src/ui/theme";
+
+// Static shell: real board/tray rendering and interaction land in the
+// next Phase 3 tasks (docs/TASKS.md 3.3-3.6).
 export default function GameScreen() {
   return (
-    <View style={styles.container} testID="game-screen">
-      <Text style={styles.text}>Game screen coming in Phase 3</Text>
-    </View>
+    <SafeAreaView style={styles.screen} testID="game-screen">
+      <ScoreHeader score={0} best={0} combo={0} onPause={() => {}} />
+      <View style={styles.content}>
+        <View style={styles.boardRegion} testID="board-region" />
+        <View style={styles.trayRegion} testID="tray-region" />
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: "#0f1115",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: colors.appBackground,
   },
-  text: {
-    color: "#ffffff",
-    fontSize: 16,
+  content: {
+    flex: 1,
+    paddingHorizontal: spacing.screenPadding,
+  },
+  boardRegion: {
+    alignSelf: "center",
+    width: "100%",
+    maxWidth: 420,
+    aspectRatio: 1,
+    marginTop: spacing.lg,
+    backgroundColor: colors.boardBg,
+    borderColor: colors.boardFrame,
+    borderWidth: 2,
+    borderRadius: radius.board,
+  },
+  trayRegion: {
+    height: 88,
+    marginTop: spacing.lg,
+    backgroundColor: colors.surfaceBg,
+    borderRadius: radius.panel,
   },
 });

@@ -335,3 +335,22 @@ player-facing rules, only edge behavior:
    board: a run can, in principle, still be dead if the board is packed
    with normal blocks — the engine reports `gameOver` again rather than
    pretending the revive helped.
+
+## 2026-07-18 — Phase 3 slice implemented by Claude Code (Codex unavailable)
+
+The session plan delegated bounded UI tasks (design tokens/shell, board
+rendering, tap interaction) to Codex per CLAUDE.md/AGENTS.md. On this
+Windows machine the Codex CLI could not perform any filesystem write —
+its sandbox fails with `windows sandbox: helper_unknown_error: apply
+deny-read ACLs` in both default and `workspace-write` modes, the
+full-access bypass is blocked by session policy, and a read-only
+"author the diff in chat" fallback hung with near-zero CPU for 15+
+minutes. Decision: Claude Code implements the Phase 3 vertical slice
+directly, honoring the same task specs, file boundaries, and review/
+verification rigor that would have gated Codex's diffs. Codex delegation
+resumes when its sandbox works on this machine. Also fixed this session's
+scope: custom fonts (Geist / JetBrains Mono via expo-font) are deferred —
+numeric displays use the platform monospace family via a theme token until
+a font task is approved (avoids adding expo-font + font assets mid-slice);
+placement haptics deferred to Phase 3B alongside the useHaptics service
+hook.
