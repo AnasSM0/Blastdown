@@ -2,9 +2,10 @@ import { useState } from "react";
 import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
 
 import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
-import type { TimerBadgePlacement } from "../../domain/selectors";
+import type { PlacementPreview, TimerBadgePlacement } from "../../domain/selectors";
+import type { CellPosition } from "../../domain/placement";
 import { colors, radius, spacing } from "../../ui/theme";
-import { GridCell } from "../GridCell";
+import { GridCell, type CellPreviewState } from "../GridCell";
 import { TimerBadge } from "../TimerBadge";
 
 type GameBoardProps = {
@@ -12,14 +13,26 @@ type GameBoardProps = {
   badges: readonly TimerBadgePlacement[];
   /** Optional fixed content size (mostly for tests); defaults to measuring. */
   boardSize?: number;
+  preview?: PlacementPreview | null;
+  onCellPress?: (position: CellPosition) => void;
 };
 
 const FRAME_WIDTH = 2;
 
-export function GameBoard({ grid, badges, boardSize }: GameBoardProps) {
+export function GameBoard({ grid, badges, boardSize, preview, onCellPress }: GameBoardProps) {
   const [measured, setMeasured] = useState(0);
   const rows = grid.length;
   const columns = grid[0]?.length ?? 0;
+
+  const previewMap = new Map<string, CellPreviewState>();
+  if (preview) {
+    for (const cell of preview.cells) {
+      previewMap.set(`${cell.row},${cell.column}`, preview.valid ? "valid" : "invalid");
+    }
+    for (const cell of preview.conflictCells) {
+      previewMap.set(`${cell.row},${cell.column}`, "conflict");
+    }
+  }
 
   const outerSize = boardSize ?? measured;
   const contentSize = outerSize - 2 * (FRAME_WIDTH + spacing.gridGutter);
@@ -40,7 +53,6 @@ export function GameBoard({ grid, badges, boardSize }: GameBoardProps) {
       onLayout={handleLayout}
       accessibilityLabel="Game board"
       testID="game-board"
-      accessible={false}
     >
       {cellSize > 0
         ? grid.map((rowCells, row) => (
@@ -50,7 +62,14 @@ export function GameBoard({ grid, badges, boardSize }: GameBoardProps) {
                   key={`cell-${row}-${column}`}
                   style={column < columns - 1 ? styles.cellGap : undefined}
                 >
-                  <GridCell cell={cell} row={row} column={column} size={cellSize} />
+                  <GridCell
+                    cell={cell}
+                    row={row}
+                    column={column}
+                    size={cellSize}
+                    previewState={previewMap.get(`${row},${column}`)}
+                    onPress={onCellPress ? () => onCellPress({ row, column }) : undefined}
+                  />
                 </View>
               ))}
             </View>

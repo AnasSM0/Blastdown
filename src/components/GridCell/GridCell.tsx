@@ -1,14 +1,18 @@
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
 import { colors, radius } from "../../ui/theme";
 import { pieceColor } from "../../ui/pieceColors";
+
+export type CellPreviewState = "valid" | "invalid" | "conflict";
 
 type GridCellProps = {
   cell: DomainGridCell;
   row: number;
   column: number;
   size: number;
+  previewState?: CellPreviewState;
+  onPress?: () => void;
 };
 
 function cellLabel(cell: DomainGridCell, row: number, column: number): string {
@@ -28,7 +32,7 @@ function cellLabel(cell: DomainGridCell, row: number, column: number): string {
 /** Presentation of one board cell. The "glass" look is approximated with a
  *  translucent fill + colored border — deliberately no per-cell blur
  *  (docs/UI_REFERENCE_AUDIT.md item 9). */
-export function GridCell({ cell, row, column, size }: GridCellProps) {
+export function GridCell({ cell, row, column, size, previewState, onPress }: GridCellProps) {
   const base = { width: size, height: size };
 
   let visual;
@@ -48,10 +52,13 @@ export function GridCell({ cell, row, column, size }: GridCellProps) {
   }
 
   return (
-    <View
+    <Pressable
       style={[styles.cell, base, visual]}
+      onPress={onPress}
+      disabled={onPress === undefined}
       testID={`cell-${row}-${column}`}
       accessibilityLabel={cellLabel(cell, row, column)}
+      accessibilityRole={onPress ? "button" : undefined}
       accessible
     >
       {cell.kind === "rubble" ? (
@@ -60,7 +67,14 @@ export function GridCell({ cell, row, column, size }: GridCellProps) {
           <View style={styles.crackB} />
         </>
       ) : null}
-    </View>
+      {previewState ? (
+        <View
+          pointerEvents="none"
+          style={[styles.preview, previewStyles[previewState]]}
+          testID={`preview-${previewState}-${row}-${column}`}
+        />
+      ) : null}
+    </Pressable>
   );
 }
 
@@ -96,5 +110,30 @@ const styles = StyleSheet.create({
     backgroundColor: colors.outline,
     transform: [{ rotate: "-50deg" }],
     opacity: 0.5,
+  },
+  preview: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderRadius: radius.cell,
+  },
+});
+
+const previewStyles = StyleSheet.create({
+  valid: {
+    borderColor: colors.cyanBlock,
+    backgroundColor: `${colors.cyanBlock}26`,
+  },
+  invalid: {
+    borderColor: colors.error,
+    backgroundColor: `${colors.error}1A`,
+  },
+  conflict: {
+    borderColor: colors.error,
+    backgroundColor: `${colors.error}59`,
   },
 });

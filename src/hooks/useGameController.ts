@@ -13,6 +13,8 @@ export type GameControllerOptions = {
   now?: () => number;
   /** Seed factory for restarts, injectable for tests. */
   nextSeed?: () => string;
+  /** Test seam: start from a crafted GameState instead of a fresh run. */
+  initialState?: GameState;
 };
 
 export type GameController = {
@@ -36,11 +38,13 @@ export function useGameController(options: GameControllerOptions = {}): GameCont
   const nowRef = useRef(options.now ?? Date.now);
   const nextSeedRef = useRef(options.nextSeed ?? defaultSeed);
 
-  const [state, setState] = useState<GameState>(() =>
-    createInitialGameState(
-      options.seed ?? (options.nextSeed ?? defaultSeed)(),
-      (options.now ?? Date.now)(),
-    ),
+  const [state, setState] = useState<GameState>(
+    () =>
+      options.initialState ??
+      createInitialGameState(
+        options.seed ?? (options.nextSeed ?? defaultSeed)(),
+        (options.now ?? Date.now)(),
+      ),
   );
   const [selectedHandId, setSelectedHandId] = useState<string | null>(null);
   const [lastEvents, setLastEvents] = useState<GameEvent[]>([]);
