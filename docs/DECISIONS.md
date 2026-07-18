@@ -303,3 +303,13 @@ at its full starting countdown (bonus `25 + 10 × countdown`). This rewards
 deliberately finishing a line with the final piece and keeps the defuse
 rule uniform — no special case for the just-placed piece. Covered by an
 explicit test in `__tests__/domain/timedPieces.test.ts`.
+
+## 2026-07-18 — Explosion penalty applied per expired piece
+
+`BUILD_SPEC.md` §7.6 defines a 50-point explosion penalty but §6.12's
+simultaneous-expiration rule doesn't say whether multiple same-turn
+expirations cost 50 once or 50 each. Decision: one penalty per expired
+piece (each emits "one explosion animation" per §6.12 and each is
+independently the player's loss), with the score still floored at zero
+after summing the whole turn's delta. Two simultaneous expirations
+therefore cost 100. Combo resets once regardless of explosion count.

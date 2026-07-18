@@ -67,9 +67,9 @@ produce identical sequences.
       with 2.5, freeze step (9) with 2.7
 - [x] 2.3 Defuse detection + defuse bonus scoring
 - [x] 2.4 Timer warning events (caution/warning/urgent thresholds)
-- [ ] 2.5 Explosion logic incl. deterministic adjacent-rubble selection and
+- [x] 2.5 Explosion logic incl. deterministic adjacent-rubble selection and
       the 6-cell simultaneous-explosion cap
-- [ ] 2.6 Rubble placement/clearing rules
+- [x] 2.6 Rubble placement/clearing rules
 - [ ] 2.7 Freeze power-up
 - [ ] 2.8 Defuse power-up
 - [ ] 2.9 Revive power-up

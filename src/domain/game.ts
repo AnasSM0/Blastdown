@@ -9,9 +9,11 @@ import { clearLines, detectCompletedLines } from "./lineClearing";
 import { calculateTurnScore } from "./scoring";
 import { isGameOver } from "./gameOver";
 import { countSurvivingCells, startingCountdownForTurn } from "./timers";
+import { resolveExpirations } from "./explosions";
 import {
   DEFUSE_BONUS_BASE,
   DEFUSE_BONUS_PER_REMAINING_TURN,
+  EXPLOSION_SCORE_PENALTY,
   TIMER_WARNING_VALUES,
 } from "../config/balance";
 
@@ -105,12 +107,27 @@ export function placePiece(
     },
   };
 
-  // Detect and clear completed lines.
+  // Detect and clear completed lines, tracking rubble removed by the clear.
   const { rows, columns } = detectCompletedLines(grid);
   const clearedLineCount = rows.length + columns.length;
+  let rubbleClearedThisTurn = 0;
   if (clearedLineCount > 0) {
+    const rowSet = new Set(rows);
+    const columnSet = new Set(columns);
+    const clearedRubbleCells: CellPosition[] = [];
+    for (let row = 0; row < grid.length; row++) {
+      for (let column = 0; column < grid.length; column++) {
+        if ((rowSet.has(row) || columnSet.has(column)) && grid[row][column].kind === "rubble") {
+          clearedRubbleCells.push({ row, column });
+        }
+      }
+    }
     grid = clearLines(grid, rows, columns);
     events.push({ type: "linesCleared", rows, columns });
+    if (clearedRubbleCells.length > 0) {
+      rubbleClearedThisTurn = clearedRubbleCells.length;
+      events.push({ type: "rubbleCleared", cells: clearedRubbleCells });
+    }
   }
 
   // Identify fully cleared timed pieces and award defuse bonuses
@@ -147,22 +164,33 @@ export function placePiece(
   }
   activeTimers = decremented;
 
-  // Score and combo.
+  // Resolve every expired piece as one simultaneous, non-recursive
+  // explosion phase. Explosion-created rubble never triggers a line clear.
+  let rngState = state.rngState;
+  const expiration = resolveExpirations(grid, activeTimers, rngState, turnNumber);
+  grid = expiration.grid;
+  activeTimers = expiration.activeTimers;
+  rngState = expiration.rngState;
+  events.push(...expiration.events);
+
+  // Score and combo. Explosions apply a per-explosion penalty (score floored
+  // at zero) and reset the combo after any line-clear increment.
   const { scoreDelta, nextCombo } = calculateTurnScore({
     cellsPlaced: shape.cells.length,
     linesCleared: clearedLineCount,
     previousCombo: state.combo,
   });
-  const totalScoreDelta = scoreDelta + defuseBonusTotal;
-  const score = state.score + totalScoreDelta;
-  events.push({ type: "scoreChanged", delta: totalScoreDelta, score });
-  if (nextCombo !== state.combo) {
-    events.push({ type: "comboChanged", combo: nextCombo });
+  const penalty = expiration.explosionCount * EXPLOSION_SCORE_PENALTY;
+  const totalScoreDelta = scoreDelta + defuseBonusTotal - penalty;
+  const score = Math.max(0, state.score + totalScoreDelta);
+  events.push({ type: "scoreChanged", delta: score - state.score, score });
+  const comboAfterExplosions = expiration.explosionCount > 0 ? 0 : nextCombo;
+  if (comboAfterExplosions !== state.combo) {
+    events.push({ type: "comboChanged", combo: comboAfterExplosions });
   }
 
   // Consume the used piece; refill if the hand is exhausted.
   let hand = state.hand.filter((piece) => piece.handId !== handId);
-  let rngState = state.rngState;
   let handRefills = state.handRefills;
   if (hand.length === 0) {
     const refill = generateHand(rngState, { refillIndex: handRefills });
@@ -183,12 +211,15 @@ export function placePiece(
     handRefills,
     activeTimers,
     score,
-    combo: nextCombo,
+    combo: comboAfterExplosions,
     bestCombo: Math.max(state.bestCombo, nextCombo),
     turn: turnNumber,
     piecesPlaced: state.piecesPlaced + 1,
     piecesDefused: state.piecesDefused + piecesDefusedThisTurn,
     linesCleared: state.linesCleared + clearedLineCount,
+    explosions: state.explosions + expiration.explosionCount,
+    rubbleCleared: state.rubbleCleared + rubbleClearedThisTurn,
+    lastExplosionId: expiration.lastExplosionId ?? state.lastExplosionId,
     lastUpdatedAt: now,
   };
 

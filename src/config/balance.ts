@@ -46,3 +46,11 @@ export const DEFUSE_BONUS_PER_REMAINING_TURN = 10;
 
 /** Remaining-turn values that emit a timerWarning event (BUILD_SPEC.md §6.11). */
 export const TIMER_WARNING_VALUES: readonly number[] = [2, 1];
+
+export const EXPLOSION_SCORE_PENALTY = 50;
+
+/** Max empty orthogonal neighbours converted to rubble per expired piece. */
+export const EXPLOSION_ADJACENT_RUBBLE_MAX_PER_PIECE = 4;
+
+/** Max adjacent rubble added across all expirations in one turn. */
+export const EXPLOSION_ADJACENT_RUBBLE_MAX_PER_TURN = 6;
