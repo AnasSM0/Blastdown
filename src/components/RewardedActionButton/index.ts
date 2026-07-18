@@ -1,0 +1,1 @@
+export { RewardedActionBar } from "./RewardedActionButton";

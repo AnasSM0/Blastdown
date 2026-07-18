@@ -6,6 +6,7 @@ import { GameBoard } from "../src/components/GameBoard";
 import { PieceTray } from "../src/components/PieceTray";
 import { ScoreHeader } from "../src/components/ScoreHeader";
 import { GameOverOverlay } from "../src/components/modals/GameOverOverlay";
+import { RewardedActionBar } from "../src/components/RewardedActionButton";
 import type { CellPosition } from "../src/domain/placement";
 import { getTimerBadgePlacements } from "../src/domain/selectors";
 import { useGameController, type GameControllerOptions } from "../src/hooks/useGameController";
@@ -72,6 +73,7 @@ export function GameScreenContent({ controllerOptions, boardSize }: GameScreenCo
           selectedHandId={controller.selectedHandId}
           onSelect={handleSelect}
         />
+        <RewardedActionBar />
       </View>
       {state.status === "gameOver" ? (
         <GameOverOverlay score={state.score} onRestart={handleRestart} />

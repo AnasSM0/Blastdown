@@ -96,13 +96,19 @@ listed in `CLAUDE.md`.
 
 - [ ] 3.1 Home screen wired to real persisted best score / Bolts (once
       Phase 5 lands storage; stub with defaults until then)
-- [ ] 3.2 Game screen layout (score header, board, piece tray)
-- [ ] 3.3 Board + grid cell rendering from domain state
-- [ ] 3.4 Piece tray rendering
-- [ ] 3.5 Tap-to-select / tap-to-place interaction
-- [ ] 3.6 Placement preview (valid/invalid)
-- [ ] 3.7 Game-over display
-- [ ] 3.8 Component tests for the above
+- [x] 3.2 Game screen layout (score header, board, piece tray)
+- [x] 3.3 Board + grid cell rendering from domain state
+- [x] 3.4 Piece tray rendering
+- [x] 3.5 Tap-to-select / tap-to-place interaction
+- [x] 3.6 Placement preview (valid/invalid)
+- [x] 3.7 Game-over display (restart-only overlay; the revive decision
+      flow per §10.4 lands with the ads phase)
+- [x] 3.8 Component tests for the above
+
+Note: 3.2–3.8 were implemented directly by Claude Code because the Codex
+CLI sandbox is broken on this machine — see the 2026-07-18 entry in
+`docs/DECISIONS.md`. The Codex task specs below remain valid for future
+delegated work once the sandbox is repaired.
 
 **Acceptance:** a complete run is playable on Android; no domain logic
 duplicated in UI; small-screen layout works.
