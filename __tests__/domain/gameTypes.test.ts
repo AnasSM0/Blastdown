@@ -28,6 +28,7 @@ describe("gameTypes", () => {
       rewardedFreezeUses: 0,
       rewardedDefuseUses: 0,
       reviveUsed: false,
+      handRefills: 0,
       status: "ready",
       startedAt: 0,
       lastUpdatedAt: 0,

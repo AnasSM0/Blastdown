@@ -265,3 +265,31 @@ the Phase 3 home screen task — not a reduced/local-only version, not a
 disabled placeholder, simply not built for the MVP. If a future milestone
 wants local (non-online) run history/stats, that requires a
 `BUILD_SPEC.md` update first, per this file's own process rule.
+
+## 2026-07-18 — Additive `handRefills` field on `GameState`
+
+`BUILD_SPEC.md` §14's `GameState` has no counter for hand refills, but
+unique hand-piece instance IDs across a whole run (needed for both testing
+determinism and future UI keying) require a stable, seed-independent
+sequence. Added `handRefills: number` (count of hands generated so far;
+also the next refill's unique-id prefix, e.g. `hand-3-1`). This is an
+additive, non-breaking extension explicitly allowed by
+`docs/ARCHITECTURE.md`'s "verbatim or additive" rule for §14 types.
+
+## 2026-07-18 — Reducer event vocabulary extends the §15.2 example set
+
+`BUILD_SPEC.md` §15.2 explicitly presents its event union as an example
+("The reducer may return gameplay events"). The engine emits a richer set
+(`scoreChanged`, `handRefilled`, plus the spec's `piecePlaced`,
+`linesCleared`, `comboChanged`, `gameOver`; timed/explosion/power-up events
+follow in Phase 2). Rationale: UI/audio/haptics layers should never
+re-derive score deltas or refill detection by diffing states. Events remain
+pure descriptions of what happened — no side effects.
+
+## 2026-07-18 — Session milestone naming vs docs/TASKS.md phases
+
+This engine build session uses milestones 1A/1B/1C/2A/2B/2C. Mapping onto
+`docs/TASKS.md`: 1A+1B ≈ tasks 1.1–1.5 (+1.7–1.9), 1C ≈ 1.6 + the classic
+subset of 2.2 (turn resolution without timers) + event output, 2A ≈
+2.1–2.4, 2B ≈ 2.5–2.6, 2C ≈ 2.7–2.10. `docs/TASKS.md` checkboxes remain
+the canonical completion record.

@@ -12,8 +12,29 @@ describe("handGeneration", () => {
 
   it("generates a hand of the requested size", () => {
     const state = createInitialRngState("hand-seed");
-    const result = generateHand(state, 5);
+    const result = generateHand(state, { handSize: 5 });
     expect(result.hand).toHaveLength(5);
+  });
+
+  it("prefixes handIds with the refill index so ids are unique across refills", () => {
+    const state = createInitialRngState("hand-seed");
+    const first = generateHand(state, { refillIndex: 0 });
+    const second = generateHand(first.nextRngState, { refillIndex: 1 });
+    const allIds = [...first.hand, ...second.hand].map((piece) => piece.handId);
+    expect(new Set(allIds).size).toBe(allIds.length);
+  });
+
+  it("restricts generation to the requested categories", () => {
+    let state = createInitialRngState("category-seed");
+    for (let i = 0; i < 50; i++) {
+      const result = generateHand(state, {
+        categories: ["small", "medium"],
+      });
+      for (const piece of result.hand) {
+        expect(getShapeById(piece.shapeId)!.category).not.toBe("large");
+      }
+      state = result.nextRngState;
+    }
   });
 
   it("every generated piece references a real shape in the catalog", () => {
@@ -34,7 +55,7 @@ describe("handGeneration", () => {
 
   it("every generated piece in a hand has a unique handId", () => {
     const state = createInitialRngState("hand-seed");
-    const result = generateHand(state, 5);
+    const result = generateHand(state, { handSize: 5 });
     const ids = result.hand.map((piece) => piece.handId);
     expect(new Set(ids).size).toBe(ids.length);
   });
@@ -58,7 +79,7 @@ describe("handGeneration", () => {
     const draws = 3000;
 
     for (let i = 0; i < draws; i++) {
-      const result = generateHand(state, 1);
+      const result = generateHand(state, { handSize: 1 });
       const shape = getShapeById(result.hand[0].shapeId)!;
       counts[shape.category] += 1;
       state = result.nextRngState;

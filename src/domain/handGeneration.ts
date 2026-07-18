@@ -25,16 +25,28 @@ function pickWeighted<T>(
   return { item: items[items.length - 1], nextState };
 }
 
-export function generateHand(rngState: number, handSize: number = HAND_SIZE): HandGenerationResult {
+export type HandGenerationOptions = {
+  handSize?: number;
+  refillIndex?: number;
+  categories?: readonly ShapeCategory[];
+};
+
+export function generateHand(
+  rngState: number,
+  options: HandGenerationOptions = {},
+): HandGenerationResult {
+  const handSize = options.handSize ?? HAND_SIZE;
+  const refillIndex = options.refillIndex ?? 0;
+  const allowedCategories =
+    options.categories ?? (Object.keys(HAND_CATEGORY_WEIGHTS) as ShapeCategory[]);
+
   let state = rngState;
   const hand: HandPiece[] = [];
-
-  const categories = Object.keys(HAND_CATEGORY_WEIGHTS) as ShapeCategory[];
 
   for (let i = 0; i < handSize; i++) {
     const categoryPick = pickWeighted(
       state,
-      categories,
+      allowedCategories,
       (category) => HAND_CATEGORY_WEIGHTS[category],
     );
     state = categoryPick.nextState;
@@ -47,7 +59,7 @@ export function generateHand(rngState: number, handSize: number = HAND_SIZE): Ha
     state = colorPick.nextState;
 
     hand.push({
-      handId: `hand-${i}`,
+      handId: `hand-${refillIndex}-${i}`,
       shapeId: shapePick.item.id,
       colorId: PIECE_COLOR_IDS[colorPick.value],
     });

@@ -55,6 +55,8 @@ export type GameState = {
   rewardedFreezeUses: number;
   rewardedDefuseUses: number;
   reviveUsed: boolean;
+  /** Count of hands generated so far; also the next refill's unique-id prefix. */
+  handRefills: number;
   lastExplosionId?: string;
   status: GameStatus;
   startedAt: number;
