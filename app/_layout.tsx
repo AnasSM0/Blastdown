@@ -3,15 +3,19 @@ import { StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { GameSessionProvider } from "../src/state/GameSessionProvider";
+
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-          }}
-        />
+        <GameSessionProvider>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+            }}
+          />
+        </GameSessionProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

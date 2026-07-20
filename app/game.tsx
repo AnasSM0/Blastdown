@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 
 import { GameBoard, BOARD_CONTENT_INSET } from "../src/components/GameBoard";
 import { PieceTray } from "../src/components/PieceTray";
@@ -13,14 +14,13 @@ import type { CellPosition } from "../src/domain/placement";
 import { getShapeById } from "../src/domain/shapes";
 import { getTimerBadgePlacements } from "../src/domain/selectors";
 import { dragOriginFromFinger, type BoardLayout, type Point } from "../src/ui/boardGeometry";
-import { useGameController, type GameControllerOptions } from "../src/hooks/useGameController";
+import {
+  useGameController,
+  type GameController,
+  type GameControllerOptions,
+} from "../src/hooks/useGameController";
+import { useGameSession } from "../src/state/GameSessionProvider";
 import { colors, spacing } from "../src/ui/theme";
-
-type GameScreenContentProps = {
-  controllerOptions?: GameControllerOptions;
-  /** Test seam: fixed board size, since onLayout doesn't fire in tests. */
-  boardSize?: number;
-};
 
 type DragState = {
   handId: string;
@@ -41,10 +41,17 @@ function shapeBoundsFor(shapeId: string): { maxRow: number; maxColumn: number } 
   };
 }
 
-/** Inner screen, exported for tests so a crafted controller can be injected.
- *  All gameplay decisions come from the domain via the controller. */
-export function GameScreenContent({ controllerOptions, boardSize }: GameScreenContentProps) {
-  const controller = useGameController(controllerOptions);
+type GameViewProps = {
+  controller: GameController;
+  /** Test seam: fixed board size, since onLayout doesn't fire in tests. */
+  boardSize?: number;
+  /** Invoked when the player leaves gameplay back to Home. */
+  onExit?: () => void;
+};
+
+/** Presentational gameplay screen over a supplied controller. Holds no
+ *  gameplay rules — every decision is delegated to the domain controller. */
+export function GameView({ controller, boardSize, onExit }: GameViewProps) {
   const { state } = controller;
 
   const [previewOrigin, setPreviewOrigin] = useState<CellPosition | null>(null);
@@ -192,7 +199,12 @@ export function GameScreenContent({ controllerOptions, boardSize }: GameScreenCo
     <View style={styles.screen} testID="game-screen">
       <SafeAreaView style={styles.safe}>
         {/* Best score is persisted in Phase 5; 0 stub until StorageService lands. */}
-        <ScoreHeader score={state.score} best={0} combo={state.combo} onPause={() => {}} />
+        <ScoreHeader
+          score={state.score}
+          best={0}
+          combo={state.combo}
+          onPause={onExit ?? (() => {})}
+        />
         <View style={styles.content}>
           <GameBoard
             ref={boardRef}
@@ -233,6 +245,18 @@ export function GameScreenContent({ controllerOptions, boardSize }: GameScreenCo
   );
 }
 
+type GameScreenContentProps = {
+  controllerOptions?: GameControllerOptions;
+  boardSize?: number;
+};
+
+/** Test entry point: builds a controller from injected options so a crafted
+ *  run can be exercised without the session provider. */
+export function GameScreenContent({ controllerOptions, boardSize }: GameScreenContentProps) {
+  const controller = useGameController(controllerOptions);
+  return <GameView controller={controller} boardSize={boardSize} />;
+}
+
 /** Content cell size implied by a fixed outer board size (test seam parity
  *  with GameBoard's own computation). */
 function boardSizeToCell(outerSize: number): number {
@@ -241,7 +265,16 @@ function boardSizeToCell(outerSize: number): number {
 }
 
 export default function GameScreen() {
-  return <GameScreenContent />;
+  const router = useRouter();
+  const { controller } = useGameSession();
+  const handleExit = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/");
+    }
+  }, [router]);
+  return <GameView controller={controller} onExit={handleExit} />;
 }
 
 const styles = StyleSheet.create({
