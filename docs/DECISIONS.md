@@ -576,3 +576,44 @@ no-op/recording services and mocked AppState. A device pass is recommended.
 `src/ui/fonts.ts`, `src/ui/theme.ts`, `src/components/GameBoard/GameBoard.tsx`,
 `app/_layout.tsx`, `app/game.tsx`, `app.config.ts` (expo-font plugin),
 `assets/audio/**`, `assets/licenses/AUDIO_LICENSES.md`, `FONT_LICENSES.md`.
+
+## 2026-07-21 — Phase 5A: tutorial, themes, and accessibility polish
+
+**Tutorial copy is BUILD_SPEC.md §9 verbatim.** The /goal paraphrase for the
+six steps (e.g. a Freeze/Defuse step) differs from the spec; per CLAUDE.md the
+spec wins, so the on-screen messages are exactly §9's six lines. Step 1 is the
+one interactive "instructional placement" (Skip appears only after it), on an
+isolated `useGameController` instance so the tutorial can never write the
+persisted active run. First-run gating: the home route redirects to the
+tutorial once when the loaded profile has `tutorialCompleted === false`;
+completion (finish or explicit skip) is the only thing that persists it.
+
+**Theme architecture.** `ThemePalette` (src/ui/themes.ts) defines the full
+enumerated surface set for five themes; `ThemeProvider` resolves the active
+palette from `settings.themeId` and gameplay surfaces read it via `useTheme()`,
+so switching applies immediately and persists. The provider defaults to Reactor
+even without a wrapper, so isolated component tests are unchanged. Block colors
+stay keyed by the three domain colorIds — themes are cosmetic only, gameplay is
+untouched. The dead `pieceColors.ts` helper was removed in favor of
+`blockColor(theme, colorId)`.
+
+**Theme unlock economy deferred.** There is no `unlockedThemes` field on the
+persisted profile contract, so no unlock is enforced: all five themes are
+selectable for testing and locked tiles show their Bolt price for information
+only. Gating on Bolts is a later phase once the profile contract adds owned
+themes.
+
+**Motion stays on RN `Animated`** (2026-07-20 entries); no Reanimated or Skia
+was introduced this phase.
+
+**Affects:** `src/ui/themes.ts`, `src/ui/ThemeProvider.tsx`,
+`src/features/tutorial/**`, `src/components/{Tutorial,ThemeScreen,SettingsScreen}/**`,
+gameplay components (GridCell, GameBoard, TimerBadge, PieceTray, ScoreHeader,
+DragGhost), `app/{index,tutorial,themes,settings}.tsx`.
+
+## 2026-07-21 — Committed .gitattributes to stop CRLF churn
+
+The working tree kept showing 60+ files as modified purely from Windows CRLF
+conversion (content identical under `--ignore-space-at-eol`). Added
+`.gitattributes` (`* text=auto eol=lf`, binaries marked) and normalized the
+tree to LF so every future commit shows only real changes.
