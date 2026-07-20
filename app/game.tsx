@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -8,6 +8,7 @@ import { PieceTray } from "../src/components/PieceTray";
 import { ScoreHeader } from "../src/components/ScoreHeader";
 import { GameOverOverlay } from "../src/components/modals/GameOverOverlay";
 import { DefuseConfirmCard } from "../src/components/modals/DefuseConfirmCard";
+import { SecondChanceBanner } from "../src/components/modals/SecondChanceBanner";
 import { RewardedActionBar } from "../src/components/RewardedActionButton";
 import { DragGhost, DRAG_LIFT, type DragGhostHandle } from "../src/components/DragGhost";
 import { BOARD_SIZE } from "../src/domain/board";
@@ -16,6 +17,7 @@ import { getShapeById } from "../src/domain/shapes";
 import {
   canActivateFreeze,
   canApplyRewardedDefuse,
+  canRevive,
   getRewardedDefuseTarget,
   getTimerBadgePlacements,
 } from "../src/domain/selectors";
@@ -59,11 +61,16 @@ type GameViewProps = {
   boardSize?: number;
   /** Invoked when the player leaves gameplay back to Home. */
   onExit?: () => void;
+  /** Invoked to open the end-of-run results screen. */
+  onResults?: () => void;
 };
+
+const SECOND_CHANCE_MS = 1500;
+const SECOND_CHANCE_REDUCED_MS = 800;
 
 /** Presentational gameplay screen over a supplied controller. Holds no
  *  gameplay rules — every decision is delegated to the domain controller. */
-export function GameView({ controller, boardSize, onExit }: GameViewProps) {
+export function GameView({ controller, boardSize, onExit, onResults }: GameViewProps) {
   const { state } = controller;
   const haptics = useHaptics();
   const reducedMotion = useReducedMotion();
@@ -78,6 +85,8 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
   const inputLocked = animator.isAnimating || reward.pending;
 
   const [defuseConfirmOpen, setDefuseConfirmOpen] = useState(false);
+  const [secondChance, setSecondChance] = useState(false);
+  const secondChanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [previewOrigin, setPreviewOrigin] = useState<CellPosition | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dragOrigin, setDragOrigin] = useState<CellPosition | null>(null);
@@ -281,13 +290,48 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
       });
   }, [controller, haptics, reward]);
 
-  const handleRestart = useCallback(() => {
-    setPreviewOrigin(null);
-    setDefuseConfirmOpen(false);
-    clearDrag();
-    animator.reset();
-    controller.restart();
-  }, [animator, clearDrag, controller]);
+  const clearSecondChance = useCallback(() => {
+    if (secondChanceTimer.current !== null) {
+      clearTimeout(secondChanceTimer.current);
+      secondChanceTimer.current = null;
+    }
+    setSecondChance(false);
+  }, []);
+
+  const handleRevive = useCallback(() => {
+    if (reward.pending || !canRevive(state)) {
+      return;
+    }
+    void reward.run("rewarded_revive", () => {
+      if (controller.revive()) {
+        haptics.success();
+        // "SECOND CHANCE" banner over the repaired board (Stitch 10), then
+        // auto-dismiss. Reduced motion shortens the hold and skips the fade.
+        setSecondChance(true);
+        if (secondChanceTimer.current !== null) {
+          clearTimeout(secondChanceTimer.current);
+        }
+        secondChanceTimer.current = setTimeout(
+          () => {
+            secondChanceTimer.current = null;
+            setSecondChance(false);
+          },
+          reducedMotion ? SECOND_CHANCE_REDUCED_MS : SECOND_CHANCE_MS,
+        );
+      }
+    });
+  }, [controller, haptics, reducedMotion, reward, state]);
+
+  const handleEndRun = useCallback(() => {
+    if (reward.pending) {
+      return;
+    }
+    clearSecondChance();
+    onResults?.();
+  }, [clearSecondChance, onResults, reward.pending]);
+
+  // Cancel a pending second-chance timer on unmount.
+  useEffect(() => () => clearSecondChance(), [clearSecondChance]);
 
   const freezeActive = state.freezeTurnsRemaining > 0;
   const defuseTarget = defuseConfirmOpen ? getRewardedDefuseTarget(state) : null;
@@ -347,8 +391,15 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
             busy={reward.pending}
           />
         ) : null}
+        {secondChance ? <SecondChanceBanner reducedMotion={reducedMotion} /> : null}
         {state.status === "gameOver" ? (
-          <GameOverOverlay score={state.score} onRestart={handleRestart} />
+          <GameOverOverlay
+            score={state.score}
+            reviveAvailable={canRevive(state)}
+            onRevive={handleRevive}
+            onEndRun={handleEndRun}
+            busy={reward.pending}
+          />
         ) : null}
       </SafeAreaView>
       {drag && cellSize > 0 ? (
@@ -375,6 +426,7 @@ type GameScreenContentProps = {
   /** Test seam: inject a scripted ad service to exercise reward branches. */
   adService?: AdService;
   onExit?: () => void;
+  onResults?: () => void;
 };
 
 /** Test entry point: builds a controller from injected options so a crafted
@@ -385,11 +437,17 @@ export function GameScreenContent({
   boardSize,
   adService,
   onExit,
+  onResults,
 }: GameScreenContentProps) {
   const controller = useGameController(controllerOptions);
   return (
     <AdServiceProvider service={adService}>
-      <GameView controller={controller} boardSize={boardSize} onExit={onExit} />
+      <GameView
+        controller={controller}
+        boardSize={boardSize}
+        onExit={onExit}
+        onResults={onResults}
+      />
     </AdServiceProvider>
   );
 }
@@ -411,7 +469,10 @@ export default function GameScreen() {
       router.replace("/");
     }
   }, [router]);
-  return <GameView controller={controller} onExit={handleExit} />;
+  const handleResults = useCallback(() => {
+    router.push("/results");
+  }, [router]);
+  return <GameView controller={controller} onExit={handleExit} onResults={handleResults} />;
 }
 
 const styles = StyleSheet.create({
