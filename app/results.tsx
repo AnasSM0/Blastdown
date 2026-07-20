@@ -1,23 +1,42 @@
-import { StyleSheet, Text, View } from "react-native";
+import { useCallback } from "react";
+import { StatusBar } from "expo-status-bar";
+import { useRouter } from "expo-router";
 
-// Placeholder route. Final results UI is implemented in Phase 3 (see docs/TASKS.md).
+import { ResultsView } from "../src/components/ResultsScreen";
+import { useGameSession } from "../src/state/GameSessionProvider";
+
+/** End-of-run results route. Reads the finished run's stats from the shared
+ *  session controller and offers Play Again (fresh run) or Home. */
 export default function ResultsScreen() {
+  const router = useRouter();
+  const { controller, startNewRun } = useGameSession();
+  const state = controller.state;
+
+  const handlePlayAgain = useCallback(() => {
+    startNewRun();
+    router.replace("/game");
+  }, [router, startNewRun]);
+
+  const handleHome = useCallback(() => {
+    router.replace("/");
+  }, [router]);
+
   return (
-    <View style={styles.container} testID="results-screen">
-      <Text style={styles.text}>Results screen coming in Phase 3</Text>
-    </View>
+    <>
+      <ResultsView
+        stats={{
+          score: state.score,
+          bestCombo: state.bestCombo,
+          linesCleared: state.linesCleared,
+          piecesPlaced: state.piecesPlaced,
+          piecesDefused: state.piecesDefused,
+          explosions: state.explosions,
+          rubbleCleared: state.rubbleCleared,
+        }}
+        onPlayAgain={handlePlayAgain}
+        onHome={handleHome}
+      />
+      <StatusBar style="light" />
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0f1115",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  text: {
-    color: "#ffffff",
-    fontSize: 16,
-  },
-});

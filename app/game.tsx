@@ -9,6 +9,7 @@ import { ScoreHeader } from "../src/components/ScoreHeader";
 import { GameOverOverlay } from "../src/components/modals/GameOverOverlay";
 import { DefuseConfirmCard } from "../src/components/modals/DefuseConfirmCard";
 import { SecondChanceBanner } from "../src/components/modals/SecondChanceBanner";
+import { PauseOverlay } from "../src/components/modals/PauseOverlay";
 import { RewardedActionBar } from "../src/components/RewardedActionButton";
 import { DragGhost, DRAG_LIFT, type DragGhostHandle } from "../src/components/DragGhost";
 import { BOARD_SIZE } from "../src/domain/board";
@@ -80,9 +81,12 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
     reducedMotion,
   });
   const reward = useRewardedAction();
-  // Input is locked during a required effect sequence and while a rewarded ad
-  // is in flight, so a reward can't overlap a placement or another reward.
-  const inputLocked = animator.isAnimating || reward.pending;
+
+  const [paused, setPaused] = useState(false);
+  // Input is locked during a required effect sequence, while a rewarded ad is
+  // in flight, and while paused, so a reward can't overlap a placement or
+  // another reward and no move lands behind the pause menu.
+  const inputLocked = animator.isAnimating || reward.pending || paused;
 
   const [defuseConfirmOpen, setDefuseConfirmOpen] = useState(false);
   const [secondChance, setSecondChance] = useState(false);
@@ -330,6 +334,39 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
     onResults?.();
   }, [clearSecondChance, onResults, reward.pending]);
 
+  const handlePause = useCallback(() => {
+    // Pausing mid-reward is disallowed so the confirm/overlay stack stays sane.
+    if (reward.pending) {
+      return;
+    }
+    setPaused(true);
+  }, [reward.pending]);
+
+  const handleResume = useCallback(() => {
+    setPaused(false);
+  }, []);
+
+  // Drop every transient overlay/selection so a fresh run starts clean. Shared
+  // by Restart (pause menu) and leaving to Home.
+  const clearPendingUi = useCallback(() => {
+    setPaused(false);
+    setDefuseConfirmOpen(false);
+    setPreviewOrigin(null);
+    clearSecondChance();
+    clearDrag();
+    animator.reset();
+  }, [animator, clearDrag, clearSecondChance]);
+
+  const handleRestart = useCallback(() => {
+    clearPendingUi();
+    controller.restart();
+  }, [clearPendingUi, controller]);
+
+  const handleHome = useCallback(() => {
+    clearPendingUi();
+    onExit?.();
+  }, [clearPendingUi, onExit]);
+
   // Cancel a pending second-chance timer on unmount.
   useEffect(() => () => clearSecondChance(), [clearSecondChance]);
 
@@ -340,12 +377,7 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
     <View style={styles.screen} testID="game-screen">
       <SafeAreaView style={styles.safe}>
         {/* Best score is persisted in Phase 5; 0 stub until StorageService lands. */}
-        <ScoreHeader
-          score={state.score}
-          best={0}
-          combo={state.combo}
-          onPause={onExit ?? (() => {})}
-        />
+        <ScoreHeader score={state.score} best={0} combo={state.combo} onPause={handlePause} />
         <View style={styles.content}>
           <GameBoard
             ref={boardRef}
@@ -392,6 +424,14 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
           />
         ) : null}
         {secondChance ? <SecondChanceBanner reducedMotion={reducedMotion} /> : null}
+        {paused ? (
+          <PauseOverlay
+            onResume={handleResume}
+            onRestart={handleRestart}
+            onHome={handleHome}
+            reducedMotion={reducedMotion}
+          />
+        ) : null}
         {state.status === "gameOver" ? (
           <GameOverOverlay
             score={state.score}
