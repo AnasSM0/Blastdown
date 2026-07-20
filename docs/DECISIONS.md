@@ -354,3 +354,60 @@ numeric displays use the platform monospace family via a theme token until
 a font task is approved (avoids adding expo-font + font assets mid-slice);
 placement haptics deferred to Phase 3B alongside the useHaptics service
 hook.
+
+## 2026-07-20 — Phase 3B: React Native `Animated` for motion, not Reanimated
+
+`docs/TASKS.md`'s Phase 4 Codex specs name Reanimated for the timer/placement
+animations. Reanimated 4 requires the `react-native-worklets` Babel plugin and
+a working worklet toolchain; this machine has no committed `babel.config.js`
+(Metro falls back to `babel-preset-expo`) and the Codex sandbox that would have
+exercised that path is broken (see 2026-07-18 entry). To keep Phase 3B's motion
+robust and testable, the drag ghost, tray lift, placement snap, and timer pulse
+use React Native's built-in `Animated` API (native-driver transforms/opacity,
+no Babel plugin, no worklets). This satisfies `docs/ANIMATION_SPEC.md`'s "match
+the feel, not the exact keyframes" guidance. If/when the richer defuse/explosion
+sequences (UI-008) need Reanimated's shared values, the toolchain must be fixed
+first; until then `Animated` is the sanctioned motion API for this repo.
+
+**Affects:** `src/components/TimerBadge`, `PieceTray`, `GridCell`, `DragGhost`.
+
+## 2026-07-20 — Drag placement maps finger→cell via measured window geometry
+
+Drag uses `react-native-gesture-handler` `Pan` with `.runOnJS(true)` (no
+worklet) and RN `Animated` for the floating ghost. The finger→board-cell
+mapping is a pure function (`src/ui/boardGeometry.ts`) over the board's
+runtime-measured window rectangle (`measureInWindow`) plus the cell size the
+board reports — never hardcoded device pixels — so it is unit-tested without
+simulating native gestures and works from 320px widths up. A duplicated
+gesture-end is a no-op because the consumed piece has already left the hand, so
+the domain rejects the second `place`. Tap-select/tap-place remains the
+accessibility fallback.
+
+**Affects:** `src/ui/boardGeometry.ts`, `src/components/PieceTray`, `DragGhost`,
+`GameBoard` (forwards ref, reports cell size), `app/game.tsx`.
+
+## 2026-07-20 — In-memory run continuity via `GameSessionProvider`
+
+"Continue" must appear on Home only while a run is in progress, and the game
+screen must share that run — but expo-router screens don't share component
+state. Introduced `GameSessionProvider` (root-level context) holding one
+app-lifetime controller: Play resets it, Continue resumes it, and Home derives
+`canContinue = hasActiveRun && status !== "gameOver"`. Persistence across cold
+starts stays Phase 5; best score / Bolts remain documented `0` stubs. The
+gameplay screen is a controller-driven `GameView`; `GameScreenContent` keeps its
+injected-controller test seam.
+
+**Affects:** `src/state/GameSessionProvider.tsx`, `app/_layout.tsx`,
+`app/index.tsx`, `app/game.tsx`.
+
+## 2026-07-20 — Reduced motion reads the OS setting; some haptics deferred
+
+`useReducedMotion()` reads `AccessibilityInfo.isReduceMotionEnabled()` (and its
+change event) rather than a persisted in-app toggle, which does not exist until
+Phase 5. Every looping/large-transform animation added this phase gates on it.
+Haptics this phase cover the three interaction cues in the session scope
+(selection, success on placement, warning on invalid drop); the per-urgent-cycle
+timer haptic pulse (`BUILD_SPEC.md` §6.11) and the audio wiring stay with the
+dedicated haptics/audio task (UI-009).
+
+**Affects:** `src/hooks/useReducedMotion.ts`, `src/hooks/useHaptics.ts`.

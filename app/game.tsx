@@ -19,6 +19,8 @@ import {
   type GameController,
   type GameControllerOptions,
 } from "../src/hooks/useGameController";
+import { useHaptics } from "../src/hooks/useHaptics";
+import { useReducedMotion } from "../src/hooks/useReducedMotion";
 import { useGameSession } from "../src/state/GameSessionProvider";
 import { colors, spacing } from "../src/ui/theme";
 
@@ -53,10 +55,13 @@ type GameViewProps = {
  *  gameplay rules — every decision is delegated to the domain controller. */
 export function GameView({ controller, boardSize, onExit }: GameViewProps) {
   const { state } = controller;
+  const haptics = useHaptics();
+  const reducedMotion = useReducedMotion();
 
   const [previewOrigin, setPreviewOrigin] = useState<CellPosition | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dragOrigin, setDragOrigin] = useState<CellPosition | null>(null);
+  const [returning, setReturning] = useState(false);
   const [cellSize, setCellSize] = useState(boardSize ? boardSizeToCell(boardSize) : 0);
 
   const boardRef = useRef<View>(null);
@@ -66,6 +71,14 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
   const lastDragOriginRef = useRef<CellPosition | null>(null);
 
   const badges = useMemo(() => getTimerBadgePlacements(state), [state]);
+
+  // Cells of the piece placed on the current turn drive the placement "snap".
+  const placement = useMemo(() => {
+    const event = controller.lastEvents.find((candidate) => candidate.type === "piecePlaced");
+    return event && event.type === "piecePlaced"
+      ? { cells: event.cells, nonce: state.turn }
+      : { cells: [] as CellPosition[], nonce: 0 };
+  }, [controller.lastEvents, state.turn]);
 
   const dragPreview = drag && dragOrigin ? controller.previewFor(drag.handId, dragOrigin) : null;
   const tapPreview = previewOrigin ? controller.previewAt(previewOrigin) : null;
@@ -79,9 +92,13 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
   const handleSelect = useCallback(
     (handId: string) => {
       setPreviewOrigin(null);
+      const wasSelected = controller.selectedHandId === handId;
       controller.selectPiece(handId);
+      if (!wasSelected) {
+        haptics.selection();
+      }
     },
-    [controller],
+    [controller, haptics],
   );
 
   const handleCellPress = useCallback(
@@ -91,12 +108,14 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
       }
       if (controller.placeAt(position)) {
         setPreviewOrigin(null);
+        haptics.success();
       } else {
         // Rejected by the domain: show exactly where the attempt conflicts.
         setPreviewOrigin(position);
+        haptics.warning();
       }
     },
-    [controller],
+    [controller, haptics],
   );
 
   const measureBoard = useCallback(() => {
@@ -143,8 +162,9 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
         startX: point.x,
         startY: point.y,
       });
+      haptics.selection();
     },
-    [controller, measureBoard, state.hand],
+    [controller, haptics, measureBoard, state.hand],
   );
 
   const handleDragMove = useCallback(
@@ -172,6 +192,7 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
   const clearDrag = useCallback(() => {
     setDrag(null);
     setDragOrigin(null);
+    setReturning(false);
     lastDragOriginRef.current = null;
   }, []);
 
@@ -179,14 +200,20 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
     (handId: string, point: Point) => {
       const piece = state.hand.find((candidate) => candidate.handId === handId);
       const origin = piece ? originForPoint(piece.shapeId, point) : null;
-      if (origin) {
-        // A duplicated finalize is a no-op: the piece is already gone from
-        // the hand, so the domain rejects the second attempt.
-        controller.place(handId, origin);
+      // A duplicated finalize is a no-op: the piece is already gone from the
+      // hand, so the domain rejects the second attempt.
+      const placed = origin ? controller.place(handId, origin) : false;
+      if (placed) {
+        haptics.success();
+        clearDrag();
+      } else {
+        // Dropped outside the board or onto an invalid cell: play the return
+        // animation, which clears the drag on completion.
+        haptics.warning();
+        setReturning(true);
       }
-      clearDrag();
     },
-    [clearDrag, controller, originForPoint, state.hand],
+    [clearDrag, controller, haptics, originForPoint, state.hand],
   );
 
   const handleRestart = useCallback(() => {
@@ -214,6 +241,8 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
             preview={preview}
             onCellPress={handleCellPress}
             onCellSizeChange={handleCellSizeChange}
+            placedCells={placement.cells}
+            placementNonce={placement.nonce}
           />
           <PieceTray
             hand={state.hand}
@@ -239,6 +268,9 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
           initialX={drag.startX}
           initialY={drag.startY}
           valid={dragPreview?.valid ?? false}
+          returning={returning}
+          reducedMotion={reducedMotion}
+          onReturnComplete={clearDrag}
         />
       ) : null}
     </View>

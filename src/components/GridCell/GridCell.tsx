@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, Pressable, StyleSheet, View } from "react-native";
 
 import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
 import { colors, radius } from "../../ui/theme";
@@ -13,7 +14,14 @@ type GridCellProps = {
   size: number;
   previewState?: CellPreviewState;
   onPress?: () => void;
+  /** Changes each turn a piece lands on this cell, triggering a brief settle
+   *  "snap" (docs/ANIMATION_SPEC.md "Placement feedback"). Undefined = no
+   *  recent placement here. */
+  flashNonce?: number;
+  reducedMotion?: boolean;
 };
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 function cellLabel(cell: DomainGridCell, row: number, column: number): string {
   const place = `row ${row + 1}, column ${column + 1}`;
@@ -32,8 +40,37 @@ function cellLabel(cell: DomainGridCell, row: number, column: number): string {
 /** Presentation of one board cell. The "glass" look is approximated with a
  *  translucent fill + colored border — deliberately no per-cell blur
  *  (docs/UI_REFERENCE_AUDIT.md item 9). */
-export function GridCell({ cell, row, column, size, previewState, onPress }: GridCellProps) {
+export function GridCell({
+  cell,
+  row,
+  column,
+  size,
+  previewState,
+  onPress,
+  flashNonce,
+  reducedMotion,
+}: GridCellProps) {
   const base = { width: size, height: size };
+  const [snap] = useState(() => new Animated.Value(1));
+  const lastFlash = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (flashNonce === undefined || flashNonce === lastFlash.current) {
+      return;
+    }
+    lastFlash.current = flashNonce;
+    if (reducedMotion) {
+      return;
+    }
+    snap.setValue(1.12);
+    const animation = Animated.timing(snap, {
+      toValue: 1,
+      duration: 150,
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [flashNonce, reducedMotion, snap]);
 
   let visual;
   switch (cell.kind) {
@@ -52,8 +89,8 @@ export function GridCell({ cell, row, column, size, previewState, onPress }: Gri
   }
 
   return (
-    <Pressable
-      style={[styles.cell, base, visual]}
+    <AnimatedPressable
+      style={[styles.cell, base, visual, { transform: [{ scale: snap }] }]}
       onPress={onPress}
       disabled={onPress === undefined}
       testID={`cell-${row}-${column}`}
@@ -74,7 +111,7 @@ export function GridCell({ cell, row, column, size, previewState, onPress }: Gri
           testID={`preview-${previewState}-${row}-${column}`}
         />
       ) : null}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

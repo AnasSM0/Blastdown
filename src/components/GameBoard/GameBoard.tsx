@@ -4,6 +4,7 @@ import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
 import type { PlacementPreview, TimerBadgePlacement } from "../../domain/selectors";
 import type { CellPosition } from "../../domain/placement";
+import { useReducedMotion } from "../../hooks/useReducedMotion";
 import { colors, radius, spacing } from "../../ui/theme";
 import { GridCell, type CellPreviewState } from "../GridCell";
 import { TimerBadge } from "../TimerBadge";
@@ -18,6 +19,10 @@ type GameBoardProps = {
   /** Reports the computed cell edge length whenever it changes, so the screen
    *  can map finger coordinates to board cells during a drag. */
   onCellSizeChange?: (cellSize: number) => void;
+  /** Cells of the most recently placed piece, flashed with a settle "snap". */
+  placedCells?: readonly CellPosition[];
+  /** Bumped each placement so the snap replays even on the same cells. */
+  placementNonce?: number;
 };
 
 const FRAME_WIDTH = 2;
@@ -28,12 +33,24 @@ const FRAME_WIDTH = 2;
 export const BOARD_CONTENT_INSET = FRAME_WIDTH + spacing.gridGutter;
 
 function GameBoardImpl(
-  { grid, badges, boardSize, preview, onCellPress, onCellSizeChange }: GameBoardProps,
+  {
+    grid,
+    badges,
+    boardSize,
+    preview,
+    onCellPress,
+    onCellSizeChange,
+    placedCells,
+    placementNonce,
+  }: GameBoardProps,
   ref: React.ForwardedRef<View>,
 ) {
   const [measured, setMeasured] = useState(0);
+  const reducedMotion = useReducedMotion();
   const rows = grid.length;
   const columns = grid[0]?.length ?? 0;
+
+  const placedSet = new Set((placedCells ?? []).map((cell) => `${cell.row},${cell.column}`));
 
   const previewMap = new Map<string, CellPreviewState>();
   if (preview) {
@@ -88,6 +105,8 @@ function GameBoardImpl(
                     size={cellSize}
                     previewState={previewMap.get(`${row},${column}`)}
                     onPress={onCellPress ? () => onCellPress({ row, column }) : undefined}
+                    flashNonce={placedSet.has(`${row},${column}`) ? placementNonce : undefined}
+                    reducedMotion={reducedMotion}
                   />
                 </View>
               ))}

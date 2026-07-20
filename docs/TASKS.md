@@ -94,8 +94,10 @@ sub-task below. Example allowed files: `app/game.tsx`,
 `src/config/balance.ts`, `src/services/**`, and all Claude-owned files
 listed in `CLAUDE.md`.
 
-- [ ] 3.1 Home screen wired to real persisted best score / Bolts (once
-      Phase 5 lands storage; stub with defaults until then)
+- [x] 3.1 Home screen ("Neon Reactor Minimal") wired into the real game flow
+      via `GameSessionProvider` (Play starts a fresh run, Continue resumes an
+      in-memory run, exit returns Home). Best score / Bolts remain documented
+      `0` stubs until Phase 5 storage — see the 2026-07-20 Decisions entry.
 - [x] 3.2 Game screen layout (score header, board, piece tray)
 - [x] 3.3 Board + grid cell rendering from domain state
 - [x] 3.4 Piece tray rendering
@@ -407,17 +409,28 @@ VERIFY: `npm run typecheck`, `npm run lint`, `npm run test -- tutorial`
 
 **Owner: Codex** · **Reviewer: Claude Code**
 
-- [ ] 4.1 Drag interaction (on top of the tap fallback, not replacing it)
-- [ ] 4.2 Timer visual states + warning pulse
+- [x] 4.1 Drag interaction (on top of the tap fallback, not replacing it)
+- [x] 4.2 Timer visual states + warning pulse (warning/urgent breathing pulse,
+      reduced-motion gated; the per-urgent-cycle haptic stays with 4.6/UI-009)
 - [ ] 4.3 Line-clear effect
 - [ ] 4.4 Defuse effect
 - [ ] 4.5 Explosion effect + screen shake
-- [ ] 4.6 Haptics wiring (via `useHaptics`, not direct SDK calls)
+- [~] 4.6 Haptics wiring (via `useHaptics`, not direct SDK calls) — selection,
+  valid-placement success, and invalid-drop warning wired this phase; the
+  urgent-timer haptic pulse and audio remain (UI-009)
 - [ ] 4.7 Audio wiring (via `useAudio`, `expo-audio`)
-- [ ] 4.8 Reduced-motion support
+- [~] 4.8 Reduced-motion support — `useReducedMotion()` gates every animation
+  added in Phase 3B (drag ghost, tray lift, placement snap, timer pulse);
+  revisit when the effect animations (4.3–4.5) land
 
 **Acceptance:** effects stay responsive; no continuous expensive animations;
 gameplay remains understandable without sound.
+
+Note: Phase 3B (4.1, 4.2, and the placement/lift/return polish, plus 3.1 home
+wiring) was implemented directly by Claude Code — the Codex sandbox is still
+broken on this machine (2026-07-18 Decisions entry). Motion uses RN `Animated`
+rather than Reanimated (2026-07-20 Decisions entry); the remaining effect tasks
+(4.3–4.5) and audio (4.7) are unstarted.
 
 ### Codex task specs (do not assign until Phase 3 tasks above are accepted)
 

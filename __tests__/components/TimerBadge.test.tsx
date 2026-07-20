@@ -3,6 +3,11 @@ import { render } from "@testing-library/react-native";
 import { TimerBadge } from "../../src/components/TimerBadge";
 import { getTimerVisualState } from "../../src/ui/timerStates";
 
+const mockReducedMotion = { value: false };
+jest.mock("../../src/hooks/useReducedMotion", () => ({
+  useReducedMotion: () => mockReducedMotion.value,
+}));
+
 describe("getTimerVisualState", () => {
   it("maps remaining turns to the spec display states", () => {
     expect(getTimerVisualState(7)).toBe("normal");
@@ -28,5 +33,13 @@ describe("TimerBadge", () => {
   it("exposes its visual state for styling assertions", async () => {
     const urgent = await render(<TimerBadge remainingTurns={1} colorId="purple" pieceId="p1" />);
     expect(urgent.getByTestId("timer-badge-p1").props.accessibilityHint).toMatch(/urgent/i);
+  });
+
+  it("keeps the numeral legible under reduced motion (never pulse-only)", async () => {
+    mockReducedMotion.value = true;
+    const result = await render(<TimerBadge remainingTurns={1} colorId="purple" pieceId="p1" />);
+    expect(result.getByText("1")).toBeTruthy();
+    expect(result.getByTestId("timer-badge-p1").props.accessibilityHint).toMatch(/urgent/i);
+    mockReducedMotion.value = false;
   });
 });

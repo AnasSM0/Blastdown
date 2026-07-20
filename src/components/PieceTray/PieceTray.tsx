@@ -1,9 +1,10 @@
-import type { ReactNode } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Animated, Pressable, StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 import type { HandPiece } from "../../domain/gameTypes";
 import { getShapeById } from "../../domain/shapes";
+import { useReducedMotion } from "../../hooks/useReducedMotion";
 import type { Point } from "../../ui/boardGeometry";
 import { colors, neonGlow, radius, spacing } from "../../ui/theme";
 import { pieceColor } from "../../ui/pieceColors";
@@ -25,8 +26,11 @@ type PieceTrayProps = {
 const SLOT_SIZE = 64;
 const MINI_CELL = 14;
 const MINI_GAP = 2;
+const SELECTED_SCALE = 1.08;
 /** Finger travel before a press becomes a drag; below this a tap selects. */
 const DRAG_ACTIVATION_DISTANCE = 8;
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 function MiniShape({ shapeId, colorId }: { shapeId: string; colorId: string }) {
   const shape = getShapeById(shapeId);
@@ -59,6 +63,86 @@ function MiniShape({ shapeId, colorId }: { shapeId: string; colorId: string }) {
   );
 }
 
+type TraySlotProps = {
+  piece: HandPiece;
+  selected: boolean;
+  dragging: boolean;
+  reducedMotion: boolean;
+  onSelect: (handId: string) => void;
+  onDragStart?: (handId: string, point: Point) => void;
+  onDragMove?: (handId: string, point: Point) => void;
+  onDragEnd?: (handId: string, point: Point) => void;
+};
+
+function TraySlot({
+  piece,
+  selected,
+  dragging,
+  reducedMotion,
+  onSelect,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+}: TraySlotProps) {
+  const [lift] = useState(() => new Animated.Value(selected ? SELECTED_SCALE : 1));
+
+  useEffect(() => {
+    const target = selected ? SELECTED_SCALE : 1;
+    if (reducedMotion) {
+      // Reduced motion keeps the selected-state distinction (border/glow) but
+      // skips the springy lift transform (BUILD_SPEC.md §19).
+      lift.setValue(target);
+      return;
+    }
+    const animation = Animated.spring(lift, {
+      toValue: target,
+      useNativeDriver: true,
+      speed: 20,
+      bounciness: 8,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [selected, reducedMotion, lift]);
+
+  const slot = (
+    <AnimatedPressable
+      onPress={() => onSelect(piece.handId)}
+      style={[
+        styles.slot,
+        selected && styles.slotSelected,
+        selected && neonGlow(pieceColor(piece.colorId), "low"),
+        dragging && styles.slotDragging,
+        { transform: [{ scale: lift }] },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`${piece.colorId} ${piece.shapeId} piece`}
+      accessibilityHint="Double tap to select, or drag onto the board to place"
+      accessibilityState={{ selected }}
+      testID={`tray-piece-${piece.handId}`}
+    >
+      <MiniShape shapeId={piece.shapeId} colorId={piece.colorId} />
+    </AnimatedPressable>
+  );
+
+  const dragEnabled = Boolean(onDragStart && onDragMove && onDragEnd);
+  if (!dragEnabled) {
+    return slot;
+  }
+
+  const pan = Gesture.Pan()
+    .runOnJS(true)
+    .minDistance(DRAG_ACTIVATION_DISTANCE)
+    .onStart((event) => onDragStart?.(piece.handId, { x: event.absoluteX, y: event.absoluteY }))
+    .onUpdate((event) => onDragMove?.(piece.handId, { x: event.absoluteX, y: event.absoluteY }))
+    .onFinalize((event) => onDragEnd?.(piece.handId, { x: event.absoluteX, y: event.absoluteY }));
+
+  return (
+    <GestureDetector gesture={pan}>
+      <View collapsable={false}>{slot}</View>
+    </GestureDetector>
+  );
+}
+
 export function PieceTray({
   hand,
   selectedHandId,
@@ -68,64 +152,25 @@ export function PieceTray({
   onDragEnd,
   draggingHandId,
 }: PieceTrayProps) {
-  const dragEnabled = Boolean(onDragStart && onDragMove && onDragEnd);
+  const reducedMotion = useReducedMotion();
 
   return (
     <View style={styles.tray} testID="piece-tray">
-      {hand.map((piece) => {
-        const selected = piece.handId === selectedHandId;
-        const dragging = piece.handId === draggingHandId;
-        const slot = (
-          <Pressable
-            key={piece.handId}
-            onPress={() => onSelect(piece.handId)}
-            style={[
-              styles.slot,
-              selected && styles.slotSelected,
-              selected && neonGlow(pieceColor(piece.colorId), "low"),
-              dragging && styles.slotDragging,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={`${piece.colorId} ${piece.shapeId} piece`}
-            accessibilityHint="Double tap to select, or drag onto the board to place"
-            accessibilityState={{ selected }}
-            testID={`tray-piece-${piece.handId}`}
-          >
-            <MiniShape shapeId={piece.shapeId} colorId={piece.colorId} />
-          </Pressable>
-        );
-
-        if (!dragEnabled) {
-          return slot;
-        }
-
-        const pan = Gesture.Pan()
-          .runOnJS(true)
-          .minDistance(DRAG_ACTIVATION_DISTANCE)
-          .onStart((event) =>
-            onDragStart?.(piece.handId, { x: event.absoluteX, y: event.absoluteY }),
-          )
-          .onUpdate((event) =>
-            onDragMove?.(piece.handId, { x: event.absoluteX, y: event.absoluteY }),
-          )
-          .onFinalize((event) =>
-            onDragEnd?.(piece.handId, { x: event.absoluteX, y: event.absoluteY }),
-          );
-
-        return (
-          <GestureDetector key={piece.handId} gesture={pan}>
-            {slotWrapper(slot)}
-          </GestureDetector>
-        );
-      })}
+      {hand.map((piece) => (
+        <TraySlot
+          key={piece.handId}
+          piece={piece}
+          selected={piece.handId === selectedHandId}
+          dragging={piece.handId === draggingHandId}
+          reducedMotion={reducedMotion}
+          onSelect={onSelect}
+          onDragStart={onDragStart}
+          onDragMove={onDragMove}
+          onDragEnd={onDragEnd}
+        />
+      ))}
     </View>
   );
-}
-
-/** GestureDetector needs a single native-view child; the Pressable qualifies,
- *  but wrapping keeps the key/collapsable contract explicit. */
-function slotWrapper(child: ReactNode): ReactNode {
-  return <View collapsable={false}>{child}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -147,7 +192,6 @@ const styles = StyleSheet.create({
   },
   slotSelected: {
     borderColor: colors.onSurface,
-    transform: [{ scale: 1.08 }],
   },
   slotDragging: {
     opacity: 0.4,

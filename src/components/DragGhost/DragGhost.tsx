@@ -1,5 +1,5 @@
-import { forwardRef, useImperativeHandle, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { Animated, StyleSheet } from "react-native";
 
 import { getShapeById } from "../../domain/shapes";
 import { spacing } from "../../ui/theme";
@@ -11,6 +11,7 @@ import { pieceColor } from "../../ui/pieceColors";
 export const DRAG_LIFT = 28;
 const LIFT = DRAG_LIFT;
 const GUTTER = spacing.gridGutter;
+const RETURN_MS = 160;
 
 export type DragGhostHandle = {
   /** Move the ghost so it floats above the given window-space finger point. */
@@ -24,6 +25,11 @@ type DragGhostProps = {
   initialX: number;
   initialY: number;
   valid: boolean;
+  /** When true, the ghost plays a brief return-to-tray animation and then
+   *  calls onReturnComplete (an invalid/cancelled drop). */
+  returning?: boolean;
+  reducedMotion?: boolean;
+  onReturnComplete?: () => void;
 };
 
 /** A translucent copy of the dragged piece that follows the finger. Its
@@ -31,10 +37,22 @@ type DragGhostProps = {
  *  re-renders on every pointer move — the board is left untouched until the
  *  mapped origin cell actually changes. */
 export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function DragGhost(
-  { shapeId, colorId, cellSize, initialX, initialY, valid },
+  {
+    shapeId,
+    colorId,
+    cellSize,
+    initialX,
+    initialY,
+    valid,
+    returning,
+    reducedMotion,
+    onReturnComplete,
+  },
   ref,
 ) {
   const [point, setPoint] = useState({ x: initialX, y: initialY });
+  const [opacity] = useState(() => new Animated.Value(0.9));
+  const [scale] = useState(() => new Animated.Value(1));
 
   useImperativeHandle(
     ref,
@@ -43,6 +61,26 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
     }),
     [],
   );
+
+  useEffect(() => {
+    if (!returning) {
+      return;
+    }
+    if (reducedMotion) {
+      onReturnComplete?.();
+      return;
+    }
+    const animation = Animated.parallel([
+      Animated.timing(opacity, { toValue: 0, duration: RETURN_MS, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 0.85, duration: RETURN_MS, useNativeDriver: true }),
+    ]);
+    animation.start(({ finished }) => {
+      if (finished) {
+        onReturnComplete?.();
+      }
+    });
+    return () => animation.stop();
+  }, [returning, reducedMotion, opacity, scale, onReturnComplete]);
 
   const shape = getShapeById(shapeId);
   if (!shape) {
@@ -61,13 +99,13 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
   const top = point.y - LIFT - height;
 
   return (
-    <View
+    <Animated.View
       pointerEvents="none"
-      style={[styles.ghost, { left, top, width, height }]}
+      style={[styles.ghost, { left, top, width, height, opacity, transform: [{ scale }] }]}
       testID="drag-ghost"
     >
       {shape.cells.map((cell) => (
-        <View
+        <Animated.View
           key={`${cell.row}-${cell.column}`}
           style={[
             styles.cell,
@@ -82,7 +120,7 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
           ]}
         />
       ))}
-    </View>
+    </Animated.View>
   );
 });
 
