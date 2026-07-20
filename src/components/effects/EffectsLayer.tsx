@@ -4,6 +4,7 @@ import type { CellPosition } from "../../domain/placement";
 import type { EffectPlan } from "../../ui/effects/eventEffects";
 import { colors, spacing } from "../../ui/theme";
 import { BOARD_CONTENT_INSET } from "../GameBoard";
+import { BurstCell } from "./BurstCell";
 import { CellFlash } from "./CellFlash";
 import { FloatingText } from "./FloatingText";
 import { PulseRing } from "./PulseRing";
@@ -47,6 +48,7 @@ export function EffectsLayer({ plan, cellSize, reducedMotion }: EffectsLayerProp
   const centerY = (row: number) => top(row) + cellSize / 2;
 
   const clearCentroid = centroid(plan.clearedCells);
+  const rubbleCentroid = centroid(plan.rubbleCells);
 
   return (
     <View pointerEvents="none" style={styles.layer} testID="effects-layer">
@@ -91,6 +93,29 @@ export function EffectsLayer({ plan, cellSize, reducedMotion }: EffectsLayerProp
           color={colors.cyanBlock}
           centerX={centerX(clearCentroid.column)}
           top={top(clearCentroid.row)}
+          reducedMotion={reducedMotion}
+        />
+      ) : null}
+
+      {plan.explosions.map((explosion, explosionIndex) =>
+        explosion.cells.map((cell, cellIndex) => (
+          <BurstCell
+            key={`burst-${explosion.explosionId}-${cell.row}-${cell.column}`}
+            left={left(cell.column)}
+            top={top(cell.row)}
+            size={cellSize}
+            reducedMotion={reducedMotion}
+            delay={explosionIndex * 40 + cellIndex * 12}
+          />
+        )),
+      )}
+
+      {rubbleCentroid && plan.scoreDelta < 0 ? (
+        <FloatingText
+          text={`${plan.scoreDelta}`}
+          color={colors.urgentRed}
+          centerX={centerX(rubbleCentroid.column)}
+          top={top(rubbleCentroid.row) - cellSize}
           reducedMotion={reducedMotion}
         />
       ) : null}

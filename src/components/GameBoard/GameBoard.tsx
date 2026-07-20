@@ -1,5 +1,5 @@
 import { forwardRef, memo, useEffect, useState } from "react";
-import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import { Animated, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 
 import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
 import type { PlacementPreview, TimerBadgePlacement } from "../../domain/selectors";
@@ -56,8 +56,30 @@ function GameBoardImpl(
 ) {
   const [measured, setMeasured] = useState(0);
   const reducedMotion = useReducedMotion();
+  const [shake] = useState(() => new Animated.Value(0));
   const rows = grid.length;
   const columns = grid[0]?.length ?? 0;
+
+  // Subtle single board shake on an explosion turn (skipped under reduced
+  // motion); keyed on effectKey so it retriggers each explosion sequence.
+  const explosionCount = effectPlan?.explosions.length ?? 0;
+  useEffect(() => {
+    if (explosionCount === 0 || reducedMotion) {
+      shake.setValue(0);
+      return;
+    }
+    const animation = Animated.sequence([
+      Animated.timing(shake, { toValue: -4, duration: 45, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: 4, duration: 55, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: -3, duration: 45, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: 0, duration: 55, useNativeDriver: true }),
+    ]);
+    animation.start();
+    return () => {
+      animation.stop();
+      shake.setValue(0);
+    };
+  }, [effectKey, explosionCount, reducedMotion, shake]);
 
   const placedSet = new Set((placedCells ?? []).map((cell) => `${cell.row},${cell.column}`));
 
@@ -91,9 +113,9 @@ function GameBoardImpl(
   };
 
   return (
-    <View
+    <Animated.View
       ref={ref}
-      style={styles.board}
+      style={[styles.board, { transform: [{ translateX: shake }] }]}
       onLayout={handleLayout}
       collapsable={false}
       accessibilityLabel="Game board"
@@ -159,7 +181,7 @@ function GameBoardImpl(
           reducedMotion={reducedMotion}
         />
       ) : null}
-    </View>
+    </Animated.View>
   );
 }
 

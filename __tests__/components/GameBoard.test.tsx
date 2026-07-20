@@ -1,6 +1,7 @@
 import { render } from "@testing-library/react-native";
 
 import { GameBoard } from "../../src/components/GameBoard";
+import { buildEffectPlan } from "../../src/ui/effects/eventEffects";
 import type { GridCell } from "../../src/domain/gameTypes";
 import type { TimerBadgePlacement } from "../../src/domain/selectors";
 
@@ -51,5 +52,27 @@ describe("GameBoard", () => {
   it("labels the board for screen readers", async () => {
     const result = await render(<GameBoard grid={makeEmptyGrid(8)} badges={[]} boardSize={328} />);
     expect(result.getByLabelText(/game board/i)).toBeTruthy();
+  });
+
+  it("renders the explosion effect overlay over the rubble it produced", async () => {
+    const grid = makeEmptyGrid(8);
+    grid[4][4] = { kind: "rubble", explosionId: "e-1" };
+    const plan = buildEffectPlan(
+      [
+        { type: "explosionStarted", explosionId: "e-1", pieceId: "piece-1" },
+        { type: "rubbleCreated", explosionId: "e-1", cells: [{ row: 4, column: 4 }] },
+        { type: "scoreChanged", delta: -50, score: 0 },
+      ],
+      false,
+    );
+
+    const result = await render(
+      <GameBoard grid={grid} badges={[]} boardSize={328} effectPlan={plan} effectKey={1} />,
+    );
+
+    // The rubble cell is drawn by the grid, and the burst overlay sits on top.
+    expect(result.getByLabelText(/rubble.*row 5.*column 5/i)).toBeTruthy();
+    expect(result.getByTestId("effects-layer")).toBeTruthy();
+    expect(result.getAllByTestId("burst-cell")).toHaveLength(1);
   });
 });

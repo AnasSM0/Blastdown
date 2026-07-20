@@ -411,3 +411,28 @@ timer haptic pulse (`BUILD_SPEC.md` §6.11) and the audio wiring stay with the
 dedicated haptics/audio task (UI-009).
 
 **Affects:** `src/hooks/useReducedMotion.ts`, `src/hooks/useHaptics.ts`.
+
+## 2026-07-20 — Phase 3C: event-driven effect pipeline on RN Animated
+
+Effects are driven only by the domain's own GameEvent stream, never by
+inspecting visual state. A pure `buildEffectPlan` (src/ui/effects/eventEffects.ts)
+turns one turn's events into ordered visual beats — cleared cells are the
+deduplicated union of cleared rows/columns (intersections once, row-major),
+explosions keep event order with rubble grouped by explosionId, score/combo
+come straight from scoreChanged/comboChanged. `useEventAnimator` consumes
+`placePiece` output keyed by the domain turn, holds an input lock for the
+required sequence's duration, animates each turn once, and clears on
+restart/unmount. Domain state stays authoritative and is applied by the
+controller independently — animation code computes no gameplay.
+
+**Reanimated verification:** babel-preset-expo auto-includes the
+react-native-worklets plugin (the worklets package is present), so Reanimated
+would likely transform on device, but runtime worklet execution could not be
+verified here without a device/emulator. To avoid risk and keep the proven
+Phase 3B gestures/animations untouched, Phase 3C stays on React Native's
+`Animated` (native-driver transforms/opacity, reduced-motion gated). No Skia
+was added. Revisit only if a future effect genuinely needs Reanimated shared
+values, and verify on-device first.
+
+**Affects:** `src/ui/effects/eventEffects.ts`, `src/hooks/useEventAnimator.ts`,
+`src/components/effects/**`, `src/components/GameBoard`, `app/game.tsx`.

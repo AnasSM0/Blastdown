@@ -412,25 +412,31 @@ VERIFY: `npm run typecheck`, `npm run lint`, `npm run test -- tutorial`
 - [x] 4.1 Drag interaction (on top of the tap fallback, not replacing it)
 - [x] 4.2 Timer visual states + warning pulse (warning/urgent breathing pulse,
       reduced-motion gated; the per-urgent-cycle haptic stays with 4.6/UI-009)
-- [ ] 4.3 Line-clear effect
-- [ ] 4.4 Defuse effect
-- [ ] 4.5 Explosion effect + screen shake
+- [x] 4.3 Line-clear effect (cyan-white per-cell sweep + score float, driven by
+      the `linesCleared` event through the effect pipeline)
+- [x] 4.4 Defuse effect (badge collapse via clear, cyan success ring +
+      "DEFUSED" float, coordinated with a same-turn line clear)
+- [x] 4.5 Explosion effect + screen shake (neon burst over event-provided
+      rubble cells, subtle board shake, penalty float; reduced motion swaps
+      rubble instantly with no shake)
 - [~] 4.6 Haptics wiring (via `useHaptics`, not direct SDK calls) — selection,
-  valid-placement success, and invalid-drop warning wired this phase; the
-  urgent-timer haptic pulse and audio remain (UI-009)
+  valid-placement success, and invalid-drop warning wired; the urgent-timer
+  haptic pulse and audio remain (UI-009)
 - [ ] 4.7 Audio wiring (via `useAudio`, `expo-audio`)
-- [~] 4.8 Reduced-motion support — `useReducedMotion()` gates every animation
-  added in Phase 3B (drag ghost, tray lift, placement snap, timer pulse);
-  revisit when the effect animations (4.3–4.5) land
+- [x] 4.8 Reduced-motion support — `useReducedMotion()` gates every animation
+      (drag ghost, tray lift, placement snap, timer pulse, and all Phase 3C
+      clear/defuse/explosion effects: brief highlight/fade, no shake/particles)
 
 **Acceptance:** effects stay responsive; no continuous expensive animations;
 gameplay remains understandable without sound.
 
-Note: Phase 3B (4.1, 4.2, and the placement/lift/return polish, plus 3.1 home
-wiring) was implemented directly by Claude Code — the Codex sandbox is still
-broken on this machine (2026-07-18 Decisions entry). Motion uses RN `Animated`
-rather than Reanimated (2026-07-20 Decisions entry); the remaining effect tasks
-(4.3–4.5) and audio (4.7) are unstarted.
+Note: Phase 3B (4.1, 4.2, placement/lift/return polish, 3.1 home wiring) and
+Phase 3C (the event-driven effect pipeline plus 4.3–4.5) were implemented
+directly by Claude Code — the Codex sandbox is still broken on this machine
+(2026-07-18 Decisions entry). Effects are driven only by domain GameEvents via
+a pure plan builder + `useEventAnimator` (2026-07-20 Decisions entry); motion
+uses RN `Animated`, not Reanimated. Remaining Phase 4 work: audio (4.7) and the
+urgent-timer haptic pulse (4.6).
 
 ### Codex task specs (do not assign until Phase 3 tasks above are accepted)
 
