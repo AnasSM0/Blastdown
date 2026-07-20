@@ -5,7 +5,9 @@ import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
 import type { PlacementPreview, TimerBadgePlacement } from "../../domain/selectors";
 import type { CellPosition } from "../../domain/placement";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
+import type { EffectPlan } from "../../ui/effects/eventEffects";
 import { colors, radius, spacing } from "../../ui/theme";
+import { EffectsLayer } from "../effects/EffectsLayer";
 import { GridCell, type CellPreviewState } from "../GridCell";
 import { TimerBadge } from "../TimerBadge";
 
@@ -23,6 +25,11 @@ type GameBoardProps = {
   placedCells?: readonly CellPosition[];
   /** Bumped each placement so the snap replays even on the same cells. */
   placementNonce?: number;
+  /** Cosmetic effect plan for the current turn's clear/defuse/explosion, or
+   *  null when idle. Rendered as an overlay positioned from the cell size. */
+  effectPlan?: EffectPlan | null;
+  /** Increments per sequence so the overlay remounts instead of interpolating. */
+  effectKey?: number;
 };
 
 const FRAME_WIDTH = 2;
@@ -42,6 +49,8 @@ function GameBoardImpl(
     onCellSizeChange,
     placedCells,
     placementNonce,
+    effectPlan,
+    effectKey,
   }: GameBoardProps,
   ref: React.ForwardedRef<View>,
 ) {
@@ -142,6 +151,14 @@ function GameBoardImpl(
             </View>
           ))
         : null}
+      {effectPlan && cellSize > 0 ? (
+        <EffectsLayer
+          key={effectKey}
+          plan={effectPlan}
+          cellSize={cellSize}
+          reducedMotion={reducedMotion}
+        />
+      ) : null}
     </View>
   );
 }

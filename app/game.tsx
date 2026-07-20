@@ -254,6 +254,8 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
             onCellSizeChange={handleCellSizeChange}
             placedCells={placement.cells}
             placementNonce={placement.nonce}
+            effectPlan={animator.plan}
+            effectKey={animator.effectKey}
           />
           <PieceTray
             hand={state.hand}
