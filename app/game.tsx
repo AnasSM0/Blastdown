@@ -21,6 +21,7 @@ import {
 } from "../src/hooks/useGameController";
 import { useHaptics } from "../src/hooks/useHaptics";
 import { useReducedMotion } from "../src/hooks/useReducedMotion";
+import { useEventAnimator } from "../src/hooks/useEventAnimator";
 import { useGameSession } from "../src/state/GameSessionProvider";
 import { colors, spacing } from "../src/ui/theme";
 
@@ -57,6 +58,12 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
   const { state } = controller;
   const haptics = useHaptics();
   const reducedMotion = useReducedMotion();
+  const animator = useEventAnimator({
+    turn: state.turn,
+    events: controller.lastEvents,
+    reducedMotion,
+  });
+  const inputLocked = animator.isAnimating;
 
   const [previewOrigin, setPreviewOrigin] = useState<CellPosition | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -91,6 +98,9 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
 
   const handleSelect = useCallback(
     (handId: string) => {
+      if (inputLocked) {
+        return;
+      }
       setPreviewOrigin(null);
       const wasSelected = controller.selectedHandId === handId;
       controller.selectPiece(handId);
@@ -98,12 +108,12 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
         haptics.selection();
       }
     },
-    [controller, haptics],
+    [controller, haptics, inputLocked],
   );
 
   const handleCellPress = useCallback(
     (position: CellPosition) => {
-      if (controller.selectedHandId === null) {
+      if (inputLocked || controller.selectedHandId === null) {
         return;
       }
       if (controller.placeAt(position)) {
@@ -115,7 +125,7 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
         haptics.warning();
       }
     },
-    [controller, haptics],
+    [controller, haptics, inputLocked],
   );
 
   const measureBoard = useCallback(() => {
@@ -147,7 +157,7 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
   const handleDragStart = useCallback(
     (handId: string, point: Point) => {
       const piece = state.hand.find((candidate) => candidate.handId === handId);
-      if (!piece || cellSizeRef.current <= 0) {
+      if (inputLocked || !piece || cellSizeRef.current <= 0) {
         return;
       }
       controller.clearSelection();
@@ -164,7 +174,7 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
       });
       haptics.selection();
     },
-    [controller, haptics, measureBoard, state.hand],
+    [controller, haptics, inputLocked, measureBoard, state.hand],
   );
 
   const handleDragMove = useCallback(
@@ -219,8 +229,9 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
   const handleRestart = useCallback(() => {
     setPreviewOrigin(null);
     clearDrag();
+    animator.reset();
     controller.restart();
-  }, [clearDrag, controller]);
+  }, [animator, clearDrag, controller]);
 
   return (
     <View style={styles.screen} testID="game-screen">
