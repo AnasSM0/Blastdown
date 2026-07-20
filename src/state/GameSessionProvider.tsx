@@ -1,38 +1,40 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 
 import { useGameController, type GameController } from "../hooks/useGameController";
+import { useGamePersistence } from "../hooks/useGamePersistence";
 
 export type GameSession = {
   /** The single app-lifetime controller shared by Home and the game screen. */
   controller: GameController;
-  /** True once the player has started a run this app session (drives whether
-   *  Home offers "Continue"). Persistence across cold starts is Phase 5. */
+  /** True once persistence has restored (or confirmed no) saved run. */
+  hydrated: boolean;
+  /** True once the player has started a run this session. */
   hasActiveRun: boolean;
-  /** True when a started run is still in progress (not game over). */
+  /** True when a started run is still in progress (drives Continue). */
   canContinue: boolean;
   /** Begin a fresh seeded run and mark the session active. */
   startNewRun: () => void;
+  /** Clear the saved run and mark the session inactive (End Run / settlement). */
+  clearActiveRun: () => void;
 };
 
 const GameSessionContext = createContext<GameSession | null>(null);
 
 export function GameSessionProvider({ children }: { children: ReactNode }) {
   const controller = useGameController();
-  const [hasActiveRun, setHasActiveRun] = useState(false);
-
-  const startNewRun = useCallback(() => {
-    controller.restart();
-    setHasActiveRun(true);
-  }, [controller]);
+  const { hydrated, hasActiveRun, canContinue, startNewRun, clearActiveRun } =
+    useGamePersistence(controller);
 
   const value = useMemo<GameSession>(
     () => ({
       controller,
+      hydrated,
       hasActiveRun,
-      canContinue: hasActiveRun && controller.state.status !== "gameOver",
+      canContinue,
       startNewRun,
+      clearActiveRun,
     }),
-    [controller, hasActiveRun, startNewRun],
+    [controller, hydrated, hasActiveRun, canContinue, startNewRun, clearActiveRun],
   );
 
   return <GameSessionContext.Provider value={value}>{children}</GameSessionContext.Provider>;

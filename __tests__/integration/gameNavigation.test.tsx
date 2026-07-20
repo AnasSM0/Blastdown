@@ -1,6 +1,7 @@
 import { act, fireEvent, render } from "@testing-library/react-native";
 
 import { AdServiceProvider } from "../../src/services/ads";
+import { StorageServiceProvider, createMemoryStorageService } from "../../src/services/storage";
 import { GameSessionProvider } from "../../src/state/GameSessionProvider";
 
 const mockBack = jest.fn();
@@ -21,11 +22,13 @@ function renderGame() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const GameScreen = require("../../app/game").default;
   return render(
-    <AdServiceProvider>
-      <GameSessionProvider>
-        <GameScreen />
-      </GameSessionProvider>
-    </AdServiceProvider>,
+    <StorageServiceProvider service={createMemoryStorageService()}>
+      <AdServiceProvider>
+        <GameSessionProvider>
+          <GameScreen />
+        </GameSessionProvider>
+      </AdServiceProvider>
+    </StorageServiceProvider>,
   );
 }
 

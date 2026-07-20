@@ -8,6 +8,13 @@ export { StorageServiceProvider, useStorageService } from "./StorageServiceProvi
 export { STORAGE_KEYS, ALL_STORAGE_KEYS, type StorageKey } from "./keys";
 export { resetAllStorage } from "./devReset";
 export {
+  loadActiveRun,
+  clearActiveRun,
+  writeActiveRun,
+  createActiveRunPersister,
+  type ActiveRunPersister,
+} from "./activeRunStorage";
+export {
   ACTIVE_RUN_SCHEMA_VERSION,
   PROFILE_SCHEMA_VERSION,
   SETTINGS_SCHEMA_VERSION,

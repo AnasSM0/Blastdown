@@ -1,5 +1,6 @@
 import { fireEvent, render } from "@testing-library/react-native";
 
+import { StorageServiceProvider, createMemoryStorageService } from "../../src/services/storage";
 import { GameSessionProvider } from "../../src/state/GameSessionProvider";
 
 const mockPush = jest.fn();
@@ -18,9 +19,11 @@ function renderHome() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const HomeScreen = require("../../app/index").default;
   return render(
-    <GameSessionProvider>
-      <HomeScreen />
-    </GameSessionProvider>,
+    <StorageServiceProvider service={createMemoryStorageService()}>
+      <GameSessionProvider>
+        <HomeScreen />
+      </GameSessionProvider>
+    </StorageServiceProvider>,
   );
 }
 
