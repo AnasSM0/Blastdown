@@ -521,3 +521,58 @@ ever stored; a `__DEV__`-guarded `resetAllStorage` clears only BlastDown keys.
 `src/state/SettingsProvider.tsx`, `src/components/SettingsScreen/**`,
 `src/components/ResultsScreen/**`, `src/config/balance.ts` (BOLTS_SCORE_DIVISOR),
 `app/_layout.tsx`, `app/index.tsx`, `app/results.tsx`, `app/settings.tsx`.
+
+## 2026-07-20 — Phase 4B: audio, haptics, fonts, settings
+
+**Audio architecture.** A single `AudioService` seam (docs/ARCHITECTURE.md):
+`ExpoAudioService` (expo-audio, lazily reused players, every native call
+guarded so a failure degrades to silence) backs the app; a recording no-op
+backs tests. `AudioServiceProvider` defaults to the no-op so importing it never
+pulls the native module into a test tree — the root layout passes the real
+service. Sound is driven only by typed events, never inferred board state:
+`useGameAudio` plays each turn's event sounds exactly once (keyed on the domain
+turn counter, deduped) and runs the music loop; `useAudio` is the settings-gated
+entry for imperative UI cues (selection/invalid/button). Rewarded freeze/defuse/
+revive do not bump the turn, so their cues fire imperatively in the handlers,
+not from the turn hook.
+
+**Music lifecycle.** One looping player, started/stopped by the music setting
+(gated on settings having loaded so a default never briefly plays over a
+disabled preference), paused on game over and on app background, resumed on
+foreground, and stopped on unmount (leaving gameplay). It is never restarted by
+a render.
+
+**Sound assets.** All 11 SFX and the music bed are original works generated for
+BlastDown (short synthesized PCM), released CC0 / project-owned — no third-party
+samples, no licensing risk. They are intentionally simple placeholders; richer
+licensed audio can replace any file later (record it in AUDIO_LICENSES.md).
+
+**Haptics.** `useHaptics` now honors the persisted haptics setting and adds a
+restrained `timerUrgent`; `useTimerHaptics` fires it as a timed piece crosses
+the countdown-2/1 thresholds (from `timerWarning` events), once per piece+
+threshold transition (turn-keyed, deduped, reset on restart) — no per-render
+spam.
+
+**Fonts.** Geist (UI) + JetBrains Mono (numerics), both SIL OFL, via expo-font +
+`@expo-google-fonts` packages (no binaries committed). `useAppFonts` loads them
+in the root layout; the tree renders immediately and React Native draws the
+system fallback until a face loads or if loading fails — startup is never
+blocked. Family names live as plain strings in `src/ui/theme` so only the loader
+(`src/ui/fonts.ts`) imports the font modules, keeping them out of test trees.
+
+**Reduced motion.** `useEffectiveReducedMotion` combines the persisted override
+with the OS setting: `null` → follow OS, `true` → force reduced, `false` →
+normal. It reads live settings, so a Settings-screen change applies immediately;
+GameView and GameBoard consume it.
+
+**Device review pending.** No device/emulator here — sound/music/haptics toggles,
+background/foreground transitions, countdown warnings, game over, revive,
+wired/Bluetooth output, and app restart are verified only through jest with the
+no-op/recording services and mocked AppState. A device pass is recommended.
+
+**Affects:** `src/services/audio/**`, `src/hooks/useAudio.ts`,
+`src/hooks/useGameAudio.ts`, `src/hooks/useHaptics.ts`,
+`src/hooks/useTimerHaptics.ts`, `src/hooks/useEffectiveReducedMotion.ts`,
+`src/ui/fonts.ts`, `src/ui/theme.ts`, `src/components/GameBoard/GameBoard.tsx`,
+`app/_layout.tsx`, `app/game.tsx`, `app.config.ts` (expo-font plugin),
+`assets/audio/**`, `assets/licenses/AUDIO_LICENSES.md`, `FONT_LICENSES.md`.

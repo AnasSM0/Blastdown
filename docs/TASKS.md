@@ -444,13 +444,16 @@ VERIFY: `npm run typecheck`, `npm run lint`, `npm run test -- tutorial`
 - [x] 4.5 Explosion effect + screen shake (neon burst over event-provided
       rubble cells, subtle board shake, penalty float; reduced motion swaps
       rubble instantly with no shake)
-- [~] 4.6 Haptics wiring (via `useHaptics`, not direct SDK calls) — selection,
-  valid-placement success, and invalid-drop warning wired; the urgent-timer
-  haptic pulse and audio remain (UI-009)
-- [ ] 4.7 Audio wiring (via `useAudio`, `expo-audio`)
-- [x] 4.8 Reduced-motion support — `useReducedMotion()` gates every animation
-      (drag ghost, tray lift, placement snap, timer pulse, and all Phase 3C
-      clear/defuse/explosion effects: brief highlight/fade, no shake/particles)
+- [x] 4.6 Haptics wiring (via `useHaptics`, not direct SDK calls) — selection,
+      valid-placement success, invalid-drop warning, and the urgent countdown-2/
+      countdown-1 timer haptic (`useTimerHaptics`, once per transition). All
+      gated by the persisted haptics setting (Phase 4B).
+- [x] 4.7 Audio wiring (via `useAudio`/`useGameAudio`, `expo-audio`) —
+      event-driven SFX (settings-gated, once per turn) + looping music with
+      AppState/game-over lifecycle (Phase 4B).
+- [x] 4.8 Reduced-motion support — `useReducedMotion()` gates every animation;
+      Phase 4B adds `useEffectiveReducedMotion` combining the persisted override
+      (null → OS, true → force, false → normal) so the Settings toggle applies.
 
 **Acceptance:** effects stay responsive; no continuous expensive animations;
 gameplay remains understandable without sound.
@@ -460,8 +463,24 @@ Phase 3C (the event-driven effect pipeline plus 4.3–4.5) were implemented
 directly by Claude Code — the Codex sandbox is still broken on this machine
 (2026-07-18 Decisions entry). Effects are driven only by domain GameEvents via
 a pure plan builder + `useEventAnimator` (2026-07-20 Decisions entry); motion
-uses RN `Animated`, not Reanimated. Remaining Phase 4 work: audio (4.7) and the
-urgent-timer haptic pulse (4.6).
+uses RN `Animated`, not Reanimated.
+
+### Phase 4B — Audio, haptics, fonts, settings
+
+Delivered 2026-07-20 (Claude Code, single-writer). Fulfils 4.6/4.7/4.8 above
+plus the deferred font loading, and the audio/haptics half of **UI-009**.
+
+- [x] 4B.1 AudioService (expo-audio) + no-op mock + provider; event-driven
+      `useGameAudio` (SFX once per turn, music loop lifecycle) + `useAudio` UI
+      cues; all settings-gated; 11 SFX + music, self-authored CC0.
+- [x] 4B.2 Urgent countdown-2/1 timer haptics, once per transition; all haptics
+      settings-gated.
+- [x] 4B.3 Approved fonts (Geist + JetBrains Mono, SIL OFL) via expo-font with
+      safe system fallback; STYLE_GUIDE typography applied.
+- [x] 4B.4 Settings apply immediately + survive restart; reduced-motion override
+      combines with OS via `useEffectiveReducedMotion`.
+- [x] 4B.5 Asset licenses recorded (`assets/licenses/AUDIO_LICENSES.md`,
+      `FONT_LICENSES.md`).
 
 ### Codex task specs (do not assign until Phase 3 tasks above are accepted)
 
