@@ -15,6 +15,10 @@ export type RunStats = {
 
 type ResultsViewProps = {
   stats: RunStats;
+  /** Player best score after this run is settled. */
+  bestScore: number;
+  /** Bolts earned by this run (floor(score/250) + defuses). */
+  boltsEarned: number;
   onPlayAgain: () => void;
   onHome: () => void;
 };
@@ -28,11 +32,17 @@ function StatRow({ label, value, accent }: { label: string; value: string; accen
   );
 }
 
-/** End-of-run results (Stitch 06) built from the run's real domain stats. Play
- *  Again starts a fresh run; Home returns to the menu. Bolts / Double Bolts are
- *  intentionally absent — the domain exposes no currency yet, so they are
- *  deferred (see docs/DECISIONS.md). */
-export function ResultsView({ stats, onPlayAgain, onHome }: ResultsViewProps) {
+/** End-of-run results (Stitch 06) built from the run's real domain stats plus
+ *  the settled profile (best score, Bolts earned). Play Again starts a fresh
+ *  run; Home returns to the menu. Double Bolts stays deferred — no rewarded
+ *  contract for it yet (see docs/DECISIONS.md). */
+export function ResultsView({
+  stats,
+  bestScore,
+  boltsEarned,
+  onPlayAgain,
+  onHome,
+}: ResultsViewProps) {
   const n = (value: number) => value.toLocaleString("en-US");
   return (
     <SafeAreaView style={styles.screen} testID="results-screen">
@@ -45,8 +55,12 @@ export function ResultsView({ stats, onPlayAgain, onHome }: ResultsViewProps) {
         >
           {n(stats.score)}
         </Text>
+        <Text style={styles.best} testID="results-best">
+          BEST: {n(bestScore)}
+        </Text>
 
         <View style={styles.card}>
+          <StatRow label="Bolts Earned" value={`+${n(boltsEarned)}`} accent={colors.scoreOrange} />
           <StatRow label="Best Combo" value={`x${stats.bestCombo}`} accent={colors.cyanBlock} />
           <StatRow label="Lines Cleared" value={n(stats.linesCleared)} accent={colors.cyanBlock} />
           <StatRow label="Pieces Placed" value={n(stats.piecesPlaced)} accent={colors.cyanBlock} />
@@ -105,6 +119,11 @@ const styles = StyleSheet.create({
   score: {
     ...typography.scoreMobile,
     fontSize: 48,
+    textAlign: "center",
+  },
+  best: {
+    ...typography.labelCaps,
+    color: colors.onSurfaceVariant,
     textAlign: "center",
     marginBottom: spacing.md,
   },
