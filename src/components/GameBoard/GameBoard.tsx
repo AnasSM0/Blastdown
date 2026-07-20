@@ -6,7 +6,8 @@ import type { PlacementPreview, TimerBadgePlacement } from "../../domain/selecto
 import type { CellPosition } from "../../domain/placement";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import type { EffectPlan } from "../../ui/effects/eventEffects";
-import { colors, radius, spacing } from "../../ui/theme";
+import { radius, spacing } from "../../ui/theme";
+import { useTheme } from "../../ui/ThemeProvider";
 import { EffectsLayer } from "../effects/EffectsLayer";
 import { GridCell, type CellPreviewState } from "../GridCell";
 import { TimerBadge } from "../TimerBadge";
@@ -33,6 +34,9 @@ type GameBoardProps = {
   /** Timed piece to ring as the rewarded-defuse target (Stitch 07); its cells
    *  get a solid cyan highlight while the confirm card is open. */
   highlightPieceId?: string | null;
+  /** Effective reduced-motion (OS combined with the persisted override). When
+   *  omitted, falls back to the OS setting alone. */
+  reducedMotion?: boolean;
 };
 
 const FRAME_WIDTH = 2;
@@ -55,11 +59,14 @@ function GameBoardImpl(
     effectPlan,
     effectKey,
     highlightPieceId,
+    reducedMotion: reducedMotionProp,
   }: GameBoardProps,
   ref: React.ForwardedRef<View>,
 ) {
+  const theme = useTheme();
   const [measured, setMeasured] = useState(0);
-  const reducedMotion = useReducedMotion();
+  const osReducedMotion = useReducedMotion();
+  const reducedMotion = reducedMotionProp ?? osReducedMotion;
   const [shake] = useState(() => new Animated.Value(0));
   const rows = grid.length;
   const columns = grid[0]?.length ?? 0;
@@ -119,7 +126,11 @@ function GameBoardImpl(
   return (
     <Animated.View
       ref={ref}
-      style={[styles.board, { transform: [{ translateX: shake }] }]}
+      style={[
+        styles.board,
+        { backgroundColor: theme.boardBg, borderColor: theme.boardFrame },
+        { transform: [{ translateX: shake }] },
+      ]}
       onLayout={handleLayout}
       collapsable={false}
       accessibilityLabel="Game board"
@@ -202,8 +213,6 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 420,
     aspectRatio: 1,
-    backgroundColor: colors.boardBg,
-    borderColor: colors.boardFrame,
     borderWidth: FRAME_WIDTH,
     borderRadius: radius.board,
     padding: spacing.gridGutter,

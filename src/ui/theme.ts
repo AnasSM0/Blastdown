@@ -1,13 +1,22 @@
-import { Platform, type TextStyle, type ViewStyle } from "react-native";
+import { type TextStyle, type ViewStyle } from "react-native";
 
 /** Neon Reactor design tokens, extracted from the approved Stitch snapshot
  *  (docs/STYLE_GUIDE.md). Visual reference only — never gameplay values. */
 
-const monoFamily = Platform.select({
-  android: "monospace",
-  ios: "Menlo",
-  default: "monospace",
-});
+/** Loaded font-family names (docs/STYLE_GUIDE.md typography). These are plain
+ *  strings so any module can reference them without importing the font
+ *  binaries — only src/ui/fonts.ts (used by the root layout) loads the actual
+ *  faces via expo-font. Until a face loads, or if loading fails, React Native
+ *  falls back to the system font for that name — a safe, automatic fallback. */
+export const fonts = {
+  /** Geist — UI text, labels, buttons, body. */
+  uiRegular: "Geist_400Regular",
+  uiSemiBold: "Geist_600SemiBold",
+  /** JetBrains Mono — all numeric displays (score, timer, stat values). */
+  monoMedium: "JetBrainsMono_500Medium",
+  monoSemiBold: "JetBrainsMono_600SemiBold",
+  monoBold: "JetBrainsMono_700Bold",
+} as const;
 
 export const colors = {
   appBackground: "#050505",
@@ -47,12 +56,14 @@ export const radius = {
 
 export const typography = {
   body: {
+    fontFamily: fonts.uiRegular,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "400",
     color: colors.onSurface,
   },
   buttonText: {
+    fontFamily: fonts.uiSemiBold,
     fontSize: 14,
     lineHeight: 20,
     fontWeight: "600",
@@ -60,6 +71,7 @@ export const typography = {
     color: colors.onSurface,
   },
   labelCaps: {
+    fontFamily: fonts.uiSemiBold,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: "600",
@@ -68,21 +80,21 @@ export const typography = {
     color: colors.onSurfaceVariant,
   },
   timerMono: {
-    fontFamily: monoFamily,
+    fontFamily: fonts.monoMedium,
     fontSize: 24,
     lineHeight: 32,
     fontWeight: "500",
     color: colors.onSurface,
   },
   scoreMobile: {
-    fontFamily: monoFamily,
+    fontFamily: fonts.monoBold,
     fontSize: 36,
     lineHeight: 40,
     fontWeight: "700",
     color: colors.scoreOrange,
   },
   numericValue: {
-    fontFamily: monoFamily,
+    fontFamily: fonts.monoSemiBold,
     fontSize: 18,
     lineHeight: 24,
     fontWeight: "600",

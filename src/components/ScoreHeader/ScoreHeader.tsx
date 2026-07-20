@@ -1,6 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors, neonGlow, spacing, typography } from "../../ui/theme";
+import { colors, spacing, typography } from "../../ui/theme";
+import { useTheme } from "../../ui/ThemeProvider";
+import { glowFor } from "../../ui/themes";
 import { ComboIndicator } from "../ComboIndicator";
 
 type ScoreHeaderProps = {
@@ -15,6 +17,7 @@ function formatNumber(value: number): string {
 }
 
 export function ScoreHeader({ score, best, combo, onPause }: ScoreHeaderProps) {
+  const theme = useTheme();
   return (
     <View style={styles.row} testID="score-header">
       <View style={styles.side}>
@@ -29,7 +32,11 @@ export function ScoreHeader({ score, best, combo, onPause }: ScoreHeaderProps) {
 
       <View style={styles.center}>
         <Text
-          style={[typography.scoreMobile, neonGlow(colors.scoreOrange, "low")]}
+          style={[
+            typography.scoreMobile,
+            { color: theme.score },
+            glowFor(theme, theme.score, "low"),
+          ]}
           accessibilityLabel={`Score ${formatNumber(score)}`}
           testID="score-value"
         >

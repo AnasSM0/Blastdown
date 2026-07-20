@@ -6,8 +6,9 @@ import { loadSettings } from "../../src/services/storage/settingsStorage";
 import { SettingsProvider } from "../../src/state/SettingsProvider";
 
 const mockBack = jest.fn();
+const mockPush = jest.fn();
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ back: mockBack, replace: jest.fn(), canGoBack: () => true }),
+  useRouter: () => ({ back: mockBack, push: mockPush, replace: jest.fn(), canGoBack: () => true }),
 }));
 
 async function renderSettings(storage = createMemoryStorageService()) {
@@ -24,7 +25,10 @@ async function renderSettings(storage = createMemoryStorageService()) {
 }
 
 describe("settings screen", () => {
-  beforeEach(() => mockBack.mockClear());
+  beforeEach(() => {
+    mockBack.mockClear();
+    mockPush.mockClear();
+  });
 
   it("persists a toggle change through the provider", async () => {
     const { getByTestId, storage } = await renderSettings();
@@ -45,5 +49,18 @@ describe("settings screen", () => {
       fireEvent.press(getByTestId("settings-back-button"));
     });
     expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("navigates to Themes and to the tutorial replay", async () => {
+    const { getByTestId } = await renderSettings();
+    await act(async () => {
+      fireEvent.press(getByTestId("settings-themes-button"));
+    });
+    expect(mockPush).toHaveBeenCalledWith("/themes");
+
+    await act(async () => {
+      fireEvent.press(getByTestId("settings-replay-tutorial-button"));
+    });
+    expect(mockPush).toHaveBeenCalledWith("/tutorial");
   });
 });
