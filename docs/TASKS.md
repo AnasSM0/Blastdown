@@ -669,13 +669,16 @@ Delivered as **Phase 4A** (2026-07-20), implemented directly by Claude Code
       GameState) with once-only run settlement
 - [x] 5.4 Bolts balance persistence (formula floor(score/250) + defuses)
 - [x] 5.5 Five functional themes (Reactor/Arctic/Magma/Void/Solar) applied via
-      `useTheme()`, selected theme persisted in settings and applied
-      immediately; unlock/purchase economy deferred (no `unlockedThemes`
-      profile contract yet — all selectable, locked tiles show price only)
+      `useTheme()` with a Bolt-based unlock economy (Phase 5B): `unlockedThemeIds`
+      on the profile, authoritative catalog + pure `purchaseTheme` service,
+      purchase confirmation with Selected/Owned/Locked/Insufficient states,
+      selection persisted and fallback-to-Reactor when unowned; effects are
+      theme-aware
 - [x] 5.6 Settings persistence (sound/music/haptics/reduced-motion override)
 - [x] 5.7 Tutorial completion persistence (profile field), set by the Phase 5A
       first-run tutorial (BUILD_SPEC.md §9 copy) on finish or explicit skip
-- [x] 5.8 Schema version + migration mechanism (versioned envelopes + validators + safe fallback; no prior versions to migrate yet)
+- [x] 5.8 Schema version + migration mechanism (versioned envelopes + validators + safe fallback; profile v1→v2 migration adds theme ownership keeping
+      Bolts/stats)
 - [x] 5.9 Themes screen UI (previewed tiles, immediate apply + persist)
 - [x] 5.10 Settings screen UI (persisted toggles + Themes and Replay-Tutorial
       navigation)

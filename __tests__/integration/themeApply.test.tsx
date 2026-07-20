@@ -4,13 +4,23 @@ import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import { GameBoard } from "../../src/components/GameBoard";
 import { StorageServiceProvider, createMemoryStorageService } from "../../src/services/storage";
 import { STORAGE_KEYS } from "../../src/services/storage/keys";
-import { defaultSettings } from "../../src/services/storage/schemas";
+import { defaultProfile, defaultSettings } from "../../src/services/storage/schemas";
 import { SettingsProvider, useSettings } from "../../src/state/SettingsProvider";
+import { ProfileProvider } from "../../src/state/ProfileProvider";
 import { ThemeProvider } from "../../src/ui/ThemeProvider";
 import { resolveTheme, THEMES } from "../../src/ui/themes";
 import type { GridCell } from "../../src/domain/gameTypes";
 
 type Storage = ReturnType<typeof createMemoryStorageService>;
+
+/** Seed the profile as owning every theme, so these rendering tests exercise
+ *  the palettes rather than the ownership fallback (covered separately). */
+function ownAllThemes(storage: Storage) {
+  storage.seed(
+    STORAGE_KEYS.profile,
+    JSON.stringify({ ...defaultProfile(0), unlockedThemeIds: THEMES.map((t) => t.id) }),
+  );
+}
 
 function grid8(): GridCell[][] {
   const grid: GridCell[][] = Array.from({ length: 8 }, () =>
@@ -26,7 +36,9 @@ function Providers({ storage, children }: { storage: Storage; children: React.Re
   return (
     <StorageServiceProvider service={storage}>
       <SettingsProvider>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ProfileProvider>
+          <ThemeProvider>{children}</ThemeProvider>
+        </ProfileProvider>
       </SettingsProvider>
     </StorageServiceProvider>
   );
@@ -53,6 +65,7 @@ function boardBackground(node: { props: Record<string, unknown> }): string | und
 describe("theme application", () => {
   it("applies a theme change immediately to the board", async () => {
     const storage = createMemoryStorageService();
+    ownAllThemes(storage);
     const result = await render(
       <Providers storage={storage}>
         <Switcher />
@@ -73,6 +86,7 @@ describe("theme application", () => {
 
   it("restores a persisted theme on load (survives restart)", async () => {
     const storage = createMemoryStorageService();
+    ownAllThemes(storage);
     storage.seed(STORAGE_KEYS.settings, JSON.stringify({ ...defaultSettings(), themeId: "magma" }));
 
     const result = await render(
@@ -90,6 +104,7 @@ describe("theme application", () => {
     "renders a valid board with normal, timed, and rubble cells for theme %s",
     async (themeId, boardBg) => {
       const storage = createMemoryStorageService();
+      ownAllThemes(storage);
       storage.seed(STORAGE_KEYS.settings, JSON.stringify({ ...defaultSettings(), themeId }));
       const result = await render(
         <Providers storage={storage}>

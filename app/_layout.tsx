@@ -26,8 +26,8 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <StorageServiceProvider>
           <SettingsProvider>
-            <ThemeProvider>
-              <ProfileProvider>
+            <ProfileProvider>
+              <ThemeProvider>
                 <AudioServiceProvider service={audioService}>
                   <AdServiceProvider>
                     <GameSessionProvider>
@@ -39,8 +39,8 @@ export default function RootLayout() {
                     </GameSessionProvider>
                   </AdServiceProvider>
                 </AudioServiceProvider>
-              </ProfileProvider>
-            </ThemeProvider>
+              </ThemeProvider>
+            </ProfileProvider>
           </SettingsProvider>
         </StorageServiceProvider>
       </SafeAreaProvider>

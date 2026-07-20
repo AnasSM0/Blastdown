@@ -36,10 +36,8 @@ describe("theme palettes", () => {
     expect(ids).toEqual(["neon-reactor", "arctic", "magma", "void", "solar"]);
   });
 
-  it("makes Reactor the default and the only unlocked theme", () => {
-    const reactor = THEMES.find((theme) => theme.id === DEFAULT_THEME_ID);
-    expect(reactor?.locked).toBe(false);
-    expect(THEMES.filter((theme) => !theme.locked)).toHaveLength(1);
+  it("includes the Reactor default palette", () => {
+    expect(THEMES.some((theme) => theme.id === DEFAULT_THEME_ID)).toBe(true);
   });
 
   it("defines every required color and all three block hues per theme", () => {

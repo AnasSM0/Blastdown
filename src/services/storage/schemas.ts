@@ -1,11 +1,13 @@
 import { GAME_STATE_VERSION } from "../../domain/game";
 import type { GameState } from "../../domain/gameTypes";
+import { DEFAULT_UNLOCKED_THEME_IDS, sanitizeUnlocked } from "../../economy/themeCatalog";
 
 /** Envelope schema versions, bumped independently of `GAME_STATE_VERSION`.
  *  The envelope version guards the persisted *shape*; the inner
  *  `state.version` guards the domain GameState shape. */
 export const ACTIVE_RUN_SCHEMA_VERSION = 1;
-export const PROFILE_SCHEMA_VERSION = 1;
+/** v2 adds `unlockedThemeIds`; v1 profiles migrate forward keeping Bolts/stats. */
+export const PROFILE_SCHEMA_VERSION = 2;
 export const SETTINGS_SCHEMA_VERSION = 1;
 
 /** A saved, resumable run. `seq` is a monotonic per-session counter used to
@@ -33,6 +35,8 @@ export type PersistedProfile = {
   bestCombo: number;
   revivesUsed: number;
   tutorialCompleted: boolean;
+  /** Theme ids the player owns. Always includes the default-unlocked themes. */
+  unlockedThemeIds: string[];
   createdAt: number;
   updatedAt: number;
 };
@@ -63,6 +67,7 @@ export function defaultProfile(now: number): PersistedProfile {
     bestCombo: 0,
     revivesUsed: 0,
     tutorialCompleted: false,
+    unlockedThemeIds: [...DEFAULT_UNLOCKED_THEME_IDS],
     createdAt: now,
     updatedAt: now,
   };
@@ -175,7 +180,12 @@ export function parseActiveRun(raw: string | null): PersistedActiveRun | null {
 export function parseProfile(raw: string | null, now: number): PersistedProfile {
   const value = parseJson(raw);
   const base = defaultProfile(now);
-  if (!isObject(value) || value.schemaVersion !== PROFILE_SCHEMA_VERSION) {
+  if (!isObject(value)) {
+    return base;
+  }
+  // Accept the current version and migrate the one prior version forward,
+  // preserving Bolts and all stats. Any other/unknown version is discarded.
+  if (value.schemaVersion !== PROFILE_SCHEMA_VERSION && value.schemaVersion !== 1) {
     return base;
   }
   const numericKeys: (keyof PersistedProfile)[] = [
@@ -192,7 +202,7 @@ export function parseProfile(raw: string | null, now: number): PersistedProfile 
     "createdAt",
     "updatedAt",
   ];
-  const merged: PersistedProfile = { ...base };
+  const merged: PersistedProfile = { ...base, schemaVersion: PROFILE_SCHEMA_VERSION };
   for (const key of numericKeys) {
     const candidate = value[key];
     if (isFiniteNumber(candidate)) {
@@ -202,6 +212,9 @@ export function parseProfile(raw: string | null, now: number): PersistedProfile 
   if (typeof value.tutorialCompleted === "boolean") {
     merged.tutorialCompleted = value.tutorialCompleted;
   }
+  // v1 has no unlockedThemeIds — sanitize(undefined) yields the defaults.
+  // v2 (or corrupt) ownership is normalized to a safe list.
+  merged.unlockedThemeIds = sanitizeUnlocked(value.unlockedThemeIds);
   return merged;
 }
 
