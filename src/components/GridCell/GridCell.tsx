@@ -13,6 +13,8 @@ type GridCellProps = {
   column: number;
   size: number;
   previewState?: CellPreviewState;
+  /** Solid cyan ring marking a rewarded-defuse target piece (Stitch 07). */
+  highlighted?: boolean;
   onPress?: () => void;
   /** Changes each turn a piece lands on this cell, triggering a brief settle
    *  "snap" (docs/ANIMATION_SPEC.md "Placement feedback"). Undefined = no
@@ -46,6 +48,7 @@ export function GridCell({
   column,
   size,
   previewState,
+  highlighted,
   onPress,
   flashNonce,
   reducedMotion,
@@ -111,6 +114,9 @@ export function GridCell({
           testID={`preview-${previewState}-${row}-${column}`}
         />
       ) : null}
+      {highlighted ? (
+        <View pointerEvents="none" style={styles.highlight} testID={`highlight-${row}-${column}`} />
+      ) : null}
     </AnimatedPressable>
   );
 }
@@ -157,6 +163,17 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderStyle: "dashed",
     borderRadius: radius.cell,
+  },
+  highlight: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderWidth: 2,
+    borderColor: colors.cyanBlock,
+    borderRadius: radius.cell,
+    backgroundColor: `${colors.cyanBlock}33`,
   },
 });
 

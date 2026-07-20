@@ -1,5 +1,6 @@
 import { fireEvent, render } from "@testing-library/react-native";
 
+import { AdServiceProvider } from "../../src/services/ads";
 import { GameSessionProvider } from "../../src/state/GameSessionProvider";
 
 const mockBack = jest.fn();
@@ -20,9 +21,11 @@ function renderGame() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const GameScreen = require("../../app/game").default;
   return render(
-    <GameSessionProvider>
-      <GameScreen />
-    </GameSessionProvider>,
+    <AdServiceProvider>
+      <GameSessionProvider>
+        <GameScreen />
+      </GameSessionProvider>
+    </AdServiceProvider>,
   );
 }
 

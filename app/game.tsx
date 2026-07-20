@@ -7,12 +7,18 @@ import { GameBoard, BOARD_CONTENT_INSET } from "../src/components/GameBoard";
 import { PieceTray } from "../src/components/PieceTray";
 import { ScoreHeader } from "../src/components/ScoreHeader";
 import { GameOverOverlay } from "../src/components/modals/GameOverOverlay";
+import { DefuseConfirmCard } from "../src/components/modals/DefuseConfirmCard";
 import { RewardedActionBar } from "../src/components/RewardedActionButton";
 import { DragGhost, DRAG_LIFT, type DragGhostHandle } from "../src/components/DragGhost";
 import { BOARD_SIZE } from "../src/domain/board";
 import type { CellPosition } from "../src/domain/placement";
 import { getShapeById } from "../src/domain/shapes";
-import { getTimerBadgePlacements } from "../src/domain/selectors";
+import {
+  canActivateFreeze,
+  canApplyRewardedDefuse,
+  getRewardedDefuseTarget,
+  getTimerBadgePlacements,
+} from "../src/domain/selectors";
 import { dragOriginFromFinger, type BoardLayout, type Point } from "../src/ui/boardGeometry";
 import {
   useGameController,
@@ -22,6 +28,9 @@ import {
 import { useHaptics } from "../src/hooks/useHaptics";
 import { useReducedMotion } from "../src/hooks/useReducedMotion";
 import { useEventAnimator } from "../src/hooks/useEventAnimator";
+import { useRewardedAction } from "../src/hooks/useRewardedAction";
+import { AdServiceProvider } from "../src/services/ads";
+import type { AdService } from "../src/services/ads";
 import { useGameSession } from "../src/state/GameSessionProvider";
 import { colors, spacing } from "../src/ui/theme";
 
@@ -63,8 +72,12 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
     events: controller.lastEvents,
     reducedMotion,
   });
-  const inputLocked = animator.isAnimating;
+  const reward = useRewardedAction();
+  // Input is locked during a required effect sequence and while a rewarded ad
+  // is in flight, so a reward can't overlap a placement or another reward.
+  const inputLocked = animator.isAnimating || reward.pending;
 
+  const [defuseConfirmOpen, setDefuseConfirmOpen] = useState(false);
   const [previewOrigin, setPreviewOrigin] = useState<CellPosition | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dragOrigin, setDragOrigin] = useState<CellPosition | null>(null);
@@ -226,12 +239,58 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
     [clearDrag, controller, haptics, originForPoint, state.hand],
   );
 
+  const handleFreeze = useCallback(() => {
+    // Guard against re-activation while active/exhausted or mid-reward — the
+    // domain would reject anyway, but this avoids a needless ad request.
+    if (inputLocked || !canActivateFreeze(state)) {
+      return;
+    }
+    void reward.run("rewarded_freeze", () => {
+      if (controller.activateFreeze()) {
+        haptics.success();
+      }
+    });
+  }, [controller, haptics, inputLocked, reward, state]);
+
+  const handleDefuseOpen = useCallback(() => {
+    if (inputLocked || !canApplyRewardedDefuse(state)) {
+      return;
+    }
+    controller.clearSelection();
+    setPreviewOrigin(null);
+    setDefuseConfirmOpen(true);
+    haptics.selection();
+  }, [controller, haptics, inputLocked, state]);
+
+  const handleDefuseCancel = useCallback(() => {
+    setDefuseConfirmOpen(false);
+  }, []);
+
+  const handleDefuseConfirm = useCallback(() => {
+    if (reward.pending) {
+      return;
+    }
+    void reward
+      .run("rewarded_defuse", () => {
+        if (controller.defuse()) {
+          haptics.success();
+        }
+      })
+      .finally(() => {
+        setDefuseConfirmOpen(false);
+      });
+  }, [controller, haptics, reward]);
+
   const handleRestart = useCallback(() => {
     setPreviewOrigin(null);
+    setDefuseConfirmOpen(false);
     clearDrag();
     animator.reset();
     controller.restart();
   }, [animator, clearDrag, controller]);
+
+  const freezeActive = state.freezeTurnsRemaining > 0;
+  const defuseTarget = defuseConfirmOpen ? getRewardedDefuseTarget(state) : null;
 
   return (
     <View style={styles.screen} testID="game-screen">
@@ -256,6 +315,7 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
             placementNonce={placement.nonce}
             effectPlan={animator.plan}
             effectKey={animator.effectKey}
+            highlightPieceId={defuseTarget?.id ?? null}
           />
           <PieceTray
             hand={state.hand}
@@ -266,8 +326,27 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
             onDragEnd={handleDragEnd}
             draggingHandId={drag?.handId ?? null}
           />
-          <RewardedActionBar />
+          <RewardedActionBar
+            freeze={{
+              onPress: handleFreeze,
+              disabled: inputLocked || !canActivateFreeze(state),
+              active: freezeActive,
+              placementsRemaining: state.freezeTurnsRemaining,
+            }}
+            defuse={{
+              onPress: handleDefuseOpen,
+              disabled: inputLocked || (!defuseConfirmOpen && !canApplyRewardedDefuse(state)),
+              selected: defuseConfirmOpen,
+            }}
+          />
         </View>
+        {defuseConfirmOpen ? (
+          <DefuseConfirmCard
+            onConfirm={handleDefuseConfirm}
+            onCancel={handleDefuseCancel}
+            busy={reward.pending}
+          />
+        ) : null}
         {state.status === "gameOver" ? (
           <GameOverOverlay score={state.score} onRestart={handleRestart} />
         ) : null}
@@ -293,13 +372,26 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
 type GameScreenContentProps = {
   controllerOptions?: GameControllerOptions;
   boardSize?: number;
+  /** Test seam: inject a scripted ad service to exercise reward branches. */
+  adService?: AdService;
+  onExit?: () => void;
 };
 
 /** Test entry point: builds a controller from injected options so a crafted
- *  run can be exercised without the session provider. */
-export function GameScreenContent({ controllerOptions, boardSize }: GameScreenContentProps) {
+ *  run can be exercised without the session provider. Wraps its own
+ *  AdServiceProvider so reward flows resolve against an injectable mock. */
+export function GameScreenContent({
+  controllerOptions,
+  boardSize,
+  adService,
+  onExit,
+}: GameScreenContentProps) {
   const controller = useGameController(controllerOptions);
-  return <GameView controller={controller} boardSize={boardSize} />;
+  return (
+    <AdServiceProvider service={adService}>
+      <GameView controller={controller} boardSize={boardSize} onExit={onExit} />
+    </AdServiceProvider>
+  );
 }
 
 /** Content cell size implied by a fixed outer board size (test seam parity

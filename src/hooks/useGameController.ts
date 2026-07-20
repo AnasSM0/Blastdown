@@ -3,7 +3,13 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import type { GameState } from "../domain/gameTypes";
 import type { GameEvent } from "../domain/events";
 import type { CellPosition } from "../domain/placement";
-import { createInitialGameState, placePiece } from "../domain/game";
+import {
+  activateFreeze as domainActivateFreeze,
+  applyRevive as domainApplyRevive,
+  applyRewardedDefuse as domainApplyRewardedDefuse,
+  createInitialGameState,
+  placePiece,
+} from "../domain/game";
 import { getPlacementPreview, type PlacementPreview } from "../domain/selectors";
 
 export type GameControllerOptions = {
@@ -32,6 +38,14 @@ export type GameController = {
    *  false (without mutating state) if the piece is gone or the move is
    *  invalid, which also makes a duplicated gesture-end a no-op. */
   place: (handId: string, origin: CellPosition) => boolean;
+  /** Apply the rewarded freeze via the domain. Returns false (no mutation) if
+   *  the domain rejects it (already active, cap reached, not playing). Callers
+   *  must only invoke this after a reward is earned. */
+  activateFreeze: () => boolean;
+  /** Apply the rewarded defuse to the domain-selected lowest-timer piece. */
+  defuse: () => boolean;
+  /** Apply the one-per-run rewarded revive from the game-over state. */
+  revive: () => boolean;
   restart: () => void;
 };
 
@@ -123,6 +137,26 @@ export function useGameController(options: GameControllerOptions = {}): GameCont
     [state],
   );
 
+  const applyTurn = useCallback(
+    (run: (state: GameState, now: number) => ReturnType<typeof placePiece>): boolean => {
+      const result = run(state, nowRef.current());
+      if (!result.ok) {
+        return false;
+      }
+      setState(result.state);
+      setLastEvents(result.events);
+      setSelectedHandId(null);
+      return true;
+    },
+    [state],
+  );
+
+  const activateFreeze = useCallback(() => applyTurn(domainActivateFreeze), [applyTurn]);
+
+  const defuse = useCallback(() => applyTurn(domainApplyRewardedDefuse), [applyTurn]);
+
+  const revive = useCallback(() => applyTurn(domainApplyRevive), [applyTurn]);
+
   const restart = useCallback(() => {
     setState(createInitialGameState(nextSeedRef.current(), nowRef.current()));
     setSelectedHandId(null);
@@ -139,6 +173,9 @@ export function useGameController(options: GameControllerOptions = {}): GameCont
     placeAt,
     previewFor,
     place,
+    activateFreeze,
+    defuse,
+    revive,
     restart,
   };
 }
