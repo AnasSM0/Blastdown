@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 
@@ -9,7 +9,18 @@ import { useProfile } from "../src/state/ProfileProvider";
 export default function HomeScreen() {
   const router = useRouter();
   const { canContinue, startNewRun } = useGameSession();
-  const { profile } = useProfile();
+  const { profile, loaded } = useProfile();
+
+  // First run only: once the profile has loaded and shows the tutorial has
+  // never been completed, send the player to it automatically. Guarded so it
+  // fires once and never loops after completion returns here.
+  const redirectedRef = useRef(false);
+  useEffect(() => {
+    if (loaded && !profile.tutorialCompleted && !redirectedRef.current) {
+      redirectedRef.current = true;
+      router.replace("/tutorial");
+    }
+  }, [loaded, profile.tutorialCompleted, router]);
 
   const handlePlay = useCallback(() => {
     startNewRun();
