@@ -1,23 +1,37 @@
-import { StyleSheet, Text, View } from "react-native";
+import { useCallback } from "react";
+import { StatusBar } from "expo-status-bar";
+import { useRouter } from "expo-router";
 
-// Placeholder route. Settings persistence is implemented in Phase 5 (see docs/TASKS.md).
+import { SettingsView } from "../src/components/SettingsScreen";
+import { useSettings } from "../src/state/SettingsProvider";
+import type { PersistedSettings } from "../src/services/storage/schemas";
+
+/** Settings route: persisted toggles wired to the SettingsProvider. */
 export default function SettingsScreen() {
+  const router = useRouter();
+  const { settings, updateSettings } = useSettings();
+
+  const handleToggle = useCallback(
+    (key: "soundEnabled" | "musicEnabled" | "hapticsEnabled" | "reducedMotion", value: boolean) => {
+      const patch: Partial<PersistedSettings> =
+        key === "reducedMotion" ? { reducedMotionOverride: value } : { [key]: value };
+      updateSettings(patch);
+    },
+    [updateSettings],
+  );
+
+  const handleBack = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/");
+    }
+  }, [router]);
+
   return (
-    <View style={styles.container} testID="settings-screen">
-      <Text style={styles.text}>Settings screen coming in Phase 5</Text>
-    </View>
+    <>
+      <SettingsView settings={settings} onToggle={handleToggle} onBack={handleBack} />
+      <StatusBar style="light" />
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0f1115",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  text: {
-    color: "#ffffff",
-    fontSize: 16,
-  },
-});

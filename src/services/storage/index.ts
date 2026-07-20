@@ -14,6 +14,8 @@ export {
   createActiveRunPersister,
   type ActiveRunPersister,
 } from "./activeRunStorage";
+export { loadProfile, saveProfile } from "./progressStorage";
+export { loadSettings, saveSettings } from "./settingsStorage";
 export {
   ACTIVE_RUN_SCHEMA_VERSION,
   PROFILE_SCHEMA_VERSION,
