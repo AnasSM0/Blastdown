@@ -4,9 +4,11 @@ import { useRouter } from "expo-router";
 
 import { SettingsView } from "../src/components/SettingsScreen";
 import { useSettings } from "../src/state/SettingsProvider";
+import { resolveTheme } from "../src/ui/themes";
 import type { PersistedSettings } from "../src/services/storage/schemas";
 
-/** Settings route: persisted toggles wired to the SettingsProvider. */
+/** Settings route: persisted toggles wired to the SettingsProvider, plus
+ *  navigation to Themes and tutorial replay. */
 export default function SettingsScreen() {
   const router = useRouter();
   const { settings, updateSettings } = useSettings();
@@ -30,7 +32,14 @@ export default function SettingsScreen() {
 
   return (
     <>
-      <SettingsView settings={settings} onToggle={handleToggle} onBack={handleBack} />
+      <SettingsView
+        settings={settings}
+        themeName={resolveTheme(settings.themeId).name}
+        onToggle={handleToggle}
+        onThemes={() => router.push("/themes")}
+        onReplayTutorial={() => router.push("/tutorial")}
+        onBack={handleBack}
+      />
       <StatusBar style="light" />
     </>
   );
