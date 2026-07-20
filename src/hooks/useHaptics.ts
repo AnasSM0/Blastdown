@@ -1,11 +1,13 @@
 import { useMemo } from "react";
 import * as Haptics from "expo-haptics";
 
+import { useSettings } from "../state/SettingsProvider";
+
 /** Gameplay haptic vocabulary, wired at the UI layer only (BUILD_SPEC.md
  *  §6.5/§6.11). Components call these instead of expo-haptics directly, so the
- *  trigger points stay in one place and can later respect a persisted haptics
- *  setting (Phase 5). All calls are best-effort: on platforms without a haptics
- *  engine they simply no-op instead of throwing. */
+ *  trigger points stay in one place and honor the persisted haptics setting.
+ *  All calls are best-effort: on platforms without a haptics engine, or when
+ *  haptics are disabled, they simply no-op instead of throwing. */
 export type GameHaptics = {
   /** Light tick when a piece is selected or picked up for drag. */
   selection: () => void;
@@ -13,6 +15,9 @@ export type GameHaptics = {
   success: () => void;
   /** Warning cue on a rejected placement. */
   warning: () => void;
+  /** Restrained urgent cue as a timer crosses a countdown-2 / countdown-1
+   *  threshold. Called once per transition by useTimerHaptics. */
+  timerUrgent: () => void;
 };
 
 function runSafely(action: () => Promise<unknown> | void): void {
@@ -27,14 +32,20 @@ function runSafely(action: () => Promise<unknown> | void): void {
 }
 
 export function useHaptics(): GameHaptics {
-  return useMemo<GameHaptics>(
-    () => ({
-      selection: () => runSafely(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)),
-      success: () =>
-        runSafely(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)),
-      warning: () =>
-        runSafely(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)),
-    }),
-    [],
-  );
+  const { settings } = useSettings();
+  const enabled = settings.hapticsEnabled;
+
+  return useMemo<GameHaptics>(() => {
+    const gate = (action: () => Promise<unknown> | void) => () => {
+      if (enabled) {
+        runSafely(action);
+      }
+    };
+    return {
+      selection: gate(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)),
+      success: gate(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)),
+      warning: gate(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)),
+      timerUrgent: gate(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)),
+    };
+  }, [enabled]);
 }

@@ -34,6 +34,7 @@ import { useEventAnimator } from "../src/hooks/useEventAnimator";
 import { useRewardedAction } from "../src/hooks/useRewardedAction";
 import { useAudio } from "../src/hooks/useAudio";
 import { useGameAudio } from "../src/hooks/useGameAudio";
+import { useTimerHaptics } from "../src/hooks/useTimerHaptics";
 import { AudioServiceProvider } from "../src/services/audio";
 import type { AudioService } from "../src/services/audio";
 import { StorageServiceProvider, createMemoryStorageService } from "../src/services/storage";
@@ -90,6 +91,8 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
   // Event-driven sound + music: plays each turn's effects once, loops music
   // while the game screen is mounted (both gated by persisted settings).
   useGameAudio({ turn: state.turn, events: controller.lastEvents, status: state.status });
+  // Countdown-2 / countdown-1 urgent haptics, once per timer transition.
+  useTimerHaptics({ turn: state.turn, events: controller.lastEvents });
   const reward = useRewardedAction();
 
   const [paused, setPaused] = useState(false);
