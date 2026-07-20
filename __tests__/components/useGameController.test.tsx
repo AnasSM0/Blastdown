@@ -88,6 +88,52 @@ describe("useGameController", () => {
     expect(result.current.state.turn).toBe(0);
   });
 
+  it("previewFor returns a preview for an explicit hand piece without a selection", async () => {
+    const { result } = await renderHook(() => useGameController(options()));
+    const handId = result.current.state.hand[0].handId;
+
+    expect(result.current.selectedHandId).toBeNull();
+    const preview = result.current.previewFor(handId, { row: 0, column: 0 });
+    expect(preview).not.toBeNull();
+    expect(preview?.cells.length).toBeGreaterThan(0);
+    // Explicit preview does not create a selection (drag path).
+    expect(result.current.selectedHandId).toBeNull();
+  });
+
+  it("place drops an explicit hand piece exactly once and rejects a duplicate", async () => {
+    const { result } = await renderHook(() => useGameController(options()));
+    const handId = result.current.state.hand[0].handId;
+
+    let first = false;
+    await act(() => {
+      first = result.current.place(handId, { row: 0, column: 0 });
+    });
+    expect(first).toBe(true);
+    expect(result.current.state.piecesPlaced).toBe(1);
+
+    const afterFirst = result.current.state;
+    // A duplicated gesture-end with the same (now consumed) handId is a no-op.
+    let second = true;
+    await act(() => {
+      second = result.current.place(handId, { row: 2, column: 2 });
+    });
+    expect(second).toBe(false);
+    expect(result.current.state).toBe(afterFirst);
+  });
+
+  it("place rejects an out-of-bounds origin without mutating state", async () => {
+    const { result } = await renderHook(() => useGameController(options()));
+    const handId = result.current.state.hand[0].handId;
+    const before = result.current.state;
+
+    let accepted = true;
+    await act(() => {
+      accepted = result.current.place(handId, { row: 99, column: 99 });
+    });
+    expect(accepted).toBe(false);
+    expect(result.current.state).toBe(before);
+  });
+
   it("restart creates a fresh seeded run and resets selection and events", async () => {
     const { result } = await renderHook(() => useGameController(options()));
     const handId = result.current.state.hand[0].handId;

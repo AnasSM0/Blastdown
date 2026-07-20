@@ -1,0 +1,63 @@
+import type { CellPosition } from "../domain/placement";
+
+/** Absolute (window-space) geometry of the rendered board's playable content
+ *  area, measured at runtime — never hardcoded device pixels. Produced by the
+ *  game screen from the board's `measureInWindow` result plus the cell size the
+ *  board computed from its own measured width. */
+export type BoardLayout = {
+  /** Left edge of the first column's cell, in window coordinates. */
+  contentLeft: number;
+  /** Top edge of the first row's cell, in window coordinates. */
+  contentTop: number;
+  /** Cell edge length in px. */
+  cellSize: number;
+  /** Distance between adjacent cell origins (cellSize + gutter). */
+  pitch: number;
+  /** Number of rows/columns (square board). */
+  size: number;
+};
+
+export type Point = { x: number; y: number };
+
+/** Map an absolute window point to the board cell containing it, or `null`
+ *  when the point is outside the playable content area. Pure — the same input
+ *  always yields the same cell, so drag mapping is testable without gestures. */
+export function cellFromPoint(point: Point, layout: BoardLayout): CellPosition | null {
+  const { contentLeft, contentTop, pitch, size } = layout;
+  if (pitch <= 0 || size <= 0) {
+    return null;
+  }
+  const relX = point.x - contentLeft;
+  const relY = point.y - contentTop;
+  if (relX < 0 || relY < 0) {
+    return null;
+  }
+  const column = Math.floor(relX / pitch);
+  const row = Math.floor(relY / pitch);
+  if (row < 0 || row >= size || column < 0 || column >= size) {
+    return null;
+  }
+  return { row, column };
+}
+
+/** Map a finger point to the board origin (top-left cell) for a dragged
+ *  piece, accounting for the ghost being centered horizontally on the finger
+ *  and floated `lift` px above it. The returned cell is where the shape's
+ *  (0,0) cell would land, so the live preview aligns with the visible ghost.
+ *  Returns `null` when that origin falls outside the board. */
+export function dragOriginFromFinger(
+  point: Point,
+  shapeBounds: { maxRow: number; maxColumn: number },
+  lift: number,
+  layout: BoardLayout,
+): CellPosition | null {
+  const { cellSize, pitch } = layout;
+  const gutter = pitch - cellSize;
+  const width = (shapeBounds.maxColumn + 1) * pitch - gutter;
+  const height = (shapeBounds.maxRow + 1) * pitch - gutter;
+  const firstCellCenter: Point = {
+    x: point.x - width / 2 + cellSize / 2,
+    y: point.y - lift - height + cellSize / 2,
+  };
+  return cellFromPoint(firstCellCenter, layout);
+}

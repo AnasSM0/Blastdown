@@ -25,6 +25,13 @@ export type GameController = {
   clearSelection: () => void;
   previewAt: (origin: CellPosition) => PlacementPreview | null;
   placeAt: (origin: CellPosition) => boolean;
+  /** Preview an explicit hand piece at an origin, independent of tap
+   *  selection — used by the drag interaction while a finger is down. */
+  previewFor: (handId: string, origin: CellPosition) => PlacementPreview | null;
+  /** Place an explicit hand piece, independent of tap selection. Returns
+   *  false (without mutating state) if the piece is gone or the move is
+   *  invalid, which also makes a duplicated gesture-end a no-op. */
+  place: (handId: string, origin: CellPosition) => boolean;
   restart: () => void;
 };
 
@@ -91,6 +98,31 @@ export function useGameController(options: GameControllerOptions = {}): GameCont
     [selectedHandId, state],
   );
 
+  const previewFor = useCallback(
+    (handId: string, origin: CellPosition): PlacementPreview | null => {
+      const shapeId = state.hand.find((piece) => piece.handId === handId)?.shapeId ?? null;
+      if (shapeId === null) {
+        return null;
+      }
+      return getPlacementPreview(state, shapeId, origin);
+    },
+    [state],
+  );
+
+  const place = useCallback(
+    (handId: string, origin: CellPosition): boolean => {
+      const result = placePiece(state, handId, origin, nowRef.current());
+      if (!result.ok) {
+        return false;
+      }
+      setState(result.state);
+      setLastEvents(result.events);
+      setSelectedHandId(null);
+      return true;
+    },
+    [state],
+  );
+
   const restart = useCallback(() => {
     setState(createInitialGameState(nextSeedRef.current(), nowRef.current()));
     setSelectedHandId(null);
@@ -105,6 +137,8 @@ export function useGameController(options: GameControllerOptions = {}): GameCont
     clearSelection,
     previewAt,
     placeAt,
+    previewFor,
+    place,
     restart,
   };
 }

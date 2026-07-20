@@ -1,7 +1,10 @@
+import type { ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 import type { HandPiece } from "../../domain/gameTypes";
 import { getShapeById } from "../../domain/shapes";
+import type { Point } from "../../ui/boardGeometry";
 import { colors, neonGlow, radius, spacing } from "../../ui/theme";
 import { pieceColor } from "../../ui/pieceColors";
 
@@ -9,11 +12,21 @@ type PieceTrayProps = {
   hand: readonly HandPiece[];
   selectedHandId: string | null;
   onSelect: (handId: string) => void;
+  /** Drag callbacks (window-space points). When omitted the tray is
+   *  tap-only, which keeps non-gesture render contexts and older tests
+   *  working unchanged. */
+  onDragStart?: (handId: string, point: Point) => void;
+  onDragMove?: (handId: string, point: Point) => void;
+  onDragEnd?: (handId: string, point: Point) => void;
+  /** True while a piece is being dragged (drives the picked-up slot style). */
+  draggingHandId?: string | null;
 };
 
 const SLOT_SIZE = 64;
 const MINI_CELL = 14;
 const MINI_GAP = 2;
+/** Finger travel before a press becomes a drag; below this a tap selects. */
+const DRAG_ACTIVATION_DISTANCE = 8;
 
 function MiniShape({ shapeId, colorId }: { shapeId: string; colorId: string }) {
   const shape = getShapeById(shapeId);
@@ -46,12 +59,23 @@ function MiniShape({ shapeId, colorId }: { shapeId: string; colorId: string }) {
   );
 }
 
-export function PieceTray({ hand, selectedHandId, onSelect }: PieceTrayProps) {
+export function PieceTray({
+  hand,
+  selectedHandId,
+  onSelect,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  draggingHandId,
+}: PieceTrayProps) {
+  const dragEnabled = Boolean(onDragStart && onDragMove && onDragEnd);
+
   return (
     <View style={styles.tray} testID="piece-tray">
       {hand.map((piece) => {
         const selected = piece.handId === selectedHandId;
-        return (
+        const dragging = piece.handId === draggingHandId;
+        const slot = (
           <Pressable
             key={piece.handId}
             onPress={() => onSelect(piece.handId)}
@@ -59,18 +83,49 @@ export function PieceTray({ hand, selectedHandId, onSelect }: PieceTrayProps) {
               styles.slot,
               selected && styles.slotSelected,
               selected && neonGlow(pieceColor(piece.colorId), "low"),
+              dragging && styles.slotDragging,
             ]}
             accessibilityRole="button"
             accessibilityLabel={`${piece.colorId} ${piece.shapeId} piece`}
+            accessibilityHint="Double tap to select, or drag onto the board to place"
             accessibilityState={{ selected }}
             testID={`tray-piece-${piece.handId}`}
           >
             <MiniShape shapeId={piece.shapeId} colorId={piece.colorId} />
           </Pressable>
         );
+
+        if (!dragEnabled) {
+          return slot;
+        }
+
+        const pan = Gesture.Pan()
+          .runOnJS(true)
+          .minDistance(DRAG_ACTIVATION_DISTANCE)
+          .onStart((event) =>
+            onDragStart?.(piece.handId, { x: event.absoluteX, y: event.absoluteY }),
+          )
+          .onUpdate((event) =>
+            onDragMove?.(piece.handId, { x: event.absoluteX, y: event.absoluteY }),
+          )
+          .onFinalize((event) =>
+            onDragEnd?.(piece.handId, { x: event.absoluteX, y: event.absoluteY }),
+          );
+
+        return (
+          <GestureDetector key={piece.handId} gesture={pan}>
+            {slotWrapper(slot)}
+          </GestureDetector>
+        );
       })}
     </View>
   );
+}
+
+/** GestureDetector needs a single native-view child; the Pressable qualifies,
+ *  but wrapping keeps the key/collapsable contract explicit. */
+function slotWrapper(child: ReactNode): ReactNode {
+  return <View collapsable={false}>{child}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -93,6 +148,9 @@ const styles = StyleSheet.create({
   slotSelected: {
     borderColor: colors.onSurface,
     transform: [{ scale: 1.08 }],
+  },
+  slotDragging: {
+    opacity: 0.4,
   },
   miniCell: {
     position: "absolute",

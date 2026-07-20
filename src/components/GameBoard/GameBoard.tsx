@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { forwardRef, memo, useEffect, useState } from "react";
 import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
 
 import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
@@ -15,11 +15,22 @@ type GameBoardProps = {
   boardSize?: number;
   preview?: PlacementPreview | null;
   onCellPress?: (position: CellPosition) => void;
+  /** Reports the computed cell edge length whenever it changes, so the screen
+   *  can map finger coordinates to board cells during a drag. */
+  onCellSizeChange?: (cellSize: number) => void;
 };
 
 const FRAME_WIDTH = 2;
 
-export function GameBoard({ grid, badges, boardSize, preview, onCellPress }: GameBoardProps) {
+/** Frame + gutter offset from the board's outer edge to the first cell's
+ *  edge — the screen adds this to the measured window origin to locate the
+ *  playable content area. */
+export const BOARD_CONTENT_INSET = FRAME_WIDTH + spacing.gridGutter;
+
+function GameBoardImpl(
+  { grid, badges, boardSize, preview, onCellPress, onCellSizeChange }: GameBoardProps,
+  ref: React.ForwardedRef<View>,
+) {
   const [measured, setMeasured] = useState(0);
   const rows = grid.length;
   const columns = grid[0]?.length ?? 0;
@@ -35,11 +46,17 @@ export function GameBoard({ grid, badges, boardSize, preview, onCellPress }: Gam
   }
 
   const outerSize = boardSize ?? measured;
-  const contentSize = outerSize - 2 * (FRAME_WIDTH + spacing.gridGutter);
+  const contentSize = outerSize - 2 * BOARD_CONTENT_INSET;
   const cellSize =
     columns > 0 && contentSize > 0
       ? (contentSize - (columns - 1) * spacing.gridGutter) / columns
       : 0;
+
+  useEffect(() => {
+    if (cellSize > 0) {
+      onCellSizeChange?.(cellSize);
+    }
+  }, [cellSize, onCellSizeChange]);
 
   const handleLayout = (event: LayoutChangeEvent) => {
     if (boardSize === undefined) {
@@ -49,8 +66,10 @@ export function GameBoard({ grid, badges, boardSize, preview, onCellPress }: Gam
 
   return (
     <View
+      ref={ref}
       style={styles.board}
       onLayout={handleLayout}
+      collapsable={false}
       accessibilityLabel="Game board"
       testID="game-board"
     >
@@ -107,6 +126,8 @@ export function GameBoard({ grid, badges, boardSize, preview, onCellPress }: Gam
     </View>
   );
 }
+
+export const GameBoard = memo(forwardRef<View, GameBoardProps>(GameBoardImpl));
 
 const styles = StyleSheet.create({
   board: {

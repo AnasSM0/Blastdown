@@ -1,1 +1,1 @@
-export { GameBoard } from "./GameBoard";
+export { GameBoard, BOARD_CONTENT_INSET } from "./GameBoard";

@@ -45,4 +45,42 @@ describe("PieceTray", () => {
     );
     expect(result.getByLabelText(/purple.*line3h/i)).toBeTruthy();
   });
+
+  it("keeps tap-to-select working when drag handlers are wired", async () => {
+    const onSelect = jest.fn();
+    const result = await render(
+      <PieceTray
+        hand={hand}
+        selectedHandId={null}
+        onSelect={onSelect}
+        onDragStart={jest.fn()}
+        onDragMove={jest.fn()}
+        onDragEnd={jest.fn()}
+        draggingHandId={null}
+      />,
+    );
+    // Tap fallback (accessibility path) must survive alongside the gesture.
+    fireEvent.press(result.getByTestId("tray-piece-h2"));
+    expect(onSelect).toHaveBeenCalledWith("h2");
+    expect(result.getAllByTestId(/^tray-piece-/)).toHaveLength(3);
+  });
+
+  it("dims the slot of the piece currently being dragged", async () => {
+    const result = await render(
+      <PieceTray
+        hand={hand}
+        selectedHandId={null}
+        onSelect={jest.fn()}
+        onDragStart={jest.fn()}
+        onDragMove={jest.fn()}
+        onDragEnd={jest.fn()}
+        draggingHandId="h1"
+      />,
+    );
+    const dragged = result.getByTestId("tray-piece-h1");
+    const flattened = Array.isArray(dragged.props.style)
+      ? Object.assign({}, ...dragged.props.style.filter(Boolean))
+      : dragged.props.style;
+    expect(flattened.opacity).toBe(0.4);
+  });
 });
