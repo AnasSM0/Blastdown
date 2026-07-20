@@ -12,8 +12,12 @@ import { StorageServiceProvider } from "../src/services/storage";
 import { GameSessionProvider } from "../src/state/GameSessionProvider";
 import { ProfileProvider } from "../src/state/ProfileProvider";
 import { SettingsProvider } from "../src/state/SettingsProvider";
+import { useAppFonts } from "../src/ui/fonts";
 
 export default function RootLayout() {
+  // Loads approved fonts; the tree renders immediately with a system fallback
+  // and never blocks startup if loading fails.
+  useAppFonts();
   const audioService = useMemo(() => createExpoAudioService(), []);
 
   return (

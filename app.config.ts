@@ -50,6 +50,7 @@ const config: ExpoConfig = {
     "expo-router",
     "expo-asset",
     "expo-audio",
+    "expo-font",
     "expo-status-bar",
     "expo-splash-screen",
     [

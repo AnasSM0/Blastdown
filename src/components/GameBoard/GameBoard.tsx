@@ -33,6 +33,9 @@ type GameBoardProps = {
   /** Timed piece to ring as the rewarded-defuse target (Stitch 07); its cells
    *  get a solid cyan highlight while the confirm card is open. */
   highlightPieceId?: string | null;
+  /** Effective reduced-motion (OS combined with the persisted override). When
+   *  omitted, falls back to the OS setting alone. */
+  reducedMotion?: boolean;
 };
 
 const FRAME_WIDTH = 2;
@@ -55,11 +58,13 @@ function GameBoardImpl(
     effectPlan,
     effectKey,
     highlightPieceId,
+    reducedMotion: reducedMotionProp,
   }: GameBoardProps,
   ref: React.ForwardedRef<View>,
 ) {
   const [measured, setMeasured] = useState(0);
-  const reducedMotion = useReducedMotion();
+  const osReducedMotion = useReducedMotion();
+  const reducedMotion = reducedMotionProp ?? osReducedMotion;
   const [shake] = useState(() => new Animated.Value(0));
   const rows = grid.length;
   const columns = grid[0]?.length ?? 0;

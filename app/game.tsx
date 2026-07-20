@@ -29,7 +29,7 @@ import {
   type GameControllerOptions,
 } from "../src/hooks/useGameController";
 import { useHaptics } from "../src/hooks/useHaptics";
-import { useReducedMotion } from "../src/hooks/useReducedMotion";
+import { useEffectiveReducedMotion } from "../src/hooks/useEffectiveReducedMotion";
 import { useEventAnimator } from "../src/hooks/useEventAnimator";
 import { useRewardedAction } from "../src/hooks/useRewardedAction";
 import { useAudio } from "../src/hooks/useAudio";
@@ -80,7 +80,7 @@ const SECOND_CHANCE_REDUCED_MS = 800;
 export function GameView({ controller, boardSize, onExit, onResults }: GameViewProps) {
   const { state } = controller;
   const haptics = useHaptics();
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useEffectiveReducedMotion();
   const animator = useEventAnimator({
     turn: state.turn,
     events: controller.lastEvents,
@@ -419,6 +419,7 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
             effectPlan={animator.plan}
             effectKey={animator.effectKey}
             highlightPieceId={defuseTarget?.id ?? null}
+            reducedMotion={reducedMotion}
           />
           <PieceTray
             hand={state.hand}
