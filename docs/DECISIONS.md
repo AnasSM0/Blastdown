@@ -474,3 +474,50 @@ would defuse.
 `src/components/RewardedActionButton/**`, `src/components/modals/**`,
 `src/components/ResultsScreen/**`, `app/game.tsx`, `app/results.tsx`,
 `app/_layout.tsx`.
+
+## 2026-07-20 — Phase 4A: local persistence (active run, profile, settings)
+
+Reliable offline persistence built on a single `StorageService` seam
+(`AsyncStorageService` in the app, an in-memory adapter in tests), entirely
+outside `src/domain` — the engine stays pure and never reads storage.
+
+**Schemas & recovery.** Three versioned envelopes — `PersistedActiveRun`,
+`PersistedProfile`, `PersistedSettings` — each carry a `schemaVersion`
+independent of `GAME_STATE_VERSION`. Every load is validated: a corrupt or
+incompatible active run parses to `null` and the app starts fresh; profile and
+settings fall back to defaults (per-field for profile). The active-run envelope
+also embeds the inner GameState `version`; a version mismatch discards the save
+rather than trusting a partial shape. No prior schema versions exist yet, so
+migration is currently "validate-or-reset"; the envelope structure leaves room
+for stepwise migrations later.
+
+**Active run & stale writes.** The full resumable GameState (including
+`rngState`) is saved after every state-changing action, on Freeze/Defuse/Revive/
+Restart (all state changes), and on app background (AppState). All writes go
+through `createActiveRunPersister` — a single serialized, coalescing drain loop,
+so writes complete strictly in request order and a stale async write can never
+overwrite a newer save. Timers are move-based (no wall-clock), so a faithful
+JSON round-trip leaves them unchanged while closed. Game over / End Run clears
+the saved run; Home does not (an unfinished run survives). Continue is offered
+only for a restored run whose status is still `playing`.
+
+**Profile & settlement.** Profile (best score, Bolts, cumulative stats,
+tutorial flag, timestamps) persists separately — no profile/Bolts field is ever
+added to GameState. Each finished run is settled exactly once via
+`GameSessionProvider.settleCurrentRun`, guarded by an app-lifetime `settledRunId`
+(seed + startedAt) so remount, Back, or repeated callbacks never double-count.
+Bolts use the approved formula `floor(score / BOLTS_SCORE_DIVISOR=250) +
+piecesDefused`. Home and Results show real best score and Bolts.
+
+**Deferrals.** Double Bolts stays deferred (no rewarded contract wired). Theme
+unlock/purchase persistence waits on the Phase 6 currency-spend flow (only the
+selected theme id is stored now). Settings sound/music/haptics are persisted but
+audio playback itself is a later phase. No secrets or production ad data are
+ever stored; a `__DEV__`-guarded `resetAllStorage` clears only BlastDown keys.
+
+**Affects:** `src/services/storage/**`, `src/services/profile/settlement.ts`,
+`src/hooks/useGamePersistence.ts`, `src/hooks/useGameController.ts` (hydrate),
+`src/state/GameSessionProvider.tsx`, `src/state/ProfileProvider.tsx`,
+`src/state/SettingsProvider.tsx`, `src/components/SettingsScreen/**`,
+`src/components/ResultsScreen/**`, `src/config/balance.ts` (BOLTS_SCORE_DIVISOR),
+`app/_layout.tsx`, `app/index.tsx`, `app/results.tsx`, `app/settings.tsx`.

@@ -4,10 +4,12 @@ import { useRouter } from "expo-router";
 
 import { HomeScreenView } from "../src/components/HomeScreen";
 import { useGameSession } from "../src/state/GameSessionProvider";
+import { useProfile } from "../src/state/ProfileProvider";
 
 export default function HomeScreen() {
   const router = useRouter();
   const { canContinue, startNewRun } = useGameSession();
+  const { profile } = useProfile();
 
   const handlePlay = useCallback(() => {
     startNewRun();
@@ -20,11 +22,9 @@ export default function HomeScreen() {
 
   return (
     <>
-      {/* Best score and Bolts are persisted in Phase 5; stubbed at 0 until
-          StorageService lands (docs/TASKS.md 3.1). */}
       <HomeScreenView
-        bestScore={0}
-        bolts={0}
+        bestScore={profile.bestScore}
+        bolts={profile.bolts}
         canContinue={canContinue}
         onPlay={handlePlay}
         onContinue={handleContinue}

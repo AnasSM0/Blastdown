@@ -67,3 +67,7 @@ export const REVIVE_TIMER_BONUS = 2;
 export const REVIVE_TIMER_CAP = 9;
 
 export const REVIVE_HAND_CATEGORIES: readonly ShapeCategory[] = ["small", "medium"];
+
+/** Bolts currency reward formula (BUILD_SPEC.md §8.1):
+ *  Bolts = floor(score / BOLTS_SCORE_DIVISOR) + successfully defused pieces. */
+export const BOLTS_SCORE_DIVISOR = 250;

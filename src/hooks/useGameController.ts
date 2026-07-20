@@ -46,6 +46,9 @@ export type GameController = {
   defuse: () => boolean;
   /** Apply the one-per-run rewarded revive from the game-over state. */
   revive: () => boolean;
+  /** Replace the current run with a restored GameState (persistence rehydrate).
+   *  Clears selection and events; does not emit any domain events. */
+  hydrate: (state: GameState) => void;
   restart: () => void;
 };
 
@@ -157,6 +160,12 @@ export function useGameController(options: GameControllerOptions = {}): GameCont
 
   const revive = useCallback(() => applyTurn(domainApplyRevive), [applyTurn]);
 
+  const hydrate = useCallback((restored: GameState) => {
+    setState(restored);
+    setSelectedHandId(null);
+    setLastEvents([]);
+  }, []);
+
   const restart = useCallback(() => {
     setState(createInitialGameState(nextSeedRef.current(), nowRef.current()));
     setSelectedHandId(null);
@@ -176,6 +185,7 @@ export function useGameController(options: GameControllerOptions = {}): GameCont
     activateFreeze,
     defuse,
     revive,
+    hydrate,
     restart,
   };
 }
