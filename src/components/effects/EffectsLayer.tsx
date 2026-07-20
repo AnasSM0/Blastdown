@@ -2,7 +2,8 @@ import { View, StyleSheet } from "react-native";
 
 import type { CellPosition } from "../../domain/placement";
 import type { EffectPlan } from "../../ui/effects/eventEffects";
-import { colors, spacing } from "../../ui/theme";
+import { spacing } from "../../ui/theme";
+import { useTheme } from "../../ui/ThemeProvider";
 import { BOARD_CONTENT_INSET } from "../GameBoard";
 import { BurstCell } from "./BurstCell";
 import { CellFlash } from "./CellFlash";
@@ -10,7 +11,6 @@ import { FloatingText } from "./FloatingText";
 import { PulseRing } from "./PulseRing";
 
 const GUTTER = spacing.gridGutter;
-const CLEAR_FLASH_COLOR = "#E6FFFF";
 const STAGGER_STEP_MS = 10;
 const STAGGER_CAP_MS = 120;
 
@@ -38,6 +38,7 @@ function centroid(cells: readonly CellPosition[]): { row: number; column: number
  *  computes gameplay. Line-clear and defuse beats live here; explosion/rubble
  *  beats are added alongside them. */
 export function EffectsLayer({ plan, cellSize, reducedMotion }: EffectsLayerProps) {
+  const theme = useTheme();
   if (cellSize <= 0) {
     return null;
   }
@@ -58,7 +59,7 @@ export function EffectsLayer({ plan, cellSize, reducedMotion }: EffectsLayerProp
           left={left(cell.column)}
           top={top(cell.row)}
           size={cellSize}
-          color={CLEAR_FLASH_COLOR}
+          color={theme.accent}
           reducedMotion={reducedMotion}
           delay={Math.min((cell.row + cell.column) * STAGGER_STEP_MS, STAGGER_CAP_MS)}
         />
@@ -71,7 +72,7 @@ export function EffectsLayer({ plan, cellSize, reducedMotion }: EffectsLayerProp
               centerX={centerX(clearCentroid.column)}
               centerY={centerY(clearCentroid.row)}
               size={cellSize * 3}
-              color={colors.cyanBlock}
+              color={theme.accent}
               reducedMotion={reducedMotion}
             />
           ))
@@ -80,7 +81,7 @@ export function EffectsLayer({ plan, cellSize, reducedMotion }: EffectsLayerProp
       {clearCentroid && plan.defuses.length > 0 ? (
         <FloatingText
           text={`DEFUSED +${plan.defuses.reduce((sum, defuse) => sum + defuse.bonus, 0)}`}
-          color={colors.cyanBlock}
+          color={theme.accent}
           centerX={centerX(clearCentroid.column)}
           top={top(clearCentroid.row) - cellSize}
           reducedMotion={reducedMotion}
@@ -90,7 +91,7 @@ export function EffectsLayer({ plan, cellSize, reducedMotion }: EffectsLayerProp
       {clearCentroid && plan.defuses.length === 0 && plan.scoreDelta > 0 ? (
         <FloatingText
           text={`+${plan.scoreDelta}`}
-          color={colors.cyanBlock}
+          color={theme.score}
           centerX={centerX(clearCentroid.column)}
           top={top(clearCentroid.row)}
           reducedMotion={reducedMotion}
@@ -105,6 +106,8 @@ export function EffectsLayer({ plan, cellSize, reducedMotion }: EffectsLayerProp
             top={top(cell.row)}
             size={cellSize}
             reducedMotion={reducedMotion}
+            fillColor={theme.score}
+            borderColor={theme.timerCritical}
             delay={explosionIndex * 40 + cellIndex * 12}
           />
         )),
@@ -113,7 +116,7 @@ export function EffectsLayer({ plan, cellSize, reducedMotion }: EffectsLayerProp
       {rubbleCentroid && plan.scoreDelta < 0 ? (
         <FloatingText
           text={`${plan.scoreDelta}`}
-          color={colors.urgentRed}
+          color={theme.timerCritical}
           centerX={centerX(rubbleCentroid.column)}
           top={top(rubbleCentroid.row) - cellSize}
           reducedMotion={reducedMotion}

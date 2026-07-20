@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { Animated, StyleSheet } from "react-native";
 
-import { colors } from "../../ui/theme";
-
 type BurstCellProps = {
   left: number;
   top: number;
   size: number;
   reducedMotion: boolean;
+  /** Burst fill (theme score/accent) and border (theme critical-danger, kept
+   *  high-contrast so an explosion always reads as danger in any theme). */
+  fillColor: string;
+  borderColor: string;
   /** Per-cell anticipation delay (ms) so a multi-cell blast reads clearly. */
   delay?: number;
 };
@@ -16,7 +18,15 @@ type BurstCellProps = {
  *  (danger palette), then a fade that reveals the rubble already drawn beneath
  *  it (docs/ANIMATION_SPEC.md "Explosion sequence"). No fire/smoke, no
  *  full-screen flash. Parents omit this entirely under reduced motion. */
-export function BurstCell({ left, top, size, reducedMotion, delay = 0 }: BurstCellProps) {
+export function BurstCell({
+  left,
+  top,
+  size,
+  reducedMotion,
+  fillColor,
+  borderColor,
+  delay = 0,
+}: BurstCellProps) {
   const [opacity] = useState(() => new Animated.Value(0));
   const [scale] = useState(() => new Animated.Value(0.5));
 
@@ -51,7 +61,16 @@ export function BurstCell({ left, top, size, reducedMotion, delay = 0 }: BurstCe
       testID="burst-cell"
       style={[
         styles.burst,
-        { left, top, width: size, height: size, opacity, transform: [{ scale }] },
+        {
+          left,
+          top,
+          width: size,
+          height: size,
+          backgroundColor: fillColor,
+          borderColor,
+          opacity,
+          transform: [{ scale }],
+        },
       ]}
     />
   );
@@ -61,8 +80,6 @@ const styles = StyleSheet.create({
   burst: {
     position: "absolute",
     borderRadius: 3,
-    backgroundColor: colors.scoreOrange,
     borderWidth: 1.5,
-    borderColor: colors.urgentRed,
   },
 });
