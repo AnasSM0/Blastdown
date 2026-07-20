@@ -1,9 +1,11 @@
 import { act, fireEvent, render } from "@testing-library/react-native";
 
 import { AdServiceProvider } from "../../src/services/ads";
+import { AudioServiceProvider } from "../../src/services/audio";
 import { StorageServiceProvider, createMemoryStorageService } from "../../src/services/storage";
 import { GameSessionProvider } from "../../src/state/GameSessionProvider";
 import { ProfileProvider } from "../../src/state/ProfileProvider";
+import { SettingsProvider } from "../../src/state/SettingsProvider";
 
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
@@ -24,13 +26,17 @@ function renderGame() {
   const GameScreen = require("../../app/game").default;
   return render(
     <StorageServiceProvider service={createMemoryStorageService()}>
-      <ProfileProvider>
-        <AdServiceProvider>
-          <GameSessionProvider>
-            <GameScreen />
-          </GameSessionProvider>
-        </AdServiceProvider>
-      </ProfileProvider>
+      <SettingsProvider>
+        <ProfileProvider>
+          <AudioServiceProvider>
+            <AdServiceProvider>
+              <GameSessionProvider>
+                <GameScreen />
+              </GameSessionProvider>
+            </AdServiceProvider>
+          </AudioServiceProvider>
+        </ProfileProvider>
+      </SettingsProvider>
     </StorageServiceProvider>,
   );
 }

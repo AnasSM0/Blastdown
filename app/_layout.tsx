@@ -3,28 +3,36 @@ import { StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { useMemo } from "react";
+
 import { AdServiceProvider } from "../src/services/ads";
+import { AudioServiceProvider } from "../src/services/audio";
+import { createExpoAudioService } from "../src/services/audio/ExpoAudioService";
 import { StorageServiceProvider } from "../src/services/storage";
 import { GameSessionProvider } from "../src/state/GameSessionProvider";
 import { ProfileProvider } from "../src/state/ProfileProvider";
 import { SettingsProvider } from "../src/state/SettingsProvider";
 
 export default function RootLayout() {
+  const audioService = useMemo(() => createExpoAudioService(), []);
+
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <StorageServiceProvider>
           <SettingsProvider>
             <ProfileProvider>
-              <AdServiceProvider>
-                <GameSessionProvider>
-                  <Stack
-                    screenOptions={{
-                      headerShown: false,
-                    }}
-                  />
-                </GameSessionProvider>
-              </AdServiceProvider>
+              <AudioServiceProvider service={audioService}>
+                <AdServiceProvider>
+                  <GameSessionProvider>
+                    <Stack
+                      screenOptions={{
+                        headerShown: false,
+                      }}
+                    />
+                  </GameSessionProvider>
+                </AdServiceProvider>
+              </AudioServiceProvider>
             </ProfileProvider>
           </SettingsProvider>
         </StorageServiceProvider>

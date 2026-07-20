@@ -32,6 +32,12 @@ import { useHaptics } from "../src/hooks/useHaptics";
 import { useReducedMotion } from "../src/hooks/useReducedMotion";
 import { useEventAnimator } from "../src/hooks/useEventAnimator";
 import { useRewardedAction } from "../src/hooks/useRewardedAction";
+import { useAudio } from "../src/hooks/useAudio";
+import { useGameAudio } from "../src/hooks/useGameAudio";
+import { AudioServiceProvider } from "../src/services/audio";
+import type { AudioService } from "../src/services/audio";
+import { StorageServiceProvider, createMemoryStorageService } from "../src/services/storage";
+import { SettingsProvider } from "../src/state/SettingsProvider";
 import { AdServiceProvider } from "../src/services/ads";
 import type { AdService } from "../src/services/ads";
 import { useGameSession } from "../src/state/GameSessionProvider";
@@ -80,6 +86,10 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
     events: controller.lastEvents,
     reducedMotion,
   });
+  const audio = useAudio();
+  // Event-driven sound + music: plays each turn's effects once, loops music
+  // while the game screen is mounted (both gated by persisted settings).
+  useGameAudio({ turn: state.turn, events: controller.lastEvents, status: state.status });
   const reward = useRewardedAction();
 
   const [paused, setPaused] = useState(false);
@@ -132,9 +142,10 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
       controller.selectPiece(handId);
       if (!wasSelected) {
         haptics.selection();
+        audio.playSfx("selection");
       }
     },
-    [controller, haptics, inputLocked],
+    [audio, controller, haptics, inputLocked],
   );
 
   const handleCellPress = useCallback(
@@ -143,15 +154,17 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
         return;
       }
       if (controller.placeAt(position)) {
+        // Placement sound comes from the piecePlaced event (useGameAudio).
         setPreviewOrigin(null);
         haptics.success();
       } else {
         // Rejected by the domain: show exactly where the attempt conflicts.
         setPreviewOrigin(position);
         haptics.warning();
+        audio.playSfx("invalid");
       }
     },
-    [controller, haptics, inputLocked],
+    [audio, controller, haptics, inputLocked],
   );
 
   const measureBoard = useCallback(() => {
@@ -246,10 +259,11 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
         // Dropped outside the board or onto an invalid cell: play the return
         // animation, which clears the drag on completion.
         haptics.warning();
+        audio.playSfx("invalid");
         setReturning(true);
       }
     },
-    [clearDrag, controller, haptics, originForPoint, state.hand],
+    [audio, clearDrag, controller, haptics, originForPoint, state.hand],
   );
 
   const handleFreeze = useCallback(() => {
@@ -258,12 +272,14 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
     if (inputLocked || !canActivateFreeze(state)) {
       return;
     }
+    audio.playSfx("button");
     void reward.run("rewarded_freeze", () => {
       if (controller.activateFreeze()) {
         haptics.success();
+        audio.playSfx("freeze");
       }
     });
-  }, [controller, haptics, inputLocked, reward, state]);
+  }, [audio, controller, haptics, inputLocked, reward, state]);
 
   const handleDefuseOpen = useCallback(() => {
     if (inputLocked || !canApplyRewardedDefuse(state)) {
@@ -273,26 +289,30 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
     setPreviewOrigin(null);
     setDefuseConfirmOpen(true);
     haptics.selection();
-  }, [controller, haptics, inputLocked, state]);
+    audio.playSfx("button");
+  }, [audio, controller, haptics, inputLocked, state]);
 
   const handleDefuseCancel = useCallback(() => {
+    audio.playSfx("button");
     setDefuseConfirmOpen(false);
-  }, []);
+  }, [audio]);
 
   const handleDefuseConfirm = useCallback(() => {
     if (reward.pending) {
       return;
     }
+    audio.playSfx("button");
     void reward
       .run("rewarded_defuse", () => {
         if (controller.defuse()) {
           haptics.success();
+          audio.playSfx("defuse");
         }
       })
       .finally(() => {
         setDefuseConfirmOpen(false);
       });
-  }, [controller, haptics, reward]);
+  }, [audio, controller, haptics, reward]);
 
   const clearSecondChance = useCallback(() => {
     if (secondChanceTimer.current !== null) {
@@ -306,9 +326,11 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
     if (reward.pending || !canRevive(state)) {
       return;
     }
+    audio.playSfx("button");
     void reward.run("rewarded_revive", () => {
       if (controller.revive()) {
         haptics.success();
+        audio.playSfx("revive");
         // "SECOND CHANCE" banner over the repaired board (Stitch 10), then
         // auto-dismiss. Reduced motion shortens the hold and skips the fade.
         setSecondChance(true);
@@ -324,27 +346,30 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
         );
       }
     });
-  }, [controller, haptics, reducedMotion, reward, state]);
+  }, [audio, controller, haptics, reducedMotion, reward, state]);
 
   const handleEndRun = useCallback(() => {
     if (reward.pending) {
       return;
     }
+    audio.playSfx("button");
     clearSecondChance();
     onResults?.();
-  }, [clearSecondChance, onResults, reward.pending]);
+  }, [audio, clearSecondChance, onResults, reward.pending]);
 
   const handlePause = useCallback(() => {
     // Pausing mid-reward is disallowed so the confirm/overlay stack stays sane.
     if (reward.pending) {
       return;
     }
+    audio.playSfx("button");
     setPaused(true);
-  }, [reward.pending]);
+  }, [audio, reward.pending]);
 
   const handleResume = useCallback(() => {
+    audio.playSfx("button");
     setPaused(false);
-  }, []);
+  }, [audio]);
 
   // Drop every transient overlay/selection so a fresh run starts clean. Shared
   // by Restart (pause menu) and leaving to Home.
@@ -358,14 +383,16 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
   }, [animator, clearDrag, clearSecondChance]);
 
   const handleRestart = useCallback(() => {
+    audio.playSfx("button");
     clearPendingUi();
     controller.restart();
-  }, [clearPendingUi, controller]);
+  }, [audio, clearPendingUi, controller]);
 
   const handleHome = useCallback(() => {
+    audio.playSfx("button");
     clearPendingUi();
     onExit?.();
-  }, [clearPendingUi, onExit]);
+  }, [audio, clearPendingUi, onExit]);
 
   // Cancel a pending second-chance timer on unmount.
   useEffect(() => () => clearSecondChance(), [clearSecondChance]);
@@ -465,30 +492,40 @@ type GameScreenContentProps = {
   boardSize?: number;
   /** Test seam: inject a scripted ad service to exercise reward branches. */
   adService?: AdService;
+  /** Test seam: inject a recording audio service to assert sound triggers. */
+  audioService?: AudioService;
   onExit?: () => void;
   onResults?: () => void;
 };
 
 /** Test entry point: builds a controller from injected options so a crafted
- *  run can be exercised without the session provider. Wraps its own
- *  AdServiceProvider so reward flows resolve against an injectable mock. */
+ *  run can be exercised without the session provider. Wraps the storage,
+ *  settings, audio, and ad providers GameView depends on, all injectable. */
 export function GameScreenContent({
   controllerOptions,
   boardSize,
   adService,
+  audioService,
   onExit,
   onResults,
 }: GameScreenContentProps) {
   const controller = useGameController(controllerOptions);
+  const storage = useMemo(() => createMemoryStorageService(), []);
   return (
-    <AdServiceProvider service={adService}>
-      <GameView
-        controller={controller}
-        boardSize={boardSize}
-        onExit={onExit}
-        onResults={onResults}
-      />
-    </AdServiceProvider>
+    <StorageServiceProvider service={storage}>
+      <SettingsProvider>
+        <AudioServiceProvider service={audioService}>
+          <AdServiceProvider service={adService}>
+            <GameView
+              controller={controller}
+              boardSize={boardSize}
+              onExit={onExit}
+              onResults={onResults}
+            />
+          </AdServiceProvider>
+        </AudioServiceProvider>
+      </SettingsProvider>
+    </StorageServiceProvider>
   );
 }
 
