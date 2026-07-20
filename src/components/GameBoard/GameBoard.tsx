@@ -6,7 +6,8 @@ import type { PlacementPreview, TimerBadgePlacement } from "../../domain/selecto
 import type { CellPosition } from "../../domain/placement";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import type { EffectPlan } from "../../ui/effects/eventEffects";
-import { colors, radius, spacing } from "../../ui/theme";
+import { radius, spacing } from "../../ui/theme";
+import { useTheme } from "../../ui/ThemeProvider";
 import { EffectsLayer } from "../effects/EffectsLayer";
 import { GridCell, type CellPreviewState } from "../GridCell";
 import { TimerBadge } from "../TimerBadge";
@@ -62,6 +63,7 @@ function GameBoardImpl(
   }: GameBoardProps,
   ref: React.ForwardedRef<View>,
 ) {
+  const theme = useTheme();
   const [measured, setMeasured] = useState(0);
   const osReducedMotion = useReducedMotion();
   const reducedMotion = reducedMotionProp ?? osReducedMotion;
@@ -124,7 +126,11 @@ function GameBoardImpl(
   return (
     <Animated.View
       ref={ref}
-      style={[styles.board, { transform: [{ translateX: shake }] }]}
+      style={[
+        styles.board,
+        { backgroundColor: theme.boardBg, borderColor: theme.boardFrame },
+        { transform: [{ translateX: shake }] },
+      ]}
       onLayout={handleLayout}
       collapsable={false}
       accessibilityLabel="Game board"
@@ -207,8 +213,6 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 420,
     aspectRatio: 1,
-    backgroundColor: colors.boardBg,
-    borderColor: colors.boardFrame,
     borderWidth: FRAME_WIDTH,
     borderRadius: radius.board,
     padding: spacing.gridGutter,

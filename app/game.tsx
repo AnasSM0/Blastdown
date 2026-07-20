@@ -43,6 +43,7 @@ import { AdServiceProvider } from "../src/services/ads";
 import type { AdService } from "../src/services/ads";
 import { useGameSession } from "../src/state/GameSessionProvider";
 import { colors, spacing } from "../src/ui/theme";
+import { useTheme } from "../src/ui/ThemeProvider";
 
 type DragState = {
   handId: string;
@@ -94,6 +95,7 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
   // Countdown-2 / countdown-1 urgent haptics, once per timer transition.
   useTimerHaptics({ turn: state.turn, events: controller.lastEvents });
   const reward = useRewardedAction();
+  const theme = useTheme();
 
   const [paused, setPaused] = useState(false);
   // Input is locked during a required effect sequence, while a rewarded ad is
@@ -404,7 +406,7 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
   const defuseTarget = defuseConfirmOpen ? getRewardedDefuseTarget(state) : null;
 
   return (
-    <View style={styles.screen} testID="game-screen">
+    <View style={[styles.screen, { backgroundColor: theme.appBackground }]} testID="game-screen">
       <SafeAreaView style={styles.safe}>
         {/* Best score is persisted in Phase 5; 0 stub until StorageService lands. */}
         <ScoreHeader score={state.score} best={0} combo={state.combo} onPause={handlePause} />

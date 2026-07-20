@@ -3,7 +3,8 @@ import { Animated, Pressable, StyleSheet, View } from "react-native";
 
 import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
 import { colors, radius } from "../../ui/theme";
-import { pieceColor } from "../../ui/pieceColors";
+import { useTheme } from "../../ui/ThemeProvider";
+import { blockColor } from "../../ui/themes";
 
 export type CellPreviewState = "valid" | "invalid" | "conflict";
 
@@ -13,7 +14,7 @@ type GridCellProps = {
   column: number;
   size: number;
   previewState?: CellPreviewState;
-  /** Solid cyan ring marking a rewarded-defuse target piece (Stitch 07). */
+  /** Solid accent ring marking a rewarded-defuse target piece (Stitch 07). */
   highlighted?: boolean;
   onPress?: () => void;
   /** Changes each turn a piece lands on this cell, triggering a brief settle
@@ -41,7 +42,7 @@ function cellLabel(cell: DomainGridCell, row: number, column: number): string {
 
 /** Presentation of one board cell. The "glass" look is approximated with a
  *  translucent fill + colored border — deliberately no per-cell blur
- *  (docs/UI_REFERENCE_AUDIT.md item 9). */
+ *  (docs/UI_REFERENCE_AUDIT.md item 9). All colors come from the active theme. */
 export function GridCell({
   cell,
   row,
@@ -53,6 +54,7 @@ export function GridCell({
   flashNonce,
   reducedMotion,
 }: GridCellProps) {
+  const theme = useTheme();
   const base = { width: size, height: size };
   const [snap] = useState(() => new Animated.Value(1));
   const lastFlash = useRef<number | undefined>(undefined);
@@ -78,14 +80,20 @@ export function GridCell({
   let visual;
   switch (cell.kind) {
     case "empty":
-      visual = styles.empty;
+      visual = { backgroundColor: theme.boardBg, borderWidth: 1, borderColor: theme.gridLine };
       break;
     case "rubble":
-      visual = styles.rubble;
+      visual = {
+        backgroundColor: theme.rubbleFill,
+        borderWidth: 1,
+        borderColor: theme.outlineVariant,
+        alignItems: "center" as const,
+        justifyContent: "center" as const,
+      };
       break;
     case "timed":
     case "normal": {
-      const accent = pieceColor(cell.colorId);
+      const accent = blockColor(theme, cell.colorId);
       visual = { backgroundColor: `${accent}22`, borderWidth: 1, borderColor: accent };
       break;
     }
@@ -103,19 +111,31 @@ export function GridCell({
     >
       {cell.kind === "rubble" ? (
         <>
-          <View style={styles.crackA} />
-          <View style={styles.crackB} />
+          <View style={[styles.crackA, { backgroundColor: theme.rubbleCrack }]} />
+          <View style={[styles.crackB, { backgroundColor: theme.rubbleCrack }]} />
         </>
       ) : null}
       {previewState ? (
         <View
           pointerEvents="none"
-          style={[styles.preview, previewStyles[previewState]]}
+          style={[
+            styles.preview,
+            previewState === "valid"
+              ? { borderColor: theme.accent, backgroundColor: `${theme.accent}26` }
+              : previewStyles[previewState],
+          ]}
           testID={`preview-${previewState}-${row}-${column}`}
         />
       ) : null}
       {highlighted ? (
-        <View pointerEvents="none" style={styles.highlight} testID={`highlight-${row}-${column}`} />
+        <View
+          pointerEvents="none"
+          style={[
+            styles.highlight,
+            { borderColor: theme.accent, backgroundColor: `${theme.accent}33` },
+          ]}
+          testID={`highlight-${row}-${column}`}
+        />
       ) : null}
     </AnimatedPressable>
   );
@@ -126,23 +146,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.cell,
     overflow: "hidden",
   },
-  empty: {
-    backgroundColor: colors.boardBg,
-    borderWidth: 1,
-    borderColor: colors.boardFrame,
-  },
-  rubble: {
-    backgroundColor: colors.boardFrame,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   crackA: {
     position: "absolute",
     width: "120%",
     height: 1.5,
-    backgroundColor: colors.outline,
     transform: [{ rotate: "35deg" }],
     opacity: 0.7,
   },
@@ -150,7 +157,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: "80%",
     height: 1.5,
-    backgroundColor: colors.outline,
     transform: [{ rotate: "-50deg" }],
     opacity: 0.5,
   },
@@ -171,9 +177,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderWidth: 2,
-    borderColor: colors.cyanBlock,
     borderRadius: radius.cell,
-    backgroundColor: `${colors.cyanBlock}33`,
   },
 });
 

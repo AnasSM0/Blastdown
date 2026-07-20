@@ -3,7 +3,8 @@ import { Animated, StyleSheet } from "react-native";
 
 import { getShapeById } from "../../domain/shapes";
 import { spacing } from "../../ui/theme";
-import { pieceColor } from "../../ui/pieceColors";
+import { useTheme } from "../../ui/ThemeProvider";
+import { blockColor } from "../../ui/themes";
 
 /** How far above the fingertip the dragged piece floats so it stays visible
  *  under the thumb (BUILD_SPEC.md §6.5 drag ergonomics). Exported so the
@@ -50,6 +51,7 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
   },
   ref,
 ) {
+  const theme = useTheme();
   const [point, setPoint] = useState({ x: initialX, y: initialY });
   const [opacity] = useState(() => new Animated.Value(0.9));
   const [scale] = useState(() => new Animated.Value(1));
@@ -87,7 +89,7 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
     return null;
   }
 
-  const accent = pieceColor(colorId);
+  const accent = blockColor(theme, colorId);
   const maxRow = Math.max(...shape.cells.map((cell) => cell.row));
   const maxColumn = Math.max(...shape.cells.map((cell) => cell.column));
   const pitch = cellSize + GUTTER;

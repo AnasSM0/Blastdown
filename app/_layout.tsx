@@ -12,6 +12,7 @@ import { StorageServiceProvider } from "../src/services/storage";
 import { GameSessionProvider } from "../src/state/GameSessionProvider";
 import { ProfileProvider } from "../src/state/ProfileProvider";
 import { SettingsProvider } from "../src/state/SettingsProvider";
+import { ThemeProvider } from "../src/ui/ThemeProvider";
 import { useAppFonts } from "../src/ui/fonts";
 
 export default function RootLayout() {
@@ -25,19 +26,21 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <StorageServiceProvider>
           <SettingsProvider>
-            <ProfileProvider>
-              <AudioServiceProvider service={audioService}>
-                <AdServiceProvider>
-                  <GameSessionProvider>
-                    <Stack
-                      screenOptions={{
-                        headerShown: false,
-                      }}
-                    />
-                  </GameSessionProvider>
-                </AdServiceProvider>
-              </AudioServiceProvider>
-            </ProfileProvider>
+            <ThemeProvider>
+              <ProfileProvider>
+                <AudioServiceProvider service={audioService}>
+                  <AdServiceProvider>
+                    <GameSessionProvider>
+                      <Stack
+                        screenOptions={{
+                          headerShown: false,
+                        }}
+                      />
+                    </GameSessionProvider>
+                  </AdServiceProvider>
+                </AudioServiceProvider>
+              </ProfileProvider>
+            </ThemeProvider>
           </SettingsProvider>
         </StorageServiceProvider>
       </SafeAreaProvider>

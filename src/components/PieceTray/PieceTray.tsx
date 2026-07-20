@@ -6,8 +6,9 @@ import type { HandPiece } from "../../domain/gameTypes";
 import { getShapeById } from "../../domain/shapes";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import type { Point } from "../../ui/boardGeometry";
-import { colors, neonGlow, radius, spacing } from "../../ui/theme";
-import { pieceColor } from "../../ui/pieceColors";
+import { colors, radius, spacing } from "../../ui/theme";
+import { useTheme } from "../../ui/ThemeProvider";
+import { blockColor, glowFor } from "../../ui/themes";
 
 type PieceTrayProps = {
   hand: readonly HandPiece[];
@@ -33,11 +34,12 @@ const DRAG_ACTIVATION_DISTANCE = 8;
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 function MiniShape({ shapeId, colorId }: { shapeId: string; colorId: string }) {
+  const theme = useTheme();
   const shape = getShapeById(shapeId);
   if (!shape) {
     return null;
   }
-  const accent = pieceColor(colorId);
+  const accent = blockColor(theme, colorId);
   const maxRow = Math.max(...shape.cells.map((cell) => cell.row));
   const maxColumn = Math.max(...shape.cells.map((cell) => cell.column));
   const width = (maxColumn + 1) * (MINI_CELL + MINI_GAP) - MINI_GAP;
@@ -84,6 +86,7 @@ function TraySlot({
   onDragMove,
   onDragEnd,
 }: TraySlotProps) {
+  const theme = useTheme();
   const [lift] = useState(() => new Animated.Value(selected ? SELECTED_SCALE : 1));
 
   useEffect(() => {
@@ -110,7 +113,7 @@ function TraySlot({
       style={[
         styles.slot,
         selected && styles.slotSelected,
-        selected && neonGlow(pieceColor(piece.colorId), "low"),
+        selected && glowFor(theme, blockColor(theme, piece.colorId), "low"),
         dragging && styles.slotDragging,
         { transform: [{ scale: lift }] },
       ]}

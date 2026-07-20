@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Animated, StyleSheet, Text } from "react-native";
 
-import { colors, neonGlow } from "../../ui/theme";
-import { pieceColor } from "../../ui/pieceColors";
+import { useTheme } from "../../ui/ThemeProvider";
+import { glowFor } from "../../ui/themes";
 import { getTimerVisualState } from "../../ui/timerStates";
 import { getPulseConfig } from "../../ui/timerPulse";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
@@ -15,7 +15,8 @@ type TimerBadgeProps = {
 
 const BADGE_SIZE = 24;
 
-export function TimerBadge({ pieceId, remainingTurns, colorId }: TimerBadgeProps) {
+export function TimerBadge({ pieceId, remainingTurns }: TimerBadgeProps) {
+  const theme = useTheme();
   const visualState = getTimerVisualState(remainingTurns);
   const reducedMotion = useReducedMotion();
   const [scale] = useState(() => new Animated.Value(1));
@@ -49,18 +50,22 @@ export function TimerBadge({ pieceId, remainingTurns, colorId }: TimerBadgeProps
 
   const accentColor =
     visualState === "urgent"
-      ? colors.urgentRed
+      ? theme.timerCritical
       : visualState === "warning" || visualState === "caution"
-        ? colors.amberBlock
-        : pieceColor(colorId);
+        ? theme.timerWarning
+        : theme.timerNormal;
   const glow =
     visualState === "urgent" || visualState === "warning"
-      ? neonGlow(accentColor, "high")
-      : neonGlow(accentColor, "low");
+      ? glowFor(theme, accentColor, "high")
+      : glowFor(theme, accentColor, "low");
 
   return (
     <Animated.View
-      style={[styles.badge, { borderColor: accentColor, transform: [{ scale }] }, glow]}
+      style={[
+        styles.badge,
+        { backgroundColor: theme.appBackground, borderColor: accentColor, transform: [{ scale }] },
+        glow,
+      ]}
       testID={`timer-badge-${pieceId}`}
       accessibilityLabel={`${remainingTurns} moves left`}
       accessibilityHint={`Timer state: ${visualState}`}
@@ -77,7 +82,6 @@ const styles = StyleSheet.create({
     height: BADGE_SIZE,
     borderRadius: BADGE_SIZE / 2,
     borderWidth: 1,
-    backgroundColor: colors.appBackground,
     alignItems: "center",
     justifyContent: "center",
   },
