@@ -635,20 +635,29 @@ VERIFY: `npm run typecheck`, `npm run lint`, `npm run test`
 
 **Owner: Claude Code** (storage logic) · **Owner: Codex** (screens)
 
-- [ ] 5.1 `StorageService` interface + AsyncStorage implementation
-- [ ] 5.2 Active-run persistence (save after every turn, on background, on
-      pause, before a rewarded ad)
-- [ ] 5.3 Best score + lifetime stats persistence
-- [ ] 5.4 Bolts balance persistence
-- [ ] 5.5 Theme unlocks + selected theme persistence
-- [ ] 5.6 Settings persistence (sound/music/haptics/reduced motion)
-- [ ] 5.7 Tutorial completion persistence
-- [ ] 5.8 Schema version + migration mechanism
+Delivered as **Phase 4A** (2026-07-20), implemented directly by Claude Code
+(single-writer). See the 2026-07-20 "Phase 4A" Decisions entry.
+
+- [x] 5.1 `StorageService` interface + AsyncStorage implementation (+ in-memory
+      test adapter, provider/hook, dev reset)
+- [x] 5.2 Active-run persistence (save after every state-changing action, on
+      app background; serialized coalescing writer prevents stale overwrites;
+      restore on launch; End Run / game over clears; timers unchanged closed)
+- [x] 5.3 Best score + lifetime stats persistence (profile, separate from
+      GameState) with once-only run settlement
+- [x] 5.4 Bolts balance persistence (formula floor(score/250) + defuses)
+- [~] 5.5 Selected theme persisted in settings; theme unlocks/purchase deferred
+  (no currency spend flow yet — Phase 6 monetization)
+- [x] 5.6 Settings persistence (sound/music/haptics/reduced-motion override)
+- [x] 5.7 Tutorial completion persistence (profile field; the tutorial UI that
+      sets it is Phase 4 UI-006)
+- [x] 5.8 Schema version + migration mechanism (versioned envelopes + validators + safe fallback; no prior versions to migrate yet)
 - [ ] 5.9 Themes screen UI (Codex)
-- [ ] 5.10 Settings screen UI (Codex)
+- [x] 5.10 Settings screen UI (persisted toggles)
 
 **Acceptance:** force-closing and reopening restores the active game;
-purchased themes persist; settings persist; no timer changes while closed.
+settings persist; no timer changes while closed. (Theme purchase/unlock
+persistence lands with Phase 6.)
 
 ---
 
