@@ -617,3 +617,35 @@ The working tree kept showing 60+ files as modified purely from Windows CRLF
 conversion (content identical under `--ignore-space-at-eol`). Added
 `.gitattributes` (`* text=auto eol=lf`, binaries marked) and normalized the
 tree to LF so every future commit shows only real changes.
+
+## 2026-07-21 — Phase 5B: Bolt-based theme unlock economy
+
+**Prices.** BUILD_SPEC.md fixes no theme price list, so the authoritative
+catalog (`src/economy/themeCatalog.ts`) uses conservative implementation
+values: Reactor 0 (default-unlocked), Arctic 500, Magma 500, Void 750, Solar 750. Prices/names/default-unlocked live only in the catalog — never hardcoded
+in a screen. `price`/`locked` were removed from `ThemePalette` (colors only).
+
+**Ownership + migration.** The profile gains `unlockedThemeIds` (schema v2).
+`parseProfile` migrates v1 profiles forward, keeping Bolts and every stat and
+defaulting ownership to just Reactor; v2 ownership is sanitized (unknown and
+duplicate ids dropped, defaults always present) so corrupt data recovers to a
+safe list. ThemeProvider now renders the selected theme only when it is owned,
+otherwise falling back to Reactor — so ProfileProvider wraps ThemeProvider.
+
+**Purchase architecture.** `src/economy/themeOwnership.ts` holds a pure
+`purchaseTheme(profile, id)` returning a typed result — no economy logic lives
+in UI. Deduct-and-unlock happen together, a balance can never go negative,
+buying an owned theme is a no-op, and an unknown id or insufficient Bolts leave
+the profile unchanged. The Themes screen applies it through a functional
+profile update, so a duplicated confirm sees the theme already owned and cannot
+double-charge; after purchase the theme is selected immediately and
+ownership/balance/selection persist. Home reads the same ProfileProvider, so
+its Bolt balance updates immediately.
+
+**Effects.** Line-clear/defuse/explosion/penalty colors now come from theme
+tokens (accent/score/timerCritical); the burst border stays the theme's
+critical color so danger reads in every theme. Timing/gameplay unchanged.
+
+**Affects:** `src/economy/**`, `src/services/storage/schemas.ts`,
+`src/ui/{ThemeProvider,themes}.ts`, `src/components/{ThemeScreen,effects}/**`,
+`app/{_layout,themes}.tsx`.
