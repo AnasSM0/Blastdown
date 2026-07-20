@@ -7,11 +7,8 @@ import { colors as reactorColors } from "./theme";
 export type ThemePalette = {
   id: string;
   name: string;
-  /** Cosmetic lock flag for the Themes screen. Unlock economy is deferred
-   *  (see docs/DECISIONS.md) — nothing is gated at runtime yet. */
-  locked: boolean;
-  /** Bolt price shown on a locked tile (informational until the economy lands). */
-  price: number;
+  // Price and unlock status live in the authoritative catalog
+  // (src/economy/themeCatalog.ts), not here — a palette is colors only.
 
   appBackground: string;
   surfaceBg: string;
@@ -45,8 +42,6 @@ export const DEFAULT_THEME_ID = "neon-reactor";
 const reactor: ThemePalette = {
   id: DEFAULT_THEME_ID,
   name: "Reactor",
-  locked: false,
-  price: 0,
   appBackground: reactorColors.appBackground,
   surfaceBg: reactorColors.surfaceBg,
   boardBg: reactorColors.boardBg,
@@ -74,8 +69,6 @@ const reactor: ThemePalette = {
 const arctic: ThemePalette = {
   id: "arctic",
   name: "Arctic",
-  locked: true,
-  price: 500,
   appBackground: "#03080F",
   surfaceBg: "#0C1A2A",
   boardBg: "#0A1622",
@@ -99,8 +92,6 @@ const arctic: ThemePalette = {
 const magma: ThemePalette = {
   id: "magma",
   name: "Magma",
-  locked: true,
-  price: 500,
   appBackground: "#0A0503",
   surfaceBg: "#1E0E08",
   boardBg: "#160A06",
@@ -124,8 +115,6 @@ const magma: ThemePalette = {
 const voidTheme: ThemePalette = {
   id: "void",
   name: "Void",
-  locked: true,
-  price: 750,
   appBackground: "#040308",
   surfaceBg: "#120C1F",
   boardBg: "#0C0817",
@@ -149,8 +138,6 @@ const voidTheme: ThemePalette = {
 const solar: ThemePalette = {
   id: "solar",
   name: "Solar",
-  locked: true,
-  price: 750,
   appBackground: "#0B0703",
   surfaceBg: "#211608",
   boardBg: "#181005",
