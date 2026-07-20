@@ -103,9 +103,34 @@ listed in `CLAUDE.md`.
 - [x] 3.4 Piece tray rendering
 - [x] 3.5 Tap-to-select / tap-to-place interaction
 - [x] 3.6 Placement preview (valid/invalid)
-- [x] 3.7 Game-over display (restart-only overlay; the revive decision
-      flow per §10.4 lands with the ads phase)
+- [x] 3.7 Game-over display (restart-only overlay superseded by the Phase 3D
+      revive/end-run flow below; §10.4 revive decision now landed)
 - [x] 3.8 Component tests for the above
+
+### Phase 3D — Run lifecycle (freeze, defuse, revive, pause, results)
+
+Implemented directly by Claude Code (single-writer; a Codex agent was active
+on the effects files this session — see the 2026-07-20 Decisions entry). The
+mock rewarded-ad seam and the full in-run/end-run lifecycle now work end to
+end. Fulfills the Codex task specs **UI-004** (pause / game-over / revive /
+second-chance) and **UI-005** (results), plus the power-up-wiring half of
+**UI-007** (freeze/defuse states driven by the domain).
+
+- [x] 3D.1 AdService seam + configurable MockAdService + AdServiceProvider;
+      `useRewardedAction` single-flight hook (earn-only callback, input lock).
+- [x] 3D.2 Freeze wired to `activateFreeze` — active state + remaining count,
+      no re-activation while active/exhausted, mutate only on earn.
+- [x] 3D.3 Defuse wired to `applyRewardedDefuse` via a confirm card; the
+      domain-selected lowest-timer piece is ringed on the board (no UI-side
+      selection). Mutate only on earn.
+- [x] 3D.4 Game-over overlay (RUN OVER + Repair & Continue + End Run); revive
+      through `applyRevive`, once per run; cancel/failure leave state unchanged;
+      transient reduced-motion-aware SECOND CHANCE banner.
+- [x] 3D.5 Pause overlay (Resume/Restart/Home; sound/music/haptics documented
+      placeholders); input locked while paused; Restart/Home clear pending UI.
+- [x] 3D.6 Results screen from real run stats; Play Again / Home. Bolts &
+      Double Bolts deferred — the domain exposes no currency yet.
+- [x] 3D.7 Unit + integration tests across all of the above.
 
 Note: 3.2–3.8 were implemented directly by Claude Code because the Codex
 CLI sandbox is broken on this machine — see the 2026-07-18 entry in
