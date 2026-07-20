@@ -1,5 +1,6 @@
-import { fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
 
+import { AdServiceProvider } from "../../src/services/ads";
 import { GameSessionProvider } from "../../src/state/GameSessionProvider";
 
 const mockBack = jest.fn();
@@ -20,9 +21,11 @@ function renderGame() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const GameScreen = require("../../app/game").default;
   return render(
-    <GameSessionProvider>
-      <GameScreen />
-    </GameSessionProvider>,
+    <AdServiceProvider>
+      <GameSessionProvider>
+        <GameScreen />
+      </GameSessionProvider>
+    </AdServiceProvider>,
   );
 }
 
@@ -33,9 +36,14 @@ describe("game navigation", () => {
     mockCanGoBack.value = true;
   });
 
-  it("returns to the previous screen (Home) from the pause control", async () => {
+  it("returns to the previous screen (Home) from the pause menu's Home action", async () => {
     const result = await renderGame();
-    fireEvent.press(result.getByTestId("pause-button"));
+    await act(async () => {
+      fireEvent.press(result.getByTestId("pause-button"));
+    });
+    await act(async () => {
+      fireEvent.press(result.getByTestId("pause-home-button"));
+    });
     expect(mockBack).toHaveBeenCalledTimes(1);
     expect(mockReplace).not.toHaveBeenCalled();
   });
@@ -43,7 +51,12 @@ describe("game navigation", () => {
   it("falls back to replacing Home when there is nothing to go back to", async () => {
     mockCanGoBack.value = false;
     const result = await renderGame();
-    fireEvent.press(result.getByTestId("pause-button"));
+    await act(async () => {
+      fireEvent.press(result.getByTestId("pause-button"));
+    });
+    await act(async () => {
+      fireEvent.press(result.getByTestId("pause-home-button"));
+    });
     expect(mockReplace).toHaveBeenCalledWith("/");
   });
 });

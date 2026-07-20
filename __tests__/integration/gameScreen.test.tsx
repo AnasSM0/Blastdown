@@ -67,7 +67,7 @@ describe("game screen vertical slice", () => {
     expect(result.getByTestId("preview-conflict-0-0")).toBeTruthy();
   });
 
-  it("shows the game-over overlay when the domain reports game over, and restart begins a fresh run", async () => {
+  it("shows the game-over overlay with revive and end-run actions when the domain reports game over", async () => {
     // One empty cell at (0,0); hand: a single (fits) then a square (cannot).
     const grid = makeEmptyGrid(8);
     for (let row = 0; row < 8; row++) {
@@ -98,9 +98,9 @@ describe("game screen vertical slice", () => {
     await user.press(result.getByTestId("cell-0-0"));
 
     expect(result.getByTestId("game-over-overlay")).toBeTruthy();
-
-    await user.press(result.getByTestId("restart-button"));
-    expect(result.queryByTestId("game-over-overlay")).toBeNull();
-    expect(result.getAllByTestId(/^tray-piece-/)).toHaveLength(3);
+    // The overlay offers the one-per-run revive and an end-run exit to results;
+    // in-place restart now happens from the results screen (Play Again).
+    expect(result.getByTestId("revive-button")).toBeTruthy();
+    expect(result.getByTestId("end-run-button")).toBeTruthy();
   });
 });

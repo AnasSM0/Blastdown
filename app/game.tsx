@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -7,12 +7,21 @@ import { GameBoard, BOARD_CONTENT_INSET } from "../src/components/GameBoard";
 import { PieceTray } from "../src/components/PieceTray";
 import { ScoreHeader } from "../src/components/ScoreHeader";
 import { GameOverOverlay } from "../src/components/modals/GameOverOverlay";
+import { DefuseConfirmCard } from "../src/components/modals/DefuseConfirmCard";
+import { SecondChanceBanner } from "../src/components/modals/SecondChanceBanner";
+import { PauseOverlay } from "../src/components/modals/PauseOverlay";
 import { RewardedActionBar } from "../src/components/RewardedActionButton";
 import { DragGhost, DRAG_LIFT, type DragGhostHandle } from "../src/components/DragGhost";
 import { BOARD_SIZE } from "../src/domain/board";
 import type { CellPosition } from "../src/domain/placement";
 import { getShapeById } from "../src/domain/shapes";
-import { getTimerBadgePlacements } from "../src/domain/selectors";
+import {
+  canActivateFreeze,
+  canApplyRewardedDefuse,
+  canRevive,
+  getRewardedDefuseTarget,
+  getTimerBadgePlacements,
+} from "../src/domain/selectors";
 import { dragOriginFromFinger, type BoardLayout, type Point } from "../src/ui/boardGeometry";
 import {
   useGameController,
@@ -22,6 +31,9 @@ import {
 import { useHaptics } from "../src/hooks/useHaptics";
 import { useReducedMotion } from "../src/hooks/useReducedMotion";
 import { useEventAnimator } from "../src/hooks/useEventAnimator";
+import { useRewardedAction } from "../src/hooks/useRewardedAction";
+import { AdServiceProvider } from "../src/services/ads";
+import type { AdService } from "../src/services/ads";
 import { useGameSession } from "../src/state/GameSessionProvider";
 import { colors, spacing } from "../src/ui/theme";
 
@@ -50,11 +62,16 @@ type GameViewProps = {
   boardSize?: number;
   /** Invoked when the player leaves gameplay back to Home. */
   onExit?: () => void;
+  /** Invoked to open the end-of-run results screen. */
+  onResults?: () => void;
 };
+
+const SECOND_CHANCE_MS = 1500;
+const SECOND_CHANCE_REDUCED_MS = 800;
 
 /** Presentational gameplay screen over a supplied controller. Holds no
  *  gameplay rules — every decision is delegated to the domain controller. */
-export function GameView({ controller, boardSize, onExit }: GameViewProps) {
+export function GameView({ controller, boardSize, onExit, onResults }: GameViewProps) {
   const { state } = controller;
   const haptics = useHaptics();
   const reducedMotion = useReducedMotion();
@@ -63,8 +80,17 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
     events: controller.lastEvents,
     reducedMotion,
   });
-  const inputLocked = animator.isAnimating;
+  const reward = useRewardedAction();
 
+  const [paused, setPaused] = useState(false);
+  // Input is locked during a required effect sequence, while a rewarded ad is
+  // in flight, and while paused, so a reward can't overlap a placement or
+  // another reward and no move lands behind the pause menu.
+  const inputLocked = animator.isAnimating || reward.pending || paused;
+
+  const [defuseConfirmOpen, setDefuseConfirmOpen] = useState(false);
+  const [secondChance, setSecondChance] = useState(false);
+  const secondChanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [previewOrigin, setPreviewOrigin] = useState<CellPosition | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dragOrigin, setDragOrigin] = useState<CellPosition | null>(null);
@@ -226,23 +252,132 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
     [clearDrag, controller, haptics, originForPoint, state.hand],
   );
 
-  const handleRestart = useCallback(() => {
+  const handleFreeze = useCallback(() => {
+    // Guard against re-activation while active/exhausted or mid-reward — the
+    // domain would reject anyway, but this avoids a needless ad request.
+    if (inputLocked || !canActivateFreeze(state)) {
+      return;
+    }
+    void reward.run("rewarded_freeze", () => {
+      if (controller.activateFreeze()) {
+        haptics.success();
+      }
+    });
+  }, [controller, haptics, inputLocked, reward, state]);
+
+  const handleDefuseOpen = useCallback(() => {
+    if (inputLocked || !canApplyRewardedDefuse(state)) {
+      return;
+    }
+    controller.clearSelection();
     setPreviewOrigin(null);
+    setDefuseConfirmOpen(true);
+    haptics.selection();
+  }, [controller, haptics, inputLocked, state]);
+
+  const handleDefuseCancel = useCallback(() => {
+    setDefuseConfirmOpen(false);
+  }, []);
+
+  const handleDefuseConfirm = useCallback(() => {
+    if (reward.pending) {
+      return;
+    }
+    void reward
+      .run("rewarded_defuse", () => {
+        if (controller.defuse()) {
+          haptics.success();
+        }
+      })
+      .finally(() => {
+        setDefuseConfirmOpen(false);
+      });
+  }, [controller, haptics, reward]);
+
+  const clearSecondChance = useCallback(() => {
+    if (secondChanceTimer.current !== null) {
+      clearTimeout(secondChanceTimer.current);
+      secondChanceTimer.current = null;
+    }
+    setSecondChance(false);
+  }, []);
+
+  const handleRevive = useCallback(() => {
+    if (reward.pending || !canRevive(state)) {
+      return;
+    }
+    void reward.run("rewarded_revive", () => {
+      if (controller.revive()) {
+        haptics.success();
+        // "SECOND CHANCE" banner over the repaired board (Stitch 10), then
+        // auto-dismiss. Reduced motion shortens the hold and skips the fade.
+        setSecondChance(true);
+        if (secondChanceTimer.current !== null) {
+          clearTimeout(secondChanceTimer.current);
+        }
+        secondChanceTimer.current = setTimeout(
+          () => {
+            secondChanceTimer.current = null;
+            setSecondChance(false);
+          },
+          reducedMotion ? SECOND_CHANCE_REDUCED_MS : SECOND_CHANCE_MS,
+        );
+      }
+    });
+  }, [controller, haptics, reducedMotion, reward, state]);
+
+  const handleEndRun = useCallback(() => {
+    if (reward.pending) {
+      return;
+    }
+    clearSecondChance();
+    onResults?.();
+  }, [clearSecondChance, onResults, reward.pending]);
+
+  const handlePause = useCallback(() => {
+    // Pausing mid-reward is disallowed so the confirm/overlay stack stays sane.
+    if (reward.pending) {
+      return;
+    }
+    setPaused(true);
+  }, [reward.pending]);
+
+  const handleResume = useCallback(() => {
+    setPaused(false);
+  }, []);
+
+  // Drop every transient overlay/selection so a fresh run starts clean. Shared
+  // by Restart (pause menu) and leaving to Home.
+  const clearPendingUi = useCallback(() => {
+    setPaused(false);
+    setDefuseConfirmOpen(false);
+    setPreviewOrigin(null);
+    clearSecondChance();
     clearDrag();
     animator.reset();
+  }, [animator, clearDrag, clearSecondChance]);
+
+  const handleRestart = useCallback(() => {
+    clearPendingUi();
     controller.restart();
-  }, [animator, clearDrag, controller]);
+  }, [clearPendingUi, controller]);
+
+  const handleHome = useCallback(() => {
+    clearPendingUi();
+    onExit?.();
+  }, [clearPendingUi, onExit]);
+
+  // Cancel a pending second-chance timer on unmount.
+  useEffect(() => () => clearSecondChance(), [clearSecondChance]);
+
+  const freezeActive = state.freezeTurnsRemaining > 0;
+  const defuseTarget = defuseConfirmOpen ? getRewardedDefuseTarget(state) : null;
 
   return (
     <View style={styles.screen} testID="game-screen">
       <SafeAreaView style={styles.safe}>
         {/* Best score is persisted in Phase 5; 0 stub until StorageService lands. */}
-        <ScoreHeader
-          score={state.score}
-          best={0}
-          combo={state.combo}
-          onPause={onExit ?? (() => {})}
-        />
+        <ScoreHeader score={state.score} best={0} combo={state.combo} onPause={handlePause} />
         <View style={styles.content}>
           <GameBoard
             ref={boardRef}
@@ -256,6 +391,7 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
             placementNonce={placement.nonce}
             effectPlan={animator.plan}
             effectKey={animator.effectKey}
+            highlightPieceId={defuseTarget?.id ?? null}
           />
           <PieceTray
             hand={state.hand}
@@ -266,10 +402,44 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
             onDragEnd={handleDragEnd}
             draggingHandId={drag?.handId ?? null}
           />
-          <RewardedActionBar />
+          <RewardedActionBar
+            freeze={{
+              onPress: handleFreeze,
+              disabled: inputLocked || !canActivateFreeze(state),
+              active: freezeActive,
+              placementsRemaining: state.freezeTurnsRemaining,
+            }}
+            defuse={{
+              onPress: handleDefuseOpen,
+              disabled: inputLocked || (!defuseConfirmOpen && !canApplyRewardedDefuse(state)),
+              selected: defuseConfirmOpen,
+            }}
+          />
         </View>
+        {defuseConfirmOpen ? (
+          <DefuseConfirmCard
+            onConfirm={handleDefuseConfirm}
+            onCancel={handleDefuseCancel}
+            busy={reward.pending}
+          />
+        ) : null}
+        {secondChance ? <SecondChanceBanner reducedMotion={reducedMotion} /> : null}
+        {paused ? (
+          <PauseOverlay
+            onResume={handleResume}
+            onRestart={handleRestart}
+            onHome={handleHome}
+            reducedMotion={reducedMotion}
+          />
+        ) : null}
         {state.status === "gameOver" ? (
-          <GameOverOverlay score={state.score} onRestart={handleRestart} />
+          <GameOverOverlay
+            score={state.score}
+            reviveAvailable={canRevive(state)}
+            onRevive={handleRevive}
+            onEndRun={handleEndRun}
+            busy={reward.pending}
+          />
         ) : null}
       </SafeAreaView>
       {drag && cellSize > 0 ? (
@@ -293,13 +463,33 @@ export function GameView({ controller, boardSize, onExit }: GameViewProps) {
 type GameScreenContentProps = {
   controllerOptions?: GameControllerOptions;
   boardSize?: number;
+  /** Test seam: inject a scripted ad service to exercise reward branches. */
+  adService?: AdService;
+  onExit?: () => void;
+  onResults?: () => void;
 };
 
 /** Test entry point: builds a controller from injected options so a crafted
- *  run can be exercised without the session provider. */
-export function GameScreenContent({ controllerOptions, boardSize }: GameScreenContentProps) {
+ *  run can be exercised without the session provider. Wraps its own
+ *  AdServiceProvider so reward flows resolve against an injectable mock. */
+export function GameScreenContent({
+  controllerOptions,
+  boardSize,
+  adService,
+  onExit,
+  onResults,
+}: GameScreenContentProps) {
   const controller = useGameController(controllerOptions);
-  return <GameView controller={controller} boardSize={boardSize} />;
+  return (
+    <AdServiceProvider service={adService}>
+      <GameView
+        controller={controller}
+        boardSize={boardSize}
+        onExit={onExit}
+        onResults={onResults}
+      />
+    </AdServiceProvider>
+  );
 }
 
 /** Content cell size implied by a fixed outer board size (test seam parity
@@ -319,7 +509,10 @@ export default function GameScreen() {
       router.replace("/");
     }
   }, [router]);
-  return <GameView controller={controller} onExit={handleExit} />;
+  const handleResults = useCallback(() => {
+    router.push("/results");
+  }, [router]);
+  return <GameView controller={controller} onExit={handleExit} onResults={handleResults} />;
 }
 
 const styles = StyleSheet.create({

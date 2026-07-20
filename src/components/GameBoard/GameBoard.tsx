@@ -30,6 +30,9 @@ type GameBoardProps = {
   effectPlan?: EffectPlan | null;
   /** Increments per sequence so the overlay remounts instead of interpolating. */
   effectKey?: number;
+  /** Timed piece to ring as the rewarded-defuse target (Stitch 07); its cells
+   *  get a solid cyan highlight while the confirm card is open. */
+  highlightPieceId?: string | null;
 };
 
 const FRAME_WIDTH = 2;
@@ -51,6 +54,7 @@ function GameBoardImpl(
     placementNonce,
     effectPlan,
     effectKey,
+    highlightPieceId,
   }: GameBoardProps,
   ref: React.ForwardedRef<View>,
 ) {
@@ -135,6 +139,11 @@ function GameBoardImpl(
                     column={column}
                     size={cellSize}
                     previewState={previewMap.get(`${row},${column}`)}
+                    highlighted={
+                      highlightPieceId != null &&
+                      cell.kind === "timed" &&
+                      cell.pieceInstanceId === highlightPieceId
+                    }
                     onPress={onCellPress ? () => onCellPress({ row, column }) : undefined}
                     flashNonce={placedSet.has(`${row},${column}`) ? placementNonce : undefined}
                     reducedMotion={reducedMotion}

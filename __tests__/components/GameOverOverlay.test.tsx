@@ -1,24 +1,58 @@
-import { fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
 
 import { GameOverOverlay } from "../../src/components/modals/GameOverOverlay";
 
+function baseProps() {
+  return {
+    score: 4321,
+    reviveAvailable: true,
+    onRevive: jest.fn(),
+    onEndRun: jest.fn(),
+  };
+}
+
 describe("GameOverOverlay", () => {
-  it("shows the final score and a restart action", async () => {
-    const result = await render(<GameOverOverlay score={4321} onRestart={jest.fn()} />);
-    expect(result.getByText(/game over/i)).toBeTruthy();
+  it("shows the final score and both actions while revive is available", async () => {
+    const result = await render(<GameOverOverlay {...baseProps()} />);
+    expect(result.getByText(/run over/i)).toBeTruthy();
     expect(result.getByText("4,321")).toBeTruthy();
-    expect(result.getByTestId("restart-button")).toBeTruthy();
+    expect(result.getByTestId("revive-button")).toBeTruthy();
+    expect(result.getByTestId("end-run-button")).toBeTruthy();
   });
 
-  it("fires onRestart when pressed", async () => {
-    const onRestart = jest.fn();
-    const result = await render(<GameOverOverlay score={0} onRestart={onRestart} />);
-    fireEvent.press(result.getByTestId("restart-button"));
-    expect(onRestart).toHaveBeenCalledTimes(1);
+  it("hides the revive action once the revive is spent", async () => {
+    const result = await render(<GameOverOverlay {...baseProps()} reviveAvailable={false} />);
+    expect(result.queryByTestId("revive-button")).toBeNull();
+    expect(result.getByTestId("end-run-button")).toBeTruthy();
   });
 
-  it("is announced to screen readers as an alert", async () => {
-    const result = await render(<GameOverOverlay score={10} onRestart={jest.fn()} />);
-    expect(result.getByLabelText(/game over/i)).toBeTruthy();
+  it("fires onRevive and onEndRun when pressed", async () => {
+    const props = baseProps();
+    const result = await render(<GameOverOverlay {...props} />);
+    await act(async () => {
+      fireEvent.press(result.getByTestId("revive-button"));
+    });
+    await act(async () => {
+      fireEvent.press(result.getByTestId("end-run-button"));
+    });
+    expect(props.onRevive).toHaveBeenCalledTimes(1);
+    expect(props.onEndRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables actions and ignores presses while busy", async () => {
+    const props = baseProps();
+    const result = await render(<GameOverOverlay {...props} busy />);
+    expect(result.getByTestId("revive-button").props.accessibilityState?.disabled).toBe(true);
+    await act(async () => {
+      fireEvent.press(result.getByTestId("revive-button"));
+      fireEvent.press(result.getByTestId("end-run-button"));
+    });
+    expect(props.onRevive).not.toHaveBeenCalled();
+    expect(props.onEndRun).not.toHaveBeenCalled();
+  });
+
+  it("is announced to screen readers", async () => {
+    const result = await render(<GameOverOverlay {...baseProps()} />);
+    expect(result.getByLabelText(/run over/i)).toBeTruthy();
   });
 });

@@ -1,6 +1,8 @@
 import { act, renderHook } from "@testing-library/react-native";
 
 import { useGameController } from "../../src/hooks/useGameController";
+import { createInitialGameState } from "../../src/domain/game";
+import type { GameState } from "../../src/domain/gameTypes";
 
 const NOW = 1_752_800_000_000;
 
@@ -148,5 +150,81 @@ describe("useGameController", () => {
     expect(result.current.state.seed).toBe("restart-1");
     expect(result.current.selectedHandId).toBeNull();
     expect(result.current.lastEvents).toEqual([]);
+  });
+});
+
+describe("useGameController lifecycle actions", () => {
+  const base = () => createInitialGameState("lifecycle-seed", NOW);
+
+  function withTimer(): GameState {
+    return {
+      ...base(),
+      status: "playing",
+      activeTimers: {
+        t1: { id: "t1", shapeId: "single", remainingTurns: 3, placedOnTurn: 1, colorId: "cyan" },
+      },
+    };
+  }
+
+  it("activateFreeze mutates via the domain and reports success once", async () => {
+    const initialState = withTimer();
+    const { result } = await renderHook(() => useGameController({ ...options(), initialState }));
+
+    let ok = false;
+    await act(() => {
+      ok = result.current.activateFreeze();
+    });
+    expect(ok).toBe(true);
+    expect(result.current.state.freezeTurnsRemaining).toBe(2);
+    expect(result.current.lastEvents.some((e) => e.type === "freezeActivated")).toBe(true);
+
+    // Cannot stack: already active -> domain rejects, no mutation.
+    let second = true;
+    await act(() => {
+      second = result.current.activateFreeze();
+    });
+    expect(second).toBe(false);
+    expect(result.current.state.rewardedFreezeUses).toBe(1);
+  });
+
+  it("defuse targets the domain-selected piece and returns false with no timers", async () => {
+    const { result } = await renderHook(() =>
+      useGameController({ ...options(), initialState: withTimer() }),
+    );
+    let ok = false;
+    await act(() => {
+      ok = result.current.defuse();
+    });
+    expect(ok).toBe(true);
+    expect(result.current.state.activeTimers.t1).toBeUndefined();
+    expect(result.current.state.piecesDefused).toBe(1);
+
+    let again = true;
+    await act(() => {
+      again = result.current.defuse();
+    });
+    expect(again).toBe(false);
+  });
+
+  it("revive works once from game over then rejects", async () => {
+    const over: GameState = { ...base(), status: "gameOver", score: 500 };
+    const { result } = await renderHook(() =>
+      useGameController({ ...options(), initialState: over }),
+    );
+
+    let ok = false;
+    await act(() => {
+      ok = result.current.revive();
+    });
+    expect(ok).toBe(true);
+    expect(result.current.state.status).toBe("playing");
+    expect(result.current.state.reviveUsed).toBe(true);
+    expect(result.current.state.score).toBe(500);
+
+    let again = true;
+    await act(() => {
+      again = result.current.revive();
+    });
+    expect(again).toBe(false);
   });
 });

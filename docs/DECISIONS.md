@@ -436,3 +436,41 @@ values, and verify on-device first.
 
 **Affects:** `src/ui/effects/eventEffects.ts`, `src/hooks/useEventAnimator.ts`,
 `src/components/effects/**`, `src/components/GameBoard`, `app/game.tsx`.
+
+## 2026-07-20 — Phase 3D: rewarded-ad seam and run lifecycle
+
+The mock rewarded-ad seam and the freeze/defuse/revive/pause/results lifecycle
+were built on the `AdService` contract from `docs/ARCHITECTURE.md`
+(`showRewarded → earned | closed | unavailable | error`). Game state is mutated
+**only** on `earned`, by calling the pure domain APIs (`activateFreeze`,
+`applyRewardedDefuse`, `applyRevive`); every other result leaves state
+untouched. `MockAdService` (configurable, deterministic, no timers) backs the
+app and tests; the Google Mobile Ads implementation lands with the real-ads
+phase and drops in at `AdServiceProvider`.
+
+**State safety:** `useRewardedAction` is single-flight (a ref gate rejects
+overlapping/duplicate requests) with a once-only success callback and a
+`pending` lock the gameplay screen adds to its input lock, so a reward can never
+overlap a placement or fire its grant twice. Capability predicates
+(`canActivateFreeze` / `canApplyRewardedDefuse` / `canRevive`) and
+`getRewardedDefuseTarget` live in `src/domain/selectors.ts` so the UI never
+re-derives a rule — the defuse confirm card rings whichever piece the domain
+would defuse.
+
+**Deferrals:**
+
+- _Double Bolts / Bolts earned_ are omitted from results and the UI. `GameState`
+  exposes no currency field, and adding one is a domain/balance change out of
+  this phase's scope. Revisit when the Bolts economy lands (Phase 5-ish).
+- _Pause_ is a UI-only state (block input + overlay). Move-based timers don't
+  advance without a placement, so no domain `paused` transition is needed; the
+  domain `paused`/`awaitingRevive` statuses stay unused for now.
+- _Pause settings toggles_ (sound/music/haptics) render as disabled
+  placeholders; reduced motion mirrors the OS setting read-only. A persisted
+  settings store is deferred to the audio/settings phase.
+
+**Affects:** `src/services/ads/**`, `src/hooks/useRewardedAction.ts`,
+`src/hooks/useGameController.ts`, `src/domain/selectors.ts`,
+`src/components/RewardedActionButton/**`, `src/components/modals/**`,
+`src/components/ResultsScreen/**`, `app/game.tsx`, `app/results.tsx`,
+`app/_layout.tsx`.

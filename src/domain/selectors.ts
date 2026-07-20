@@ -1,4 +1,5 @@
-import type { GameState } from "./gameTypes";
+import { MAX_REWARDED_DEFUSES_PER_RUN, MAX_REWARDED_FREEZES_PER_RUN } from "../config/balance";
+import type { ActiveTimedPiece, GameState } from "./gameTypes";
 import type { CellPosition } from "./placement";
 import { getShapeById } from "./shapes";
 import { BOARD_SIZE } from "./board";
@@ -80,4 +81,48 @@ export function getPlacementPreview(
   }
 
   return { valid, cells, conflictCells };
+}
+
+/** The active timed piece a rewarded defuse would target: lowest remaining
+ *  timer, ties broken by earliest placement. Mirrors `applyRewardedDefuse`'s
+ *  choice exactly so the confirmation UI can name the piece without re-deriving
+ *  the rule. Null when no active timers exist. */
+export function getRewardedDefuseTarget(state: GameState): ActiveTimedPiece | null {
+  const timers = Object.values(state.activeTimers);
+  if (timers.length === 0) {
+    return null;
+  }
+  return timers.reduce((lowest, timer) =>
+    timer.remainingTurns < lowest.remainingTurns ||
+    (timer.remainingTurns === lowest.remainingTurns && timer.placedOnTurn < lowest.placedOnTurn)
+      ? timer
+      : lowest,
+  );
+}
+
+/** True when a rewarded freeze may be activated now (guards the freeze button
+ *  against re-activation while active or once the per-run cap is hit). Mirrors
+ *  `activateFreeze`'s precondition. */
+export function canActivateFreeze(state: GameState): boolean {
+  return (
+    state.status === "playing" &&
+    state.freezeTurnsRemaining === 0 &&
+    state.rewardedFreezeUses < MAX_REWARDED_FREEZES_PER_RUN
+  );
+}
+
+/** True when a rewarded defuse may be applied now. Mirrors
+ *  `applyRewardedDefuse`'s precondition (§6.17: not offered with no timers). */
+export function canApplyRewardedDefuse(state: GameState): boolean {
+  return (
+    state.status === "playing" &&
+    state.rewardedDefuseUses < MAX_REWARDED_DEFUSES_PER_RUN &&
+    Object.keys(state.activeTimers).length > 0
+  );
+}
+
+/** True when the one-per-run rewarded revive is still available from the
+ *  game-over state. Mirrors `applyRevive`'s precondition. */
+export function canRevive(state: GameState): boolean {
+  return state.status === "gameOver" && !state.reviveUsed;
 }
