@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 
 import { GameBoard, BOARD_CONTENT_INSET } from "../src/components/GameBoard";
 import { PieceTray } from "../src/components/PieceTray";
+import { ReactorBackground } from "../src/components/ReactorBackground";
 import { ScoreHeader } from "../src/components/ScoreHeader";
 import { GameOverOverlay } from "../src/components/modals/GameOverOverlay";
 import { DefuseConfirmCard } from "../src/components/modals/DefuseConfirmCard";
@@ -45,6 +46,7 @@ import type { AdService } from "../src/services/ads";
 import { AnalyticsServiceProvider, rewardOutcome, useAnalytics } from "../src/services/analytics";
 import type { AnalyticsService } from "../src/services/analytics";
 import { useGameSession } from "../src/state/GameSessionProvider";
+import { useProfile } from "../src/state/ProfileProvider";
 import { colors, spacing } from "../src/ui/theme";
 import { useTheme } from "../src/ui/ThemeProvider";
 
@@ -69,6 +71,10 @@ function shapeBoundsFor(shapeId: string): { maxRow: number; maxColumn: number } 
 
 type GameViewProps = {
   controller: GameController;
+  /** Persisted best score for the HUD. Threaded in from the single profile read
+   *  path (the real route reads `useProfile`); defaults to 0 for the pre-load /
+   *  default-profile state and for isolated renders. */
+  best?: number;
   /** Test seam: fixed board size, since onLayout doesn't fire in tests. */
   boardSize?: number;
   /** Invoked when the player leaves gameplay back to Home. */
@@ -101,7 +107,7 @@ export function computeBoardSide(content: { width: number; height: number }): nu
 
 /** Presentational gameplay screen over a supplied controller. Holds no
  *  gameplay rules — every decision is delegated to the domain controller. */
-export function GameView({ controller, boardSize, onExit, onResults }: GameViewProps) {
+export function GameView({ controller, best = 0, boardSize, onExit, onResults }: GameViewProps) {
   const { state } = controller;
   const haptics = useHaptics();
   const reducedMotion = useEffectiveReducedMotion();
@@ -461,10 +467,12 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.appBackground }]} testID="game-screen">
+      {/* Programmatic reactor-depth background (P1-2), full-bleed behind the
+          safe-area content and never interactive. */}
+      <ReactorBackground />
       <SafeAreaView style={styles.safe} edges={["top", "bottom", "left", "right"]}>
-        {/* Zone 1 — compact HUD. Best score is persisted in Phase 5; 0 stub
-            until the HUD wiring lands (P1-2). */}
-        <ScoreHeader score={state.score} best={0} combo={state.combo} onPause={handlePause} />
+        {/* Zone 1 — compact HUD, showing the persisted best score (P1-2). */}
+        <ScoreHeader score={state.score} best={best} combo={state.combo} onPause={handlePause} />
         {/* Zones 2–4 — board / tray / action dock, evenly distributed so the
             board stays large while the tray and dock never drift far below it
             and the lower screen is not left empty. */}
@@ -563,6 +571,8 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
 
 type GameScreenContentProps = {
   controllerOptions?: GameControllerOptions;
+  /** Test seam: HUD best score (defaults to 0, mirroring a fresh profile). */
+  best?: number;
   boardSize?: number;
   /** Test seam: inject a scripted ad service to exercise reward branches. */
   adService?: AdService;
@@ -579,6 +589,7 @@ type GameScreenContentProps = {
  *  settings, audio, and ad providers GameView depends on, all injectable. */
 export function GameScreenContent({
   controllerOptions,
+  best,
   boardSize,
   adService,
   audioService,
@@ -596,6 +607,7 @@ export function GameScreenContent({
             <AdServiceProvider service={adService}>
               <GameView
                 controller={controller}
+                best={best}
                 boardSize={boardSize}
                 onExit={onExit}
                 onResults={onResults}
@@ -618,6 +630,9 @@ function boardSizeToCell(outerSize: number): number {
 export default function GameScreen() {
   const router = useRouter();
   const { controller } = useGameSession();
+  // Single profile read path for the HUD best score; before load this is the
+  // default profile (bestScore 0), which is a safe value to display.
+  const { profile } = useProfile();
   const handleExit = useCallback(() => {
     if (router.canGoBack()) {
       router.back();
@@ -628,7 +643,14 @@ export default function GameScreen() {
   const handleResults = useCallback(() => {
     router.push("/results");
   }, [router]);
-  return <GameView controller={controller} onExit={handleExit} onResults={handleResults} />;
+  return (
+    <GameView
+      controller={controller}
+      best={profile.bestScore}
+      onExit={handleExit}
+      onResults={handleResults}
+    />
+  );
 }
 
 const styles = StyleSheet.create({

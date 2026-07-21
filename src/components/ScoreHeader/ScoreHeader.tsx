@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors, spacing, typography } from "../../ui/theme";
+import { spacing, typography } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import { glowFor } from "../../ui/themes";
 import { ComboIndicator } from "../ComboIndicator";
@@ -16,15 +16,32 @@ function formatNumber(value: number): string {
   return value.toLocaleString("en-US");
 }
 
+/** Cap runaway OS text scaling so the three HUD columns can't collide at large
+ *  accessibility sizes. The digits still scale — they just stop before overlap.
+ *  The current score keeps a tighter cap (it is the widest element) and also
+ *  shrinks to fit its column as a final guard. */
+const SCORE_MAX_SCALE = 1.4;
+const LABEL_MAX_SCALE = 1.6;
+
 export function ScoreHeader({ score, best, combo, onPause }: ScoreHeaderProps) {
   const theme = useTheme();
   return (
     <View style={styles.row} testID="score-header">
       <View style={styles.side}>
-        <Text style={typography.labelCaps}>BEST</Text>
         <Text
-          style={typography.numericValue}
+          style={[typography.labelCaps, { color: theme.onSurfaceVariant }]}
+          numberOfLines={1}
+          maxFontSizeMultiplier={LABEL_MAX_SCALE}
+        >
+          BEST
+        </Text>
+        <Text
+          style={[typography.numericValue, { color: theme.onSurfaceVariant }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          maxFontSizeMultiplier={LABEL_MAX_SCALE}
           accessibilityLabel={`Best score ${formatNumber(best)}`}
+          testID="best-value"
         >
           {formatNumber(best)}
         </Text>
@@ -37,6 +54,9 @@ export function ScoreHeader({ score, best, combo, onPause }: ScoreHeaderProps) {
             { color: theme.score },
             glowFor(theme, theme.score, "low"),
           ]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          maxFontSizeMultiplier={SCORE_MAX_SCALE}
           accessibilityLabel={`Score ${formatNumber(score)}`}
           testID="score-value"
         >
@@ -48,14 +68,14 @@ export function ScoreHeader({ score, best, combo, onPause }: ScoreHeaderProps) {
       <View style={[styles.side, styles.sideRight]}>
         <Pressable
           onPress={onPause}
-          style={styles.pauseButton}
+          style={[styles.pauseButton, { borderColor: theme.outlineVariant }]}
           accessibilityRole="button"
           accessibilityLabel="Pause"
           testID="pause-button"
           hitSlop={4}
         >
-          <View style={styles.pauseBar} />
-          <View style={styles.pauseBar} />
+          <View style={[styles.pauseBar, { backgroundColor: theme.onSurfaceVariant }]} />
+          <View style={[styles.pauseBar, { backgroundColor: theme.onSurfaceVariant }]} />
         </Pressable>
       </View>
     </View>
@@ -71,12 +91,21 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   side: {
-    minWidth: 72,
+    // Fixed, non-shrinking side columns keep the centered score truly centered
+    // and give it a stable amount of room to shrink into at large text scales.
+    // Wide enough for a realistic multi-digit best; the value also shrinks to
+    // fit rather than truncating.
+    width: 72,
+    flexShrink: 0,
   },
   sideRight: {
     alignItems: "flex-end",
   },
   center: {
+    // The score column takes the remaining width and can shrink (minWidth: 0)
+    // so `adjustsFontSizeToFit` has room to work instead of overflowing.
+    flex: 1,
+    minWidth: 0,
     alignItems: "center",
     gap: spacing.xs,
   },
@@ -85,7 +114,6 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -95,6 +123,5 @@ const styles = StyleSheet.create({
     width: 4,
     height: 16,
     borderRadius: 2,
-    backgroundColor: colors.onSurfaceVariant,
   },
 });

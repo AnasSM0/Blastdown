@@ -33,6 +33,20 @@ export type ThemePalette = {
   score: string;
   accent: string;
 
+  /** Programmatic reactor-depth background (P1-2). Purely decorative, low
+   *  contrast, and always behind gameplay — never a gameplay-critical color.
+   *  Each hue is derived from the theme's own tones so no theme is "broken":
+   *  `base` is the deepest full-bleed fill, `glow` a soft central lift, `seam`
+   *  the panel divider, `grid` the faint circuit hairline, `corner` the corner
+   *  bracket stroke. */
+  background: {
+    base: string;
+    glow: string;
+    seam: string;
+    grid: string;
+    corner: string;
+  };
+
   /** Glow intensity multiplier (1 = the Reactor baseline). */
   glow: number;
 };
@@ -63,6 +77,16 @@ const reactor: ThemePalette = {
   rubbleCrack: reactorColors.outline,
   score: reactorColors.scoreOrange,
   accent: reactorColors.cyanBlock,
+  // Reactor is nudged toward the Premium deep navy/graphite reference here:
+  // the flat near-black screen gains navy depth from the background layer,
+  // while the appBackground token itself is left unchanged.
+  background: {
+    base: "#070C16",
+    glow: "#101A30",
+    seam: "#18233A",
+    grid: "#0E1626",
+    corner: "#243350",
+  },
   glow: 1,
 };
 
@@ -86,6 +110,13 @@ const arctic: ThemePalette = {
   rubbleCrack: "#5E8298",
   score: "#7DE3FF",
   accent: "#8AB4FF",
+  background: {
+    base: "#04090F",
+    glow: "#0B1A2A",
+    seam: "#173141",
+    grid: "#0A141F",
+    corner: "#1E3A4C",
+  },
   glow: 0.9,
 };
 
@@ -109,6 +140,13 @@ const magma: ThemePalette = {
   rubbleCrack: "#9A6146",
   score: "#FF7A1A",
   accent: "#FFB347",
+  background: {
+    base: "#0A0604",
+    glow: "#1B0D07",
+    seam: "#301810",
+    grid: "#150A06",
+    corner: "#3A1D12",
+  },
   glow: 1.2,
 };
 
@@ -132,6 +170,13 @@ const voidTheme: ThemePalette = {
   rubbleCrack: "#6B5990",
   score: "#C77DFF",
   accent: "#FF6EC7",
+  background: {
+    base: "#050409",
+    glow: "#130C22",
+    seam: "#241738",
+    grid: "#0F0A1B",
+    corner: "#33224E",
+  },
   glow: 1.1,
 };
 
@@ -155,6 +200,13 @@ const solar: ThemePalette = {
   rubbleCrack: "#9A7A44",
   score: "#FFD447",
   accent: "#FF9E2C",
+  background: {
+    base: "#0B0804",
+    glow: "#1C1207",
+    seam: "#301F0C",
+    grid: "#150E06",
+    corner: "#3E2C12",
+  },
   glow: 1.05,
 };
 

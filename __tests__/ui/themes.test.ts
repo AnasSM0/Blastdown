@@ -51,6 +51,15 @@ describe("theme palettes", () => {
       expect(theme.glow).toBeGreaterThan(0);
     }
   });
+
+  it("defines a valid reactor-background token set for every theme (P1-2)", () => {
+    for (const theme of THEMES) {
+      const bg = theme.background;
+      for (const field of ["base", "glow", "seam", "grid", "corner"] as const) {
+        expect(bg[field]).toMatch(HEX);
+      }
+    }
+  });
 });
 
 describe("resolveTheme", () => {
