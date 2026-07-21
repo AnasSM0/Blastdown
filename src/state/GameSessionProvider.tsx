@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode
 
 import { useGameController, type GameController } from "../hooks/useGameController";
 import { useGamePersistence } from "../hooks/useGamePersistence";
+import { useAnalytics } from "../services/analytics/AnalyticsServiceProvider";
 import { computeBoltsEarned, runId, settleRun } from "../services/profile/settlement";
 import { useProfile } from "./ProfileProvider";
 
@@ -28,13 +29,26 @@ const GameSessionContext = createContext<GameSession | null>(null);
 
 export function GameSessionProvider({ children }: { children: ReactNode }) {
   const controller = useGameController();
-  const { hydrated, hasActiveRun, canContinue, startNewRun, clearActiveRun } =
-    useGamePersistence(controller);
+  const {
+    hydrated,
+    hasActiveRun,
+    canContinue,
+    startNewRun: startPersistedRun,
+    clearActiveRun,
+  } = useGamePersistence(controller);
   const { updateProfile } = useProfile();
+  const { track } = useAnalytics();
 
   // App-lifetime guard so a run settles once even if Results remounts or Back
   // re-enters it. A new run has a new id and settles on its own.
   const settledRunIdRef = useRef<string | null>(null);
+
+  // Begin a fresh run and log run_start once per start (Play / Play Again are
+  // distinct, user-initiated starts, so each is its own event).
+  const startNewRun = useCallback(() => {
+    startPersistedRun();
+    track({ name: "run_start" });
+  }, [startPersistedRun, track]);
 
   const settleCurrentRun = useCallback((): number => {
     const state = controller.state;
@@ -45,8 +59,24 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     }
     settledRunIdRef.current = id;
     updateProfile((profile) => settleRun(profile, state, Date.now()).profile);
+    // run_end fires from the same once-per-run guard as settlement, so restart /
+    // Back / remount can never double-log the terminal event.
+    track({
+      name: "run_end",
+      score: state.score,
+      turn: state.turn,
+      bestCombo: state.bestCombo,
+      linesCleared: state.linesCleared,
+      piecesPlaced: state.piecesPlaced,
+      piecesDefused: state.piecesDefused,
+      explosions: state.explosions,
+      rubbleCleared: state.rubbleCleared,
+      revived: state.reviveUsed,
+      durationMs: Math.max(0, state.lastUpdatedAt - state.startedAt),
+      boltsEarned,
+    });
     return boltsEarned;
-  }, [controller, updateProfile]);
+  }, [controller, track, updateProfile]);
 
   const value = useMemo<GameSession>(
     () => ({

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -17,6 +17,10 @@ type TutorialViewProps = {
   onComplete: () => void;
   /** Called when the player skips (allowed only after the step-1 placement). */
   onSkip: () => void;
+  /** Optional: notified with the step id whenever the player moves to a new
+   *  step (not on first mount — the initial view is covered by tutorial_start).
+   *  Used for analytics; the view works fine without it. */
+  onStepChange?: (stepId: number) => void;
   /** Test seam: fixed board size, since onLayout doesn't fire in tests. */
   boardSize?: number;
 };
@@ -33,12 +37,27 @@ function highlightPreview(cells: readonly CellPosition[]): PlacementPreview | nu
  *  Uses its own isolated controller for the interactive step, so it can never
  *  touch the persisted active run. Persistence of completion is the caller's
  *  responsibility (onComplete / onSkip). */
-export function TutorialView({ onComplete, onSkip, boardSize }: TutorialViewProps) {
+export function TutorialView({ onComplete, onSkip, onStepChange, boardSize }: TutorialViewProps) {
   const steps = useMemo(() => tutorialSteps(), []);
   const [index, setIndex] = useState(0);
   const [placed, setPlaced] = useState(false);
 
   const step = steps[index];
+
+  // Notify on step changes only (skip the initial mount, covered by
+  // tutorial_start). Read the callback through a ref so it never re-fires.
+  const onStepChangeRef = useRef(onStepChange);
+  useEffect(() => {
+    onStepChangeRef.current = onStepChange;
+  });
+  const firstStepRef = useRef(true);
+  useEffect(() => {
+    if (firstStepRef.current) {
+      firstStepRef.current = false;
+      return;
+    }
+    onStepChangeRef.current?.(steps[index].id);
+  }, [index, steps]);
   const isInteractive = step.interactiveHand !== undefined;
   const isLast = index === steps.length - 1;
 

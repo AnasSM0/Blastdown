@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 
 import { ResultsView } from "../src/components/ResultsScreen";
+import { useAnalytics } from "../src/services/analytics";
 import { computeBoltsEarned } from "../src/services/profile/settlement";
 import { useProfile } from "../src/state/ProfileProvider";
 import { useGameSession } from "../src/state/GameSessionProvider";
@@ -14,17 +15,20 @@ export default function ResultsScreen() {
   const router = useRouter();
   const { controller, startNewRun, settleCurrentRun } = useGameSession();
   const { profile } = useProfile();
+  const { track } = useAnalytics();
   const state = controller.state;
 
   // Settle on mount. The session guards against a second settlement (remount /
-  // Back), so this is safe to call unconditionally.
+  // Back), so this is safe to call unconditionally. results_view is logged once
+  // here too (guarded by the same ref) so a remount can't re-log it.
   const settledRef = useRef(false);
   useEffect(() => {
     if (!settledRef.current) {
       settledRef.current = true;
       settleCurrentRun();
+      track({ name: "results_view" });
     }
-  }, [settleCurrentRun]);
+  }, [settleCurrentRun, track]);
 
   const handlePlayAgain = useCallback(() => {
     startNewRun();

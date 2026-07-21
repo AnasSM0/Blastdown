@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 
 import { SettingsView } from "../src/components/SettingsScreen";
+import { useAnalytics } from "../src/services/analytics";
 import { useSettings } from "../src/state/SettingsProvider";
 import { resolveTheme } from "../src/ui/themes";
 import type { PersistedSettings } from "../src/services/storage/schemas";
@@ -12,14 +13,17 @@ import type { PersistedSettings } from "../src/services/storage/schemas";
 export default function SettingsScreen() {
   const router = useRouter();
   const { settings, updateSettings } = useSettings();
+  const { track } = useAnalytics();
 
   const handleToggle = useCallback(
     (key: "soundEnabled" | "musicEnabled" | "hapticsEnabled" | "reducedMotion", value: boolean) => {
       const patch: Partial<PersistedSettings> =
         key === "reducedMotion" ? { reducedMotionOverride: value } : { [key]: value };
       updateSettings(patch);
+      // Setting name is an enumerated key; value is coerced to 0/1 — no free text.
+      track({ name: "settings_changed", setting: key, value: value ? 1 : 0 });
     },
-    [updateSettings],
+    [track, updateSettings],
   );
 
   const handleBack = useCallback(() => {

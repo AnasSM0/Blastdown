@@ -6,6 +6,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useMemo } from "react";
 
 import { AdServiceProvider } from "../src/services/ads";
+import { AnalyticsServiceProvider } from "../src/services/analytics";
+import { AnalyticsSessionTracker } from "../src/components/AnalyticsSessionTracker";
 import { AudioServiceProvider } from "../src/services/audio";
 import { createExpoAudioService } from "../src/services/audio/ExpoAudioService";
 import { StorageServiceProvider } from "../src/services/storage";
@@ -25,23 +27,26 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <StorageServiceProvider>
-          <SettingsProvider>
-            <ProfileProvider>
-              <ThemeProvider>
-                <AudioServiceProvider service={audioService}>
-                  <AdServiceProvider>
-                    <GameSessionProvider>
-                      <Stack
-                        screenOptions={{
-                          headerShown: false,
-                        }}
-                      />
-                    </GameSessionProvider>
-                  </AdServiceProvider>
-                </AudioServiceProvider>
-              </ThemeProvider>
-            </ProfileProvider>
-          </SettingsProvider>
+          <AnalyticsServiceProvider>
+            <SettingsProvider>
+              <ProfileProvider>
+                <ThemeProvider>
+                  <AudioServiceProvider service={audioService}>
+                    <AdServiceProvider>
+                      <GameSessionProvider>
+                        <AnalyticsSessionTracker />
+                        <Stack
+                          screenOptions={{
+                            headerShown: false,
+                          }}
+                        />
+                      </GameSessionProvider>
+                    </AdServiceProvider>
+                  </AudioServiceProvider>
+                </ThemeProvider>
+              </ProfileProvider>
+            </SettingsProvider>
+          </AnalyticsServiceProvider>
         </StorageServiceProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
