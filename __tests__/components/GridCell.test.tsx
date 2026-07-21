@@ -1,5 +1,5 @@
 import { render } from "@testing-library/react-native";
-import { StyleSheet } from "react-native";
+import { StyleSheet, type ViewStyle } from "react-native";
 
 import { GridCell } from "../../src/components/GridCell";
 import type { GridCell as DomainGridCell } from "../../src/domain/gameTypes";
@@ -7,8 +7,8 @@ import { resolveTheme } from "../../src/ui/themes";
 
 const reactor = resolveTheme(undefined);
 
-function fillOf(node: { props: { style: unknown } }): unknown {
-  return StyleSheet.flatten(node.props.style as never).backgroundColor;
+function fillOf(node: { props: Record<string, unknown> }): unknown {
+  return StyleSheet.flatten(node.props.style as ViewStyle)?.backgroundColor;
 }
 
 async function renderCell(cell: DomainGridCell, extra?: Record<string, unknown>) {
