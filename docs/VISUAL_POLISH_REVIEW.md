@@ -111,3 +111,61 @@ tasks lay their polished surfaces onto, is pure layout (lowest risk, no
 domain/theme contract touched), and directly fixes the most obvious baseline
 problem (the dead lower third + top-packed board). Every subsequent material
 task (blocks, rubble, tray, dock) benefits from a correct composition first.
+
+---
+
+## Phase 1 · P1-1 — Responsive gameplay composition (implemented)
+
+Layout-only foundation. No blocks/timers/rubble/theme-tokens/animations changed.
+
+**Files changed:**
+
+- `app/game.tsx` — restructured `GameView` into four stable vertical zones (HUD
+  → board → tray → action dock); added measured board geometry.
+- `__tests__/integration/gameLayout.test.tsx` — new tests (see below).
+
+**Responsive decisions:**
+
+- **Four zones.** `ScoreHeader` (HUD) sits above a `content` column holding a
+  board zone, tray zone, and action zone. `content` uses
+  `justifyContent: "space-evenly"` so leftover vertical space becomes even
+  breathing room instead of the baseline's dead bottom third — the tray and dock
+  can no longer drift far below the board.
+- **Measured square board.** `content`'s box is measured via `onLayout`;
+  `computeBoardSide` returns the largest square that fits both the available
+  width and a height budget (`min(width, height × 0.62, 420)`). The board grows
+  to fill width on tall screens and shrinks on short screens so it never clips
+  the tray/dock. No fixed device coordinates — pure measured geometry. A
+  caller-supplied `boardSize` still overrides measurement (test seam).
+- **64-cell geometry preserved.** The board is rendered inside a square wrapper
+  sized to `boardSide` and `GameBoard` receives `boardSize={boardSide}`, so its
+  internal 8×8 cell computation is unchanged — exactly 64 cells at every width.
+- **Safe areas.** `SafeAreaView` now declares `edges={["top","bottom","left","right"]}`
+  explicitly, so the HUD clears the status bar and the action dock clears Android
+  gesture / three-button navigation.
+- **Text scaling.** The board zone absorbs slack; if HUD/tray/dock text scales
+  up, the board shrinks rather than pushing the primary controls off-screen.
+- **≥320 px.** Verified in tests at 320/360/390/420 logical px — 64 cells and all
+  four zones present at each.
+- **Unchanged:** drag/tap, pause, reward, analytics, audio, persistence, theme,
+  accessibility, and all effect/animation timing. Materials of blocks, timers,
+  rubble, tray slots, and reward buttons are untouched (P1-2..P1-9).
+
+**Tests added (`gameLayout.test.tsx`):** `computeBoardSide` unit (width-bound,
+height-bound, cap, unmeasured→0); board renders exactly 64 cells + HUD/board/
+tray/dock/pause/freeze/defuse at 320/360/390/420 px; tap placement still works
+after the restructure. Full suite: 78 suites / 432 tests green; coverage 89.5%.
+
+**Screenshot / device finding:** no Android device or emulator is available in
+this environment, so an after-capture at the baseline resolution
+(`docs/current game images/phase1-p1-layout-after.jpg`) was **not** produced —
+recorded here rather than fabricated. `expo export --platform android` succeeds,
+confirming the layout builds. On-device visual confirmation of the four-zone
+composition is deferred to when a device/emulator is available.
+
+**Risks:** (1) First paint before `onLayout` renders no board for one frame
+(`boardSide === 0`); harmless flash, board appears next frame. (2) The 0.62
+height fraction is a tuning value — may want adjustment once P1-7 (3-slot tray)
+and P1-8 (action dock) change the tray/dock heights; revisit then. (3) Very tall
+aspect ratios leave symmetric slack around the board (by design, via
+space-evenly) rather than a tight group — acceptable and consistent.

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
@@ -80,6 +80,25 @@ type GameViewProps = {
 const SECOND_CHANCE_MS = 1500;
 const SECOND_CHANCE_REDUCED_MS = 800;
 
+/** Upper bound on the board's edge so it never balloons on tablets/wide screens
+ *  (mirrors GameBoard's own maxWidth). */
+const MAX_BOARD_SIZE = 420;
+/** The board may claim at most this fraction of the gameplay content height, so
+ *  the tray and action dock always have room beneath it on short screens — the
+ *  board shrinks to fit rather than clipping the controls. */
+const BOARD_HEIGHT_FRACTION = 0.62;
+
+/** Board edge length from the measured content box: the largest square that
+ *  fits the available width and the height budget, capped. Returns 0 until the
+ *  content area has been measured (nothing renders that frame). Pure — no fixed
+ *  device coordinates, just measured geometry. */
+export function computeBoardSide(content: { width: number; height: number }): number {
+  if (content.width <= 0 || content.height <= 0) {
+    return 0;
+  }
+  return Math.min(content.width, content.height * BOARD_HEIGHT_FRACTION, MAX_BOARD_SIZE);
+}
+
 /** Presentational gameplay screen over a supplied controller. Holds no
  *  gameplay rules — every decision is delegated to the domain controller. */
 export function GameView({ controller, boardSize, onExit, onResults }: GameViewProps) {
@@ -109,6 +128,18 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
   // in flight, and while paused, so a reward can't overlap a placement or
   // another reward and no move lands behind the pause menu.
   const inputLocked = animator.isAnimating || reward.pending || paused;
+
+  // Measured gameplay content box; drives a responsive square board that fits
+  // both the available width and a height budget. A caller-supplied `boardSize`
+  // (test seam) overrides measurement, since onLayout doesn't fire under jest.
+  const [contentBox, setContentBox] = useState({ width: 0, height: 0 });
+  const boardSide = boardSize ?? computeBoardSide(contentBox);
+  const handleContentLayout = useCallback((event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    setContentBox((current) =>
+      current.width === width && current.height === height ? current : { width, height },
+    );
+  }, []);
 
   const [defuseConfirmOpen, setDefuseConfirmOpen] = useState(false);
   const [secondChance, setSecondChance] = useState(false);
@@ -430,47 +461,61 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.appBackground }]} testID="game-screen">
-      <SafeAreaView style={styles.safe}>
-        {/* Best score is persisted in Phase 5; 0 stub until StorageService lands. */}
+      <SafeAreaView style={styles.safe} edges={["top", "bottom", "left", "right"]}>
+        {/* Zone 1 — compact HUD. Best score is persisted in Phase 5; 0 stub
+            until the HUD wiring lands (P1-2). */}
         <ScoreHeader score={state.score} best={0} combo={state.combo} onPause={handlePause} />
-        <View style={styles.content}>
-          <GameBoard
-            ref={boardRef}
-            grid={state.grid}
-            badges={badges}
-            boardSize={boardSize}
-            preview={preview}
-            onCellPress={handleCellPress}
-            onCellSizeChange={handleCellSizeChange}
-            placedCells={placement.cells}
-            placementNonce={placement.nonce}
-            effectPlan={animator.plan}
-            effectKey={animator.effectKey}
-            highlightPieceId={defuseTarget?.id ?? null}
-            reducedMotion={reducedMotion}
-          />
-          <PieceTray
-            hand={state.hand}
-            selectedHandId={controller.selectedHandId}
-            onSelect={handleSelect}
-            onDragStart={handleDragStart}
-            onDragMove={handleDragMove}
-            onDragEnd={handleDragEnd}
-            draggingHandId={drag?.handId ?? null}
-          />
-          <RewardedActionBar
-            freeze={{
-              onPress: handleFreeze,
-              disabled: inputLocked || !canActivateFreeze(state),
-              active: freezeActive,
-              placementsRemaining: state.freezeTurnsRemaining,
-            }}
-            defuse={{
-              onPress: handleDefuseOpen,
-              disabled: inputLocked || (!defuseConfirmOpen && !canApplyRewardedDefuse(state)),
-              selected: defuseConfirmOpen,
-            }}
-          />
+        {/* Zones 2–4 — board / tray / action dock, evenly distributed so the
+            board stays large while the tray and dock never drift far below it
+            and the lower screen is not left empty. */}
+        <View style={styles.content} onLayout={handleContentLayout}>
+          <View style={styles.boardZone}>
+            {boardSide > 0 ? (
+              <View style={[styles.boardWrapper, { width: boardSide, height: boardSide }]}>
+                <GameBoard
+                  ref={boardRef}
+                  grid={state.grid}
+                  badges={badges}
+                  boardSize={boardSide}
+                  preview={preview}
+                  onCellPress={handleCellPress}
+                  onCellSizeChange={handleCellSizeChange}
+                  placedCells={placement.cells}
+                  placementNonce={placement.nonce}
+                  effectPlan={animator.plan}
+                  effectKey={animator.effectKey}
+                  highlightPieceId={defuseTarget?.id ?? null}
+                  reducedMotion={reducedMotion}
+                />
+              </View>
+            ) : null}
+          </View>
+          <View style={styles.trayZone}>
+            <PieceTray
+              hand={state.hand}
+              selectedHandId={controller.selectedHandId}
+              onSelect={handleSelect}
+              onDragStart={handleDragStart}
+              onDragMove={handleDragMove}
+              onDragEnd={handleDragEnd}
+              draggingHandId={drag?.handId ?? null}
+            />
+          </View>
+          <View style={styles.actionZone}>
+            <RewardedActionBar
+              freeze={{
+                onPress: handleFreeze,
+                disabled: inputLocked || !canActivateFreeze(state),
+                active: freezeActive,
+                placementsRemaining: state.freezeTurnsRemaining,
+              }}
+              defuse={{
+                onPress: handleDefuseOpen,
+                disabled: inputLocked || (!defuseConfirmOpen && !canApplyRewardedDefuse(state)),
+                selected: defuseConfirmOpen,
+              }}
+            />
+          </View>
         </View>
         {defuseConfirmOpen ? (
           <DefuseConfirmCard
@@ -597,6 +642,23 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: spacing.screenPadding,
-    gap: spacing.lg,
+    paddingVertical: spacing.sm,
+    // Distribute the three gameplay zones so the board stays large and the
+    // remaining space becomes even breathing room rather than a dead bottom gap.
+    justifyContent: "space-evenly",
+    alignItems: "stretch",
+  },
+  boardZone: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  boardWrapper: {
+    alignSelf: "center",
+  },
+  trayZone: {
+    justifyContent: "center",
+  },
+  actionZone: {
+    justifyContent: "center",
   },
 });

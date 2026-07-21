@@ -823,7 +823,8 @@ scoring, timer, persistence, economy, analytics, reward, or domain change.**
   `npm run test`, `npm run format:check`, `npx expo-doctor`. Tasks that change
   layout/geometry also run `npx expo export --platform android`.
 
-- [ ] **P1-1 Responsive gameplay composition**
+- [x] **P1-1 Responsive gameplay composition** — done (4-zone measured
+      composition; see `VISUAL_POLISH_REVIEW.md` "Phase 1 · P1-1").
   - Allowed: `app/game.tsx` (`GameView` layout/styles only),
     `src/components/GameBoard/GameBoard.tsx` (sizing), `__tests__/**`.
   - Forbidden: `GridCell` visuals, reward/tray internals.
