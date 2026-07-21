@@ -700,3 +700,43 @@ taxonomy are ready for those adapters to drop in.
 `src/state/{GameSessionProvider,ProfileProvider,SettingsProvider}.tsx`,
 `src/components/{ResultsScreen,Tutorial}/**`, `app/{_layout,game,results,themes,settings,tutorial}.tsx`,
 `docs/{ANALYTICS,ERROR_REPORTING,RELEASE_CHECKLIST,TASKS,DECISIONS}.md`.
+
+## 2026-07-21 — Professional UI Polish Phase 0 (audit only)
+
+Read-only audit of the gameplay UI against the approved Stitch references and
+`docs/PROFESSIONAL_UI_POLISH_MASTER_PLAN.md` ("Neon Reactor Premium"). No
+production UI changed. Full findings in `docs/VISUAL_POLISH_REVIEW.md`; Phase 1
+task plan in `docs/TASKS.md`.
+
+**Baseline** committed as `docs/current game images/gameplay screen.jpg` (do not
+overwrite) alongside the master plan (`docs: add UI polish plan and gameplay
+baseline`).
+
+**Key gaps vs direction:** outline-only blocks, board-colored (featureless)
+empty cells, X-cross rubble, variable-count tray (not a stable 3-slot), dead
+lower-third composition, flat background, and a `BEST 0` HUD stub (`app/game.tsx`
+passes `best={0}` instead of the persisted profile best).
+
+**Architecture facts recorded:** (1) UI holds no domain logic — clean, preserve.
+(2) Single animation system — **RN `Animated`, zero `react-native-reanimated`
+imports**; `docs/UI_IMPLEMENTATION.md` and `docs/ANIMATION_SPEC.md` still said
+"Reanimated" and were annotated as stale this phase. (3) Geometry is measured, no
+fixed device coordinates. (4) **149 hardcoded `colors.*` references across 15
+components bypass the theme**; gameplay-critical offenders (`GridCell` preview,
+`PieceTray` slots, `ScoreHeader` pause, `RewardedActionButton`) are the P1-9
+theme-compatibility target. (5) Base tokens in `src/ui/theme.ts` predate the
+plan's Premium palette and need a tokens-only alignment pass (P1-2).
+
+**Floating Settings gear** in the screenshot is an external dev-client / OS
+overlay, not BlastDown UI (no such control exists in code) — flagged as an
+invalid mockup detail to ignore, not a component to build.
+
+**Phase 1 = static-surface polish only** (composition, HUD/background, frame/
+empty cells, premium blocks, timer contours, cracked rubble, 3-slot tray, action
+dock, theme compatibility, a11y review, before/after). Motion feel is Phase 2.
+Owner is Claude Code for all P1 tasks (Codex sandbox broken). Protected: domain,
+balance, persistence, economy, analytics/diagnostics, reward logic, ad config,
+`BUILD_SPEC.md`. No new deps/assets; no second animation system; no per-cell blur.
+
+**Phase 6B (production ads/consent) stays paused** until Visual Polish Phases
+0–3 are approved.

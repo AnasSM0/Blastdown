@@ -1,5 +1,14 @@
 # Accessibility
 
+> **Phase 0 audit status (2026-07-21).** Implemented today: numeric timer labels
+> (`TimerBadge` always renders a digit), reduced-motion gating across all
+> effects, safe-area insets (`SafeAreaView` in the gameplay/overlay trees),
+> touch targets ≥44–48px, and non-flashing pulses. **Still open** (tracked for
+> UI Polish Phase 1 §P1-9/P1-10 and later): a dedicated colorblind-safe palette
+> option, verification at 360-px width + large font scale, and keeping every new
+> polished surface (premium blocks, cracked rubble, contours) within these rules
+> — never signaling state by color alone. See `docs/VISUAL_POLISH_REVIEW.md` §3.
+
 Requirements derived from `BUILD_SPEC.md` §19, cross-checked against what
 the approved Stitch screens actually show. Stitch screens are a visual
 reference only — none of them can demonstrate screen-reader behavior, so
