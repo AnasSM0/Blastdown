@@ -60,6 +60,29 @@ describe("theme palettes", () => {
       }
     }
   });
+
+  it("defines valid board-frame and empty-cell tokens for every theme (P1-3)", () => {
+    for (const theme of THEMES) {
+      for (const field of [
+        "boardFrameInner",
+        "boardFrameBevel",
+        "boardFrameCorner",
+        "emptyCell",
+        "emptyCellBorder",
+      ] as const) {
+        expect(theme[field]).toMatch(HEX);
+      }
+    }
+  });
+
+  it("keeps the empty-cell fill distinct from the board panel and rubble (P1-3)", () => {
+    for (const theme of THEMES) {
+      // Empty cells must read as their own surface, not the board void or rubble.
+      expect(theme.emptyCell).not.toBe(theme.boardBg);
+      expect(theme.emptyCell).not.toBe(theme.rubbleFill);
+      expect(theme.emptyCellBorder).not.toBe(theme.emptyCell);
+    }
+  });
 });
 
 describe("resolveTheme", () => {

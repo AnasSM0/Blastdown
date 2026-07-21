@@ -80,7 +80,13 @@ export function GridCell({
   let visual;
   switch (cell.kind) {
     case "empty":
-      visual = { backgroundColor: theme.boardBg, borderWidth: 1, borderColor: theme.gridLine };
+      // A subdued fill distinct from the board panel so the 8×8 grid reads
+      // clearly, without competing with filled blocks, previews, or rubble.
+      visual = {
+        backgroundColor: theme.emptyCell,
+        borderWidth: 1,
+        borderColor: theme.emptyCellBorder,
+      };
       break;
     case "rubble":
       visual = {

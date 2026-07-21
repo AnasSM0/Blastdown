@@ -858,7 +858,9 @@ scoring, timer, persistence, economy, analytics, reward, or domain change.**
     79 suites / 441 tests, coverage 89.57%, doctor 20/20, Android export ✅. No
     device available → after-screenshot not captured (recorded, not fabricated).
 
-- [ ] **P1-3 Board frame and empty cells**
+- [x] **P1-3 Board frame and empty cells** — done 2026-07-22
+      (branch `phase-professional-polish-1-board-frame`). See
+      `docs/VISUAL_POLISH_REVIEW.md` §"Phase 1 · P1-3".
   - Allowed: `src/components/GameBoard/GameBoard.tsx` (frame),
     `src/components/GridCell/GridCell.tsx` (empty case), theme tokens.
   - Forbidden: block/rubble logic beyond visuals, domain.
@@ -867,6 +869,14 @@ scoring, timer, persistence, economy, analytics, reward, or domain change.**
     board frame reads as a premium bezel; contrast is comfortable; theme-aware.
   - Tests: empty `GridCell` renders the empty-cell token; frame present.
   - Verify: full battery.
+  - Result: empty cells use new `emptyCell`/`emptyCellBorder` tokens (distinct
+    from board panel and rubble); frame depth via 3 decorative
+    `pointerEvents="none"` layers (inner ring + top bevel behind cells, corner
+    brackets on top) with `BOARD_CONTENT_INSET` unchanged so drag geometry and
+    the 64-cell square are preserved. Five new tokens/theme
+    (`boardFrameInner/Bevel/Corner`, `emptyCell`, `emptyCellBorder`). 80 suites /
+    448 tests, coverage 89.59%, doctor 20/20, Android export ✅. No device →
+    after-screenshot not captured (recorded, not fabricated).
 
 - [ ] **P1-4 Premium block surfaces**
   - Allowed: `src/components/GridCell/GridCell.tsx` (timed/normal), an optional

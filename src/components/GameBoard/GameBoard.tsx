@@ -41,6 +41,12 @@ type GameBoardProps = {
 
 const FRAME_WIDTH = 2;
 
+/** Corner-accent geometry (P1-3). Short, thin brackets inset just inside the
+ *  frame; purely decorative and non-interactive. */
+const CORNER_LENGTH = 12;
+const CORNER_THICKNESS = 2;
+const CORNER_INSET = 3;
+
 /** Frame + gutter offset from the board's outer edge to the first cell's
  *  edge — the screen adds this to the measured window origin to locate the
  *  playable content area. */
@@ -136,6 +142,19 @@ function GameBoardImpl(
       accessibilityLabel="Game board"
       testID="game-board"
     >
+      {/* Frame depth (P1-3), all decorative and non-interactive, drawn BEHIND
+          the cells within the frame/gutter zone so the playable area is never
+          covered or reduced: a fine inner-border ring plus a subtle top inset
+          highlight. Cheap static Views — no blur, animation, or shadow. */}
+      <View
+        pointerEvents="none"
+        testID="board-frame-inner"
+        style={[styles.frameInner, { borderColor: theme.boardFrameInner }]}
+      />
+      <View
+        pointerEvents="none"
+        style={[styles.frameBevel, { backgroundColor: theme.boardFrameBevel }]}
+      />
       {cellSize > 0
         ? grid.map((rowCells, row) => (
             <View key={`row-${row}`} style={[styles.row, row < rows - 1 && styles.rowGap]}>
@@ -164,6 +183,74 @@ function GameBoardImpl(
             </View>
           ))
         : null}
+      {/* Small theme-aware corner accents (P1-3), drawn on top at the four
+          board corners; thin and non-interactive so hit testing is untouched. */}
+      <View pointerEvents="none" testID="board-frame-corners" style={styles.cornerLayer}>
+        <View
+          style={[
+            styles.corner,
+            styles.cornerTL,
+            styles.cornerH,
+            { backgroundColor: theme.boardFrameCorner },
+          ]}
+        />
+        <View
+          style={[
+            styles.corner,
+            styles.cornerTL,
+            styles.cornerV,
+            { backgroundColor: theme.boardFrameCorner },
+          ]}
+        />
+        <View
+          style={[
+            styles.corner,
+            styles.cornerTR,
+            styles.cornerH,
+            { backgroundColor: theme.boardFrameCorner },
+          ]}
+        />
+        <View
+          style={[
+            styles.corner,
+            styles.cornerTR,
+            styles.cornerV,
+            { backgroundColor: theme.boardFrameCorner },
+          ]}
+        />
+        <View
+          style={[
+            styles.corner,
+            styles.cornerBL,
+            styles.cornerH,
+            { backgroundColor: theme.boardFrameCorner },
+          ]}
+        />
+        <View
+          style={[
+            styles.corner,
+            styles.cornerBL,
+            styles.cornerV,
+            { backgroundColor: theme.boardFrameCorner },
+          ]}
+        />
+        <View
+          style={[
+            styles.corner,
+            styles.cornerBR,
+            styles.cornerH,
+            { backgroundColor: theme.boardFrameCorner },
+          ]}
+        />
+        <View
+          style={[
+            styles.corner,
+            styles.cornerBR,
+            styles.cornerV,
+            { backgroundColor: theme.boardFrameCorner },
+          ]}
+        />
+      </View>
       {cellSize > 0
         ? badges.map((badge) => (
             <View
@@ -230,4 +317,48 @@ const styles = StyleSheet.create({
     position: "absolute",
     zIndex: 2,
   },
+  // A fine inner-border ring sitting just inside the outer frame, within the
+  // gutter — draws structure without touching cell geometry.
+  frameInner: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.board - FRAME_WIDTH,
+  },
+  // Subtle top inset highlight — a thin light line along the inner top edge.
+  frameBevel: {
+    position: "absolute",
+    top: 0,
+    left: spacing.lg,
+    right: spacing.lg,
+    height: StyleSheet.hairlineWidth,
+    opacity: 0.6,
+  },
+  cornerLayer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
+  corner: {
+    position: "absolute",
+    opacity: 0.85,
+  },
+  cornerH: {
+    width: CORNER_LENGTH,
+    height: CORNER_THICKNESS,
+  },
+  cornerV: {
+    width: CORNER_THICKNESS,
+    height: CORNER_LENGTH,
+  },
+  cornerTL: { top: CORNER_INSET, left: CORNER_INSET },
+  cornerTR: { top: CORNER_INSET, right: CORNER_INSET },
+  cornerBL: { bottom: CORNER_INSET, left: CORNER_INSET },
+  cornerBR: { bottom: CORNER_INSET, right: CORNER_INSET },
 });

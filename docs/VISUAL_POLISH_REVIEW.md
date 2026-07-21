@@ -253,3 +253,74 @@ themes were derived, not visually tuned on-device — validate contrast against
 board cells when a device is available. (3) Extreme best scores (7+ digits)
 shrink to fit the fixed side column via `adjustsFontSizeToFit`; at some point the
 digits get small, but they stay legible and never truncate.
+
+---
+
+## Phase 1 · P1-3 — Board frame and empty cells (2026-07-22)
+
+Third Phase 1 task, built on the P1-2 tokens. Scope: premium board frame depth
+and distinct empty-cell presentation — no block-material, timer, rubble, tray,
+action-dock, or animation work.
+
+**Files changed:**
+
+- `src/ui/themes.ts` — added board-frame + empty-cell tokens to `ThemePalette`
+  and all five palettes: `boardFrameInner` (fine inner ring), `boardFrameBevel`
+  (top inset highlight), `boardFrameCorner` (corner accent), `emptyCell` (fill),
+  `emptyCellBorder`. Reactor is the reference; the other four derive from their
+  own board tones so all stay readable. Token additions limited to P1-3 needs.
+- `src/components/GameBoard/GameBoard.tsx` — frame depth via three decorative,
+  `pointerEvents="none"` layers that do **not** touch layout geometry: a
+  hairline inner-border ring and a subtle top bevel drawn behind the cells
+  within the frame/gutter zone, and four small theme-aware corner brackets drawn
+  on top. `BOARD_CONTENT_INSET` (`FRAME_WIDTH 2 + gridGutter 2`) is unchanged, so
+  drag mapping, badge anchors, cell size, squareness (`aspectRatio: 1`), and the
+  64-cell geometry are all preserved.
+- `src/components/GridCell/GridCell.tsx` — the empty case now fills with
+  `theme.emptyCell` + `theme.emptyCellBorder` instead of the board-panel color,
+  so the 8×8 structure reads clearly. No extra per-cell View/wrapper (fill +
+  border only) to protect performance across 64 cells.
+
+**Frame / cell decisions:**
+
+- Frame depth is purely additive overlays — zero change to the board's box
+  model — which is the only way to add a bezel without disturbing the measured
+  drag geometry the whole input path depends on.
+- Inner ring + bevel sit behind cells inside the 4px frame/gutter zone (never
+  covering playable area); corner brackets sit on top but are thin (2px) and
+  short (12px), non-interactive, so hit testing is untouched.
+- Empty cell kept to fill + border (no inner-highlight sub-View) — the distinct
+  fill already reveals the grid, and avoiding a 64× extra View honors the
+  performance rule.
+- Distinctness matrix preserved: empty (`emptyCell` navy/tonal fill) ≠ filled
+  (`${accent}22` + accent border) ≠ rubble (`rubbleFill` + cracks) ≠ preview
+  (dashed overlay) ≠ highlight (solid accent ring).
+
+**Token changes:** five new semantic tokens per theme
+(`boardFrameInner/Bevel/Corner`, `emptyCell`, `emptyCellBorder`); no
+gameplay-critical color is hardcoded in `GameBoard`/`GridCell`; no
+block/timer/rubble/tray/reward colors touched.
+
+**Tests:** `themes.test.ts` validates the five new tokens (valid hex) for all
+themes and asserts `emptyCell` is distinct from the board panel and rubble;
+`GridCell.test.tsx` (new) asserts the empty fill uses the dedicated token and
+stays distinct from filled/rubble/preview, with the empty a11y label intact;
+`GameBoard.test.tsx` asserts the board stays square, the frame layers render and
+are non-interactive, and the cell count is still 64;
+`GameBoardInteraction.test.tsx` (unchanged) confirms tap/hit testing still
+works. Full suite: **80 suites / 448 tests** green; coverage **89.59%**.
+
+**Verification:** typecheck ✅, lint ✅, test ✅, coverage ✅ 89.59%,
+format:check ✅, expo-doctor ✅ 20/20, `expo export --platform android` ✅.
+
+**Screenshot / device finding:** no Android device/emulator available, so
+`docs/current game images/phase1-p3-board-after.jpg` was **not** produced —
+recorded here rather than fabricated. Android export succeeds, confirming the
+frame/cell changes build. On-device visual confirmation deferred.
+
+**Risks:** (1) Corner brackets overlap the outermost cells' corners by ~2px
+(decorative bezel, `pointerEvents="none"` so no touch impact) — acceptable and
+intentional. (2) The hairline inner ring at very small board widths (≈320px)
+sits close to the outer frame; still legible, revisit if it reads as a double
+line on-device. (3) Non-Reactor frame/empty tokens were derived, not tuned
+on-device — validate contrast against blocks/rubble when a device is available.
