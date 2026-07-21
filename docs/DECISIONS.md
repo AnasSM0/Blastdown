@@ -800,3 +800,37 @@ tradeoff for the "optional inner highlight" clause.
 Magma / Void / Solar derive theirs from their own board tones so all five stay
 readable. No gameplay-critical color is hardcoded in `GameBoard`/`GridCell`, and
 no block/timer/rubble/tray/reward colors were touched (deferred to P1-4+).
+
+## 2026-07-22 — UI Polish Phase 1 · P1-4 (premium block surfaces)
+
+**One shared block material, centralized alpha math.** A pure
+`blockSurface(theme, accent, variant)` (`src/ui/blockSurface.ts`) is the single
+source of every block's fill/edge/highlight/glow/opacity/dashed, for all eight
+states. Board (`GridCell` via a new `BlockSurface` tile), tray (`PieceTray`
+mini-cells + selected/consumed slots), and drag ghost all consume it keyed on
+the piece's `blockColor` accent. This keeps cyan/violet/amber identity uniform,
+makes cells of one piece read as related (same material + edge intensity) with
+no UI-side grouping logic, and keeps hex values out of the components.
+
+**Critical timed styling reuses the existing visual-state threshold — no new
+timer logic.** `GameBoard` derives the urgent piece-id set from the badge data
+it already receives (`getTimerVisualState(remainingTurns) === "urgent"`) and
+passes a `critical` flag to those cells. The critical variant intensifies the
+edge + glow + highlight but never recolors, honoring "critical must preserve the
+original block color." Full piece contours (grouping a piece's outline) remain
+deferred to P1-5, which owns timer-ownership visuals.
+
+**Invalid preview = dashed edge (a non-color cue).** Valid previews are solid in
+the block accent; invalid/conflict previews use the theme's `timerCritical`
+danger hue with a dashed border, so placeability is distinguishable by pattern,
+not color alone (colorblind-safe). Conflict is a stronger fill than plain
+invalid. The drag ghost mirrors this (solid vs dashed).
+
+**Consumed/disabled = lose glow + opacity.** The dragged piece's tray copy
+renders with the `disabled` material (no glow, reduced opacity); the tray slot
+keeps its approved 0.4 drag-dim. No new tokens were added — P1-4 tints existing
+`accent`/`timerCritical`/glow tokens only.
+
+**Perf note:** each filled block adds one static sheen sub-View (no blur, no
+animated shadow). Accepted as cheap; flagged to watch on low-end devices if a
+full board ever stutters.

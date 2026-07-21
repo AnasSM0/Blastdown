@@ -1,10 +1,18 @@
 import { render } from "@testing-library/react-native";
-import { StyleSheet } from "react-native";
+import { StyleSheet, type ViewStyle } from "react-native";
 
 import { GameBoard } from "../../src/components/GameBoard";
 import { buildEffectPlan } from "../../src/ui/effects/eventEffects";
 import type { GridCell } from "../../src/domain/gameTypes";
 import type { TimerBadgePlacement } from "../../src/domain/selectors";
+import { blockColor, resolveTheme } from "../../src/ui/themes";
+import { blockSurface } from "../../src/ui/blockSurface";
+
+const reactor = resolveTheme(undefined);
+
+function fillOf(node: { props: Record<string, unknown> }): unknown {
+  return StyleSheet.flatten(node.props.style as ViewStyle)?.backgroundColor;
+}
 
 function makeEmptyGrid(size: number): GridCell[][] {
   return Array.from({ length: size }, () =>
@@ -63,6 +71,26 @@ describe("GameBoard", () => {
     expect(result.getAllByTestId(/^timer-badge-/)).toHaveLength(2);
     expect(result.getByText("6")).toBeTruthy();
     expect(result.getByText("1")).toBeTruthy();
+  });
+
+  it("applies the critical block material only to urgent timed pieces (P1-4)", async () => {
+    const grid = makeEmptyGrid(8);
+    grid[0][0] = { kind: "timed", pieceInstanceId: "urgent", colorId: "cyan" };
+    grid[5][5] = { kind: "timed", pieceInstanceId: "calm", colorId: "cyan" };
+    const badges: TimerBadgePlacement[] = [
+      { pieceId: "urgent", position: { row: 0, column: 0 }, remainingTurns: 1, colorId: "cyan" },
+      { pieceId: "calm", position: { row: 5, column: 5 }, remainingTurns: 6, colorId: "cyan" },
+    ];
+
+    const result = await render(<GameBoard grid={grid} badges={badges} boardSize={328} />);
+
+    const accent = blockColor(reactor, "cyan");
+    expect(fillOf(result.getByTestId("block-0-0"))).toBe(
+      blockSurface(reactor, accent, "critical").fill,
+    );
+    expect(fillOf(result.getByTestId("block-5-5"))).toBe(
+      blockSurface(reactor, accent, "normal").fill,
+    );
   });
 
   it("labels the board for screen readers", async () => {
