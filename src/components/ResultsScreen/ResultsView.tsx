@@ -13,12 +13,26 @@ export type RunStats = {
   rubbleCleared: number;
 };
 
+/** Optional mock "double Bolts" rewarded action. Absent (or amount 0) hides the
+ *  control entirely — there is nothing to double. */
+export type DoubleBoltsProps = {
+  /** Bolts that would be banked a second time. */
+  amount: number;
+  onPress: () => void;
+  /** True while the rewarded ad request is in flight. */
+  pending: boolean;
+  /** True once the reward has been applied for this run (one-time). */
+  applied: boolean;
+};
+
 type ResultsViewProps = {
   stats: RunStats;
   /** Player best score after this run is settled. */
   bestScore: number;
   /** Bolts earned by this run (floor(score/250) + defuses). */
   boltsEarned: number;
+  /** Mock double-Bolts rewarded action; omit to hide it. */
+  doubleBolts?: DoubleBoltsProps;
   onPlayAgain: () => void;
   onHome: () => void;
 };
@@ -40,10 +54,12 @@ export function ResultsView({
   stats,
   bestScore,
   boltsEarned,
+  doubleBolts,
   onPlayAgain,
   onHome,
 }: ResultsViewProps) {
   const n = (value: number) => value.toLocaleString("en-US");
+  const showDoubleBolts = doubleBolts !== undefined && doubleBolts.amount > 0;
   return (
     <SafeAreaView style={styles.screen} testID="results-screen">
       <ScrollView contentContainerStyle={styles.content}>
@@ -76,6 +92,34 @@ export function ResultsView({
             accent={colors.cyanBlock}
           />
         </View>
+
+        {showDoubleBolts ? (
+          doubleBolts.applied ? (
+            <View
+              style={styles.doubleBoltsApplied}
+              accessibilityLabel={`Bolts doubled, plus ${n(doubleBolts.amount)}`}
+              testID="double-bolts-applied"
+            >
+              <Text style={styles.doubleBoltsAppliedText}>
+                BOLTS DOUBLED ✓ +{n(doubleBolts.amount)}
+              </Text>
+            </View>
+          ) : (
+            <Pressable
+              onPress={doubleBolts.onPress}
+              disabled={doubleBolts.pending}
+              style={[styles.doubleBolts, neonGlow(colors.scoreOrange, "low")]}
+              accessibilityRole="button"
+              accessibilityLabel={`Watch an ad to double your Bolts, plus ${n(doubleBolts.amount)}`}
+              accessibilityState={{ disabled: doubleBolts.pending }}
+              testID="double-bolts-button"
+            >
+              <Text style={styles.doubleBoltsText}>
+                {doubleBolts.pending ? "LOADING…" : `DOUBLE BOLTS +${n(doubleBolts.amount)} ▶`}
+              </Text>
+            </Pressable>
+          )
+        ) : null}
 
         <Pressable
           onPress={onPlayAgain}
@@ -147,6 +191,33 @@ const styles = StyleSheet.create({
   statValue: {
     ...typography.buttonText,
     color: colors.onSurface,
+  },
+  doubleBolts: {
+    marginTop: spacing.lg,
+    minHeight: 52,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.scoreOrange,
+    backgroundColor: `${colors.scoreOrange}1F`,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  doubleBoltsText: {
+    ...typography.buttonText,
+    color: colors.scoreOrange,
+  },
+  doubleBoltsApplied: {
+    marginTop: spacing.lg,
+    minHeight: 52,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  doubleBoltsAppliedText: {
+    ...typography.buttonText,
+    color: colors.scoreOrange,
   },
   playAgain: {
     marginTop: spacing.lg,

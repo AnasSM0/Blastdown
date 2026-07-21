@@ -1,9 +1,12 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 
 import { ThemeScreenView } from "../src/components/ThemeScreen";
+import { themePrice } from "../src/economy/themeCatalog";
 import { isUnlocked, purchaseTheme } from "../src/economy/themeOwnership";
+import { useAnalytics } from "../src/services/analytics";
+import type { ThemePurchaseOutcome } from "../src/services/analytics";
 import { useProfile } from "../src/state/ProfileProvider";
 import { useSettings } from "../src/state/SettingsProvider";
 import { THEMES } from "../src/ui/themes";
@@ -17,23 +20,37 @@ export default function ThemesScreen() {
   const router = useRouter();
   const { settings, updateSettings } = useSettings();
   const { profile, updateProfile } = useProfile();
+  const { track } = useAnalytics();
   const [pendingThemeId, setPendingThemeId] = useState<string | null>(null);
+
+  useEffect(() => {
+    track({ name: "theme_view" });
+  }, [track]);
 
   const handleSelect = useCallback(
     (themeId: string) => {
       if (isUnlocked(profile.unlockedThemeIds, themeId)) {
         updateSettings({ themeId });
+        track({ name: "theme_select", themeId });
       } else {
         setPendingThemeId(themeId);
       }
     },
-    [profile.unlockedThemeIds, updateSettings],
+    [profile.unlockedThemeIds, track, updateSettings],
   );
 
   const handleConfirmPurchase = useCallback(
     (themeId: string) => {
-      // Decide from the current profile; bail without mutation if unaffordable.
+      // Decide from the current profile; the reason drives the analytics outcome.
       const preview = purchaseTheme(profile, themeId);
+      const outcome: ThemePurchaseOutcome =
+        preview.reason === "purchased"
+          ? "purchased"
+          : preview.reason === "already-owned"
+            ? "already_owned"
+            : "insufficient";
+      track({ name: "theme_purchase", themeId, price: themePrice(themeId), result: outcome });
+      // Bail without mutation if unaffordable / unknown.
       if (!preview.ok) {
         return;
       }
@@ -41,9 +58,10 @@ export default function ThemesScreen() {
       // already owned (no double deduction), then select it immediately.
       updateProfile((current) => purchaseTheme(current, themeId).profile);
       updateSettings({ themeId });
+      track({ name: "theme_select", themeId });
       setPendingThemeId(null);
     },
-    [profile, updateProfile, updateSettings],
+    [profile, track, updateProfile, updateSettings],
   );
 
   const handleCancelPurchase = useCallback(() => setPendingThemeId(null), []);

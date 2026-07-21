@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { reportCaught } from "../services/diagnostics/reportError";
 import { loadSettings, saveSettings } from "../services/storage/settingsStorage";
 import { defaultSettings, type PersistedSettings } from "../services/storage/schemas";
 import { useStorageService } from "../services/storage/StorageServiceProvider";
@@ -33,7 +34,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const stored = await loadSettings(storage);
+      let stored: PersistedSettings;
+      try {
+        stored = await loadSettings(storage);
+      } catch (error) {
+        // Load failure: keep the defaults (already in state); record it.
+        reportCaught("persistence", error, { op: "loadSettings" });
+        loadedRef.current = true;
+        if (!cancelled) {
+          setLoaded(true);
+        }
+        return;
+      }
       if (cancelled) {
         return;
       }
@@ -52,7 +64,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setSettings((current) => {
         const next = { ...current, ...patch };
         if (loadedRef.current) {
-          void saveSettings(storage, next);
+          void saveSettings(storage, next).catch((error) =>
+            reportCaught("persistence", error, { op: "saveSettings" }),
+          );
         }
         return next;
       });

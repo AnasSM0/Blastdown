@@ -649,3 +649,54 @@ critical color so danger reads in every theme. Timing/gameplay unchanged.
 **Affects:** `src/economy/**`, `src/services/storage/schemas.ts`,
 `src/ui/{ThemeProvider,themes}.ts`, `src/components/{ThemeScreen,effects}/**`,
 `app/{_layout,themes}.tsx`.
+
+## 2026-07-21 — Phase 6A: analytics, diagnostics & monetization readiness
+
+**Analytics behind an adapter.** Added a typed `AnalyticsService` seam
+(`src/services/analytics/`) mirroring the ads/audio/storage pattern: Noop
+(default, offline-safe) and in-memory (test) implementations, a provider, and a
+`useAnalytics` hook that swallows backend errors and defaults to no-op when no
+provider is mounted — so analytics can never affect gameplay and isolated
+component tests are unchanged. Screens/components never touch a vendor SDK.
+
+**Privacy by type.** The event taxonomy (`docs/ANALYTICS.md`) is a closed
+discriminated union whose properties are numbers, booleans, or enumerated
+catalog ids only. There is no field for free text, device identifiers, precise
+location, or raw `GameState` — the type system enforces the Data-Safety
+contract. `run_end` carries only aggregates; a unit test pins its key set.
+
+**Dedup via existing guards.** Turn-scoped gameplay events reuse the
+`useGameAudio` once-per-turn key (`useGameAnalytics`). `run_end` and
+`results_view` reuse the once-per-run settlement guard and the Results mount
+ref, so restart/Back/remount/restore can't duplicate terminal events. Reward
+`*_result` is logged from the promise resolution, never inside the earn
+callback, so a reward can't double-log.
+
+**Diagnostics.** Added an `ErrorReporter` seam (`src/services/diagnostics/`) with
+Noop/in-memory impls, a provider + hook, and a module bridge
+(`reportError`/`reportCaught`) so imperative service code can report without
+prop-drilling. `reportCaught` extracts only message + stack and never
+serializes the thrown value, so secrets/stored state can't leak. An app-level
+`AppErrorBoundary` catches render errors, reports them (surface `ui`), and shows
+a generic recovery screen with Try Again — the raw error/state is never shown to
+the player. Profile/settings persistence and rewarded-ad failures now report at
+their catch sites (behavior unchanged — they were already swallowed).
+
+**Monetization readiness.** Typed `REWARD_PLACEMENTS` (freeze/defuse/revive/
+doubleBolts). Added a **mock** Double Bolts action on Results: pure
+`applyDoubleBolts(profile, boltsEarned)` banks the run's Bolts a second time
+(clamped ≥ 0, immutable), applied at most once per run via a session
+`doubledRunIdRef` guard mirroring settlement, behind `useRewardedAction`'s
+single-flight gate. No profile-schema change was needed, so nothing was
+deferred. Offer/earned/closed/unavailable/failed outcomes are logged.
+
+**Deferred (Phase 6B / production):** production analytics + crash-reporting
+SDK adapters, real ad-unit ids, live ad SDK calls, and consent UI. The seams and
+taxonomy are ready for those adapters to drop in.
+
+**Affects:** `src/services/analytics/**`, `src/services/diagnostics/**`,
+`src/components/{ErrorBoundary,AnalyticsSessionTracker}`, `src/hooks/{useGameAnalytics,useRewardedAction}.ts`,
+`src/services/ads/{placements,index}.ts`, `src/services/profile/settlement.ts`,
+`src/state/{GameSessionProvider,ProfileProvider,SettingsProvider}.tsx`,
+`src/components/{ResultsScreen,Tutorial}/**`, `app/{_layout,game,results,themes,settings,tutorial}.tsx`,
+`docs/{ANALYTICS,ERROR_REPORTING,RELEASE_CHECKLIST,TASKS,DECISIONS}.md`.

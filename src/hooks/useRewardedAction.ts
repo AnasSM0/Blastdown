@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAdService } from "../services/ads/AdServiceProvider";
 import type { RewardedPlacement, RewardedResult } from "../services/ads/types";
+import { reportCaught } from "../services/diagnostics/reportError";
 
 export type RewardedAction = {
   /** Show the rewarded ad for `placement`. On `earned` — and only then —
@@ -48,6 +49,10 @@ export function useRewardedAction(): RewardedAction {
         if (result === "earned" && mountedRef.current) {
           onEarned();
         }
+      } catch (error) {
+        // Ad SDK failure: treated as "error" (no reward), reported for
+        // diagnostics. The placement id is a safe enumerated value.
+        reportCaught("reward", error, { placement });
       } finally {
         inFlightRef.current = false;
         if (mountedRef.current) {
