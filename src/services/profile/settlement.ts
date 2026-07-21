@@ -41,6 +41,15 @@ export function settleRun(
   return { profile: nextProfile, boltsEarned };
 }
 
+/** Apply a mock "double Bolts" reward to a profile: bank the run's Bolts a
+ *  second time (the base amount was already banked by `settleRun`). Pure and
+ *  total; `boltsEarned` is clamped at 0 so it can never reduce a balance. The
+ *  once-per-run guarantee (no repeated doubling) lives in the session, not
+ *  here. */
+export function applyDoubleBolts(profile: PersistedProfile, boltsEarned: number): PersistedProfile {
+  return { ...profile, bolts: profile.bolts + Math.max(0, boltsEarned) };
+}
+
 /** Stable identity for a run, so settlement can run exactly once even across
  *  remounts and repeated callbacks. Seed + start time uniquely name a run. */
 export function runId(state: GameState): string {

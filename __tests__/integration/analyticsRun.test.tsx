@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { GameScreenContent } from "../../app/game";
 import { createInitialGameState } from "../../src/domain/game";
 import type { GameState, GridCell } from "../../src/domain/gameTypes";
+import { createMockAdService } from "../../src/services/ads/MockAdService";
 import { AnalyticsServiceProvider } from "../../src/services/analytics/AnalyticsServiceProvider";
 import { createMemoryAnalyticsService } from "../../src/services/analytics/MemoryAnalyticsService";
 import type { MemoryAnalyticsService } from "../../src/services/analytics/MemoryAnalyticsService";
@@ -142,5 +143,49 @@ describe("gameplay event analytics", () => {
 
     // The turn still resolved: the piece left the tray despite analytics failing.
     expect(result.queryByTestId(`tray-piece-${firstHandId}`)).toBeNull();
+  });
+});
+
+describe("reward instrumentation analytics", () => {
+  function runWithTimer(): GameState {
+    const grid = makeEmptyGrid(8);
+    grid[0][0] = { kind: "timed", pieceInstanceId: "t1", colorId: "cyan" };
+    grid[0][1] = { kind: "timed", pieceInstanceId: "t1", colorId: "cyan" };
+    return {
+      ...createInitialGameState("reward-analytics", NOW),
+      status: "playing",
+      grid,
+      activeTimers: {
+        t1: { id: "t1", shapeId: "domino", remainingTurns: 2, placedOnTurn: 1, colorId: "cyan" },
+      },
+      hand: [{ handId: "h-spare", shapeId: "single", colorId: "amber" }],
+    };
+  }
+
+  it("logs freeze_offer and freeze_result once for an earned freeze", async () => {
+    const analytics = createMemoryAnalyticsService();
+    const ads = createMockAdService({ rewarded: { rewarded_freeze: "earned" } });
+    const result = await render(
+      <GameScreenContent
+        controllerOptions={{
+          seed: "reward-analytics",
+          now: () => NOW,
+          initialState: runWithTimer(),
+        }}
+        boardSize={328}
+        adService={ads}
+        analytics={analytics}
+      />,
+    );
+
+    const user = userEvent.setup();
+    await user.press(result.getByTestId("freeze-button"));
+
+    await waitFor(() => expect(analytics.count("freeze_result")).toBe(1));
+    expect(analytics.count("freeze_offer")).toBe(1);
+    expect(analytics.byName("freeze_result")[0]).toEqual({
+      name: "freeze_result",
+      result: "earned",
+    });
   });
 });

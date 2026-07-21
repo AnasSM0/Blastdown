@@ -3,7 +3,12 @@ import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode
 import { useGameController, type GameController } from "../hooks/useGameController";
 import { useGamePersistence } from "../hooks/useGamePersistence";
 import { useAnalytics } from "../services/analytics/AnalyticsServiceProvider";
-import { computeBoltsEarned, runId, settleRun } from "../services/profile/settlement";
+import {
+  applyDoubleBolts,
+  computeBoltsEarned,
+  runId,
+  settleRun,
+} from "../services/profile/settlement";
 import { useProfile } from "./ProfileProvider";
 
 export type GameSession = {
@@ -23,6 +28,10 @@ export type GameSession = {
    *  Bolts, cumulative stats). Idempotent per run across remount/Back/repeat
    *  calls. Returns the Bolts earned this run. */
   settleCurrentRun: () => number;
+  /** Apply the mock "double Bolts" reward for the current run exactly once.
+   *  Banks the run's Bolts a second time. Returns true if it applied, false if
+   *  this run was already doubled (a duplicate can never double-charge). */
+  doubleBoltsForCurrentRun: () => boolean;
 };
 
 const GameSessionContext = createContext<GameSession | null>(null);
@@ -42,6 +51,8 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   // App-lifetime guard so a run settles once even if Results remounts or Back
   // re-enters it. A new run has a new id and settles on its own.
   const settledRunIdRef = useRef<string | null>(null);
+  // Separate once-per-run guard for the double-Bolts reward.
+  const doubledRunIdRef = useRef<string | null>(null);
 
   // Begin a fresh run and log run_start once per start (Play / Play Again are
   // distinct, user-initiated starts, so each is its own event).
@@ -78,6 +89,17 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     return boltsEarned;
   }, [controller, track, updateProfile]);
 
+  const doubleBoltsForCurrentRun = useCallback((): boolean => {
+    const state = controller.state;
+    const id = runId(state);
+    if (doubledRunIdRef.current === id) {
+      return false;
+    }
+    doubledRunIdRef.current = id;
+    updateProfile((profile) => applyDoubleBolts(profile, computeBoltsEarned(state)));
+    return true;
+  }, [controller, updateProfile]);
+
   const value = useMemo<GameSession>(
     () => ({
       controller,
@@ -87,6 +109,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       startNewRun,
       clearActiveRun,
       settleCurrentRun,
+      doubleBoltsForCurrentRun,
     }),
     [
       controller,
@@ -96,6 +119,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       startNewRun,
       clearActiveRun,
       settleCurrentRun,
+      doubleBoltsForCurrentRun,
     ],
   );
 

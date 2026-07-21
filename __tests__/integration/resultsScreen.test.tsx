@@ -23,11 +23,26 @@ jest.mock("expo-router", () => ({
   useRouter: () => ({ replace: mockReplace, push: jest.fn(), back: jest.fn() }),
 }));
 
+const mockDoubleBolts = jest.fn(() => true);
+
 jest.mock("../../src/state/GameSessionProvider", () => ({
   useGameSession: () => ({
     controller: { state: mockFinishedState },
     startNewRun: mockStartNewRun,
     settleCurrentRun: mockSettle,
+    doubleBoltsForCurrentRun: mockDoubleBolts,
+  }),
+}));
+
+// Stub the rewarded action so the route renders without an AdServiceProvider;
+// `run` immediately invokes the earn callback so the double-Bolts path applies.
+jest.mock("../../src/hooks/useRewardedAction", () => ({
+  useRewardedAction: () => ({
+    run: (_placement: string, onEarned: () => void) => {
+      onEarned();
+      return Promise.resolve("earned");
+    },
+    pending: false,
   }),
 }));
 
@@ -44,6 +59,7 @@ describe("results route", () => {
     mockReplace.mockClear();
     mockStartNewRun.mockClear();
     mockSettle.mockClear();
+    mockDoubleBolts.mockClear();
   });
 
   function renderResults() {
@@ -82,5 +98,21 @@ describe("results route", () => {
       fireEvent.press(result.getByTestId("results-home-button"));
     });
     expect(mockReplace).toHaveBeenCalledWith("/");
+  });
+
+  it("double Bolts applies once and swaps to the applied state", async () => {
+    const result = await renderResults();
+    // Earned Bolts (212) > 0, so the offer is shown.
+    expect(result.getByTestId("double-bolts-button")).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(result.getByTestId("double-bolts-button"));
+    });
+
+    expect(mockDoubleBolts).toHaveBeenCalledTimes(1);
+    // The offer is replaced by the applied confirmation, so it can't be pressed
+    // again (one-time reward).
+    expect(result.getByTestId("double-bolts-applied")).toBeTruthy();
+    expect(result.queryByTestId("double-bolts-button")).toBeNull();
   });
 });

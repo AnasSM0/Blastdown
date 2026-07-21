@@ -40,9 +40,9 @@ import { AudioServiceProvider } from "../src/services/audio";
 import type { AudioService } from "../src/services/audio";
 import { StorageServiceProvider, createMemoryStorageService } from "../src/services/storage";
 import { SettingsProvider } from "../src/state/SettingsProvider";
-import { AdServiceProvider } from "../src/services/ads";
+import { AdServiceProvider, REWARD_PLACEMENTS } from "../src/services/ads";
 import type { AdService } from "../src/services/ads";
-import { AnalyticsServiceProvider, useAnalytics } from "../src/services/analytics";
+import { AnalyticsServiceProvider, rewardOutcome, useAnalytics } from "../src/services/analytics";
 import type { AnalyticsService } from "../src/services/analytics";
 import { useGameSession } from "../src/state/GameSessionProvider";
 import { colors, spacing } from "../src/ui/theme";
@@ -291,13 +291,18 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
       return;
     }
     audio.playSfx("button");
-    void reward.run("rewarded_freeze", () => {
-      if (controller.activateFreeze()) {
-        haptics.success();
-        audio.playSfx("freeze");
-      }
-    });
-  }, [audio, controller, haptics, inputLocked, reward, state]);
+    // Offer logged when the ad is actually requested; result logged from the
+    // resolution (never inside onEarned, so a reward can't double-log).
+    track({ name: "freeze_offer" });
+    void reward
+      .run(REWARD_PLACEMENTS.freeze, () => {
+        if (controller.activateFreeze()) {
+          haptics.success();
+          audio.playSfx("freeze");
+        }
+      })
+      .then((result) => track({ name: "freeze_result", result: rewardOutcome(result) }));
+  }, [audio, controller, haptics, inputLocked, reward, state, track]);
 
   const handleDefuseOpen = useCallback(() => {
     if (inputLocked || !canApplyRewardedDefuse(state)) {
@@ -320,17 +325,19 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
       return;
     }
     audio.playSfx("button");
+    track({ name: "defuse_offer" });
     void reward
-      .run("rewarded_defuse", () => {
+      .run(REWARD_PLACEMENTS.defuse, () => {
         if (controller.defuse()) {
           haptics.success();
           audio.playSfx("defuse");
         }
       })
+      .then((result) => track({ name: "defuse_result", result: rewardOutcome(result) }))
       .finally(() => {
         setDefuseConfirmOpen(false);
       });
-  }, [audio, controller, haptics, reward]);
+  }, [audio, controller, haptics, reward, track]);
 
   const clearSecondChance = useCallback(() => {
     if (secondChanceTimer.current !== null) {
@@ -345,26 +352,29 @@ export function GameView({ controller, boardSize, onExit, onResults }: GameViewP
       return;
     }
     audio.playSfx("button");
-    void reward.run("rewarded_revive", () => {
-      if (controller.revive()) {
-        haptics.success();
-        audio.playSfx("revive");
-        // "SECOND CHANCE" banner over the repaired board (Stitch 10), then
-        // auto-dismiss. Reduced motion shortens the hold and skips the fade.
-        setSecondChance(true);
-        if (secondChanceTimer.current !== null) {
-          clearTimeout(secondChanceTimer.current);
+    track({ name: "revive_offer" });
+    void reward
+      .run(REWARD_PLACEMENTS.revive, () => {
+        if (controller.revive()) {
+          haptics.success();
+          audio.playSfx("revive");
+          // "SECOND CHANCE" banner over the repaired board (Stitch 10), then
+          // auto-dismiss. Reduced motion shortens the hold and skips the fade.
+          setSecondChance(true);
+          if (secondChanceTimer.current !== null) {
+            clearTimeout(secondChanceTimer.current);
+          }
+          secondChanceTimer.current = setTimeout(
+            () => {
+              secondChanceTimer.current = null;
+              setSecondChance(false);
+            },
+            reducedMotion ? SECOND_CHANCE_REDUCED_MS : SECOND_CHANCE_MS,
+          );
         }
-        secondChanceTimer.current = setTimeout(
-          () => {
-            secondChanceTimer.current = null;
-            setSecondChance(false);
-          },
-          reducedMotion ? SECOND_CHANCE_REDUCED_MS : SECOND_CHANCE_MS,
-        );
-      }
-    });
-  }, [audio, controller, haptics, reducedMotion, reward, state]);
+      })
+      .then((result) => track({ name: "revive_result", result: rewardOutcome(result) }));
+  }, [audio, controller, haptics, reducedMotion, reward, state, track]);
 
   const handleEndRun = useCallback(() => {
     if (reward.pending) {
