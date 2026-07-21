@@ -1,5 +1,16 @@
 # UI Implementation Mapping
 
+> **Phase 0 audit status (2026-07-21).** This mapping is the original Stitch
+> ingestion contract. Two things are now stale and are corrected in
+> `docs/VISUAL_POLISH_REVIEW.md`: (1) **motion is implemented with React Native
+> `Animated`, not Reanimated** — there are zero `react-native-reanimated`
+> imports in the app (decision: `DECISIONS.md` 2026-07-20). Read every
+> "Reanimated" mention below as "RN `Animated`". (2) The current gameplay build
+> ships **outline-only blocks, board-colored empty cells, X-cross rubble, and a
+> variable-count tray** — the UI Polish Phase 1 tasks in `docs/TASKS.md` bring
+> these to the "Neon Reactor Premium" direction. The file-by-file ownership map
+> lives in `docs/VISUAL_POLISH_REVIEW.md` §2.
+
 How each visual element in the approved Stitch snapshot
 (`docs/references/ui/stitch-mcp/`) becomes a React Native / Expo
 implementation. This is the Part 6 deliverable of the Stitch design

@@ -799,3 +799,157 @@ for full verification results. **Next: Phase 1, item 1.1** — define
 rest of Phase 1 in order. Do not start Phase 3 (Codex UI work) until Phase 1
 and Phase 2's acceptance criteria are met — there is no domain state for
 Codex to render against yet.
+
+---
+
+## Professional UI Polish — Phase 1 (planned, not started)
+
+Authority: `docs/PROFESSIONAL_UI_POLISH_MASTER_PLAN.md` + `docs/VISUAL_POLISH_REVIEW.md`.
+Direction: "Neon Reactor Premium". Visual/motion polish only — **no gameplay,
+scoring, timer, persistence, economy, analytics, reward, or domain change.**
+
+**Global rules for every P1 task:**
+
+- **Owner: Claude Code** for all tasks. The Codex sandbox is broken on this
+  machine (`DECISIONS.md` 2026-07-18); do not delegate implementation.
+- **Single-writer:** confirm a clean tree and that no other agent is editing the
+  task's files before starting; edit only the task's allowed files.
+- **Forbidden for all tasks:** `src/domain/**`, `src/config/balance.ts`,
+  `src/services/**`, `src/economy/**`, persistence schemas, analytics/diagnostics
+  contracts, reward logic (`src/hooks/useRewardedAction.ts`, ad service),
+  production ad config, `BUILD_SPEC.md`. No new dependencies or assets. No second
+  animation system (stay on RN `Animated`). No per-cell blur.
+- **Verification for every task:** `npm run typecheck`, `npm run lint`,
+  `npm run test`, `npm run format:check`, `npx expo-doctor`. Tasks that change
+  layout/geometry also run `npx expo export --platform android`.
+
+- [ ] **P1-1 Responsive gameplay composition**
+  - Allowed: `app/game.tsx` (`GameView` layout/styles only),
+    `src/components/GameBoard/GameBoard.tsx` (sizing), `__tests__/**`.
+  - Forbidden: `GridCell` visuals, reward/tray internals.
+  - Depends on: none.
+  - Acceptance: HUD / board / tray / dock distribute vertically with no dead
+    bottom third; board scales cleanly 360–420px wide; safe-area top+bottom
+    respected; zero gameplay-behavior change; all existing tests green.
+  - Tests: composition smoke (board+tray+dock+HUD all render; testIDs present)
+    at a min-width board size.
+  - Verify: full battery + Android export.
+
+- [ ] **P1-2 HUD and reactor background**
+  - Allowed: `src/components/ScoreHeader/**`, `src/components/ComboIndicator/**`,
+    a new `src/components/ReactorBackground/**`, `app/game.tsx` (wire real best +
+    background), `src/ui/theme.ts` + `src/ui/themes.ts` (token alignment only).
+  - Forbidden: `GridCell`, reward controls, domain.
+  - Depends on: P1-1.
+  - Acceptance: `BEST` shows the persisted profile best (wired from `useProfile`,
+    not the `0` stub); a programmatic reactor-depth background (gradient/vignette,
+    no asset, cheap, theme-aware) replaces the flat fill; base tokens aligned
+    toward the Premium palette without breaking the 5 themes.
+  - Tests: `ScoreHeader` renders a non-zero best from its prop; HUD a11y labels
+    intact; background renders under each theme.
+  - Verify: full battery + Android export.
+
+- [ ] **P1-3 Board frame and empty cells**
+  - Allowed: `src/components/GameBoard/GameBoard.tsx` (frame),
+    `src/components/GridCell/GridCell.tsx` (empty case), theme tokens.
+  - Forbidden: block/rubble logic beyond visuals, domain.
+  - Depends on: P1-2 (tokens).
+  - Acceptance: empty cells use a distinct empty-cell token (not board fill);
+    board frame reads as a premium bezel; contrast is comfortable; theme-aware.
+  - Tests: empty `GridCell` renders the empty-cell token; frame present.
+  - Verify: full battery.
+
+- [ ] **P1-4 Premium block surfaces**
+  - Allowed: `src/components/GridCell/GridCell.tsx` (timed/normal), an optional
+    `BlockSurface` subcomponent, theme tokens.
+  - Forbidden: domain, timer/rubble logic.
+  - Depends on: P1-2, P1-3.
+  - Acceptance: blocks have a solid/gradient premium fill with inner light + edge
+    (not outline-only); cheap (no per-cell blur, ≤1 shadow layer); readable in all
+    5 themes; distinguishable by hue+brightness (colorblind-safe), not color alone.
+  - Tests: block renders a fill for each `colorId`; snapshot of the three hues.
+  - Verify: full battery.
+
+- [ ] **P1-5 Timer badges and piece contours**
+  - Allowed: `src/components/TimerBadge/**`, `src/components/GameBoard/GameBoard.tsx`
+    (contour overlay), `src/components/GridCell/GridCell.tsx` (contour),
+    `src/ui/timerStates.ts`, `src/ui/timerPulse.ts` (visual thresholds only).
+  - Forbidden: domain timer rules/values.
+  - Depends on: P1-4.
+  - Acceptance: a contour visually groups a timed piece's cells so ownership is
+    unambiguous; badge refined and theme-aware; numeral always legible; pulse
+    reduced-motion gated; never color-only.
+  - Tests: badge digit renders; a multi-cell timed piece shows a grouping contour.
+  - Verify: full battery.
+
+- [ ] **P1-6 Cracked rubble**
+  - Allowed: `src/components/GridCell/GridCell.tsx` (rubble case), theme tokens
+    (`rubbleFill`/`rubbleCrack`).
+  - Forbidden: domain rubble rules.
+  - Depends on: P1-3.
+  - Acceptance: cracked-stone treatment (base fill + branching cracks) replaces
+    the "X"; visually distinct from blocks and empty cells; theme-aware; cheap.
+  - Tests: rubble cell renders crack elements and keeps its "Rubble" a11y label.
+  - Verify: full battery.
+
+- [ ] **P1-7 Stable three-slot tray**
+  - Allowed: `src/components/PieceTray/**`.
+  - Forbidden: domain hand/refill rules.
+  - Depends on: P1-4 (block surface reused in mini-shapes).
+  - Acceptance: always renders 3 fixed slots (empty placeholder for a consumed
+    slot) with no reflow as pieces are used; slot chrome theme-aware; drag/tap
+    target = full slot box; selected/dragging states preserved.
+  - Tests: with a 1-piece hand, three slots render (two empty); select + drag
+    callbacks still fire.
+  - Verify: full battery.
+
+- [ ] **P1-8 Freeze/Defuse action dock**
+  - Allowed: `src/components/RewardedActionButton/**`, `app/game.tsx` (dock
+    placement only).
+  - Forbidden: reward trigger logic (`useRewardedAction`, ad service), domain.
+  - Depends on: P1-1.
+  - Acceptance: a grounded action dock (not floating); theme-aware idle/active/
+    selected/disabled states; ≥48px targets; `N MOVES` freeze label preserved;
+    the reward-earn flow is untouched.
+  - Tests: existing reward-flow integration tests pass unchanged; button states
+    render per prop.
+  - Verify: full battery.
+
+- [ ] **P1-9 Theme compatibility**
+  - Allowed: gameplay-visible components (`GridCell`, `PieceTray`, `ScoreHeader`,
+    `RewardedActionButton`, `GameBoard`) + theme tokens; remove hardcoded
+    `colors.*` from these.
+  - Forbidden: domain; non-gameplay screens optional (out of Phase 1 scope).
+  - Depends on: P1-2..P1-8.
+  - Acceptance: every gameplay-visible chrome color reads from the active theme;
+    all 5 themes render correctly; critical danger stays readable in each theme;
+    no `colors.*` theme-bypass remains in gameplay components.
+  - Tests: `it.each` over `THEMES` asserting key chrome (block, empty, rubble,
+    badge, preview-conflict, dock-active) matches the theme token.
+  - Verify: full battery.
+
+- [ ] **P1-10 Responsive & accessibility review**
+  - Allowed: `docs/**`, `__tests__/**` (UI code changes only to fix regressions
+    this review surfaces).
+  - Forbidden: feature work, domain.
+  - Depends on: P1-1..P1-9.
+  - Acceptance: verified at 360/390/420-px widths and a large font scale; all
+    touch targets ≥44px; reduced-motion honored across new visuals; findings
+    recorded in `VISUAL_POLISH_REVIEW.md` + `ACCESSIBILITY.md`.
+  - Tests: gameplay renders at min board width; a11y labels present on new chrome.
+  - Verify: full battery + Android export.
+
+- [ ] **P1-11 Before/after screenshot comparison**
+  - Allowed: `docs/**`, add an AFTER capture under `docs/current game images/`
+    (never overwrite `gameplay screen.jpg`).
+  - Forbidden: code.
+  - Depends on: P1-1..P1-10.
+  - Acceptance: baseline vs polished documented area-by-area; any regression
+    triaged into a follow-up task; sign-off recorded.
+  - Tests: none (docs).
+  - Verify: `npm run format:check`.
+
+**Phase 1 acceptance:** every P1 task checked; full verification + Android export
+clean; all 5 themes correct; no gameplay/domain/economy/analytics/reward change;
+before/after comparison approved. Then Phase 2 (motion polish), Phase 3
+(whole-app polish), and only afterward resume Phase 6B.

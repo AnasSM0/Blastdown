@@ -1,5 +1,18 @@
 # Animation Spec
 
+> **Phase 0 audit status (2026-07-21).** Implementation reality: **all motion
+> uses React Native `Animated`, not Reanimated** (single animation system; no
+> `react-native-reanimated` imports — `DECISIONS.md` 2026-07-20). Read
+> "Reanimated" below as "RN `Animated`". Reduced-motion gating is **implemented**
+> and threaded through every effect via `useReducedMotion` /
+> `useEffectiveReducedMotion` (the mandatory-gating section below is satisfied).
+> Currently implemented beats: timer-badge pulse (`TimerBadge`), placement snap
+> (`GridCell`), explosion shake (`GameBoard`), line-clear/defuse/explosion/rubble
+> via `useEventAnimator` + `src/ui/effects/eventEffects.ts` + `EffectsLayer`
+> (`CellFlash`/`PulseRing`/`BurstCell`/`FloatingText`), second-chance banner,
+> drag ghost. UI Polish **Phase 2** (not Phase 1) refines motion feel; Phase 1 is
+> static-surface polish only.
+
 Timing/easing values extracted from the `@keyframes` blocks in the approved
 Stitch screens (`docs/references/ui/stitch-mcp/`), translated to
 Reanimated. `BUILD_SPEC.md` §12.2 and §18 govern what may animate and how
