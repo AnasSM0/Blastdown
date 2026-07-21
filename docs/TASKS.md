@@ -731,16 +731,45 @@ configs stay separated.
 
 **Owner: Claude Code**
 
-- [ ] 8.1 `AnalyticsService` interface + event schema (`docs/ANALYTICS.md`,
-      to be written at the start of this phase)
-- [ ] 8.2 Production analytics provider implementation
-- [ ] 8.3 Run-summary event with all required aggregated fields
-- [ ] 8.4 Ad-funnel events
-- [ ] 8.5 Crash reporting integration
-- [ ] 8.6 Privacy configuration review (no unnecessary personal data)
+- [x] 8.1 `AnalyticsService` interface + event schema (`docs/ANALYTICS.md`) —
+      **Phase 6A**
+- [ ] 8.2 Production analytics provider implementation (Phase 6B / production)
+- [x] 8.3 Run-summary event with all required aggregated fields (`run_end`) —
+      **Phase 6A**
+- [x] 8.4 Ad-funnel events (freeze/defuse/revive/double-Bolts offer+result) —
+      **Phase 6A**
+- [~] 8.5 Crash reporting integration — **Phase 6A** added the `ErrorReporter`
+  seam + app-level boundary + recovery (`docs/ERROR_REPORTING.md`); the
+  production crash SDK adapter is deferred to the production phase
+- [x] 8.6 Privacy configuration review (no unnecessary personal data) —
+      **Phase 6A** (typed aggregate-only taxonomy; see `docs/ANALYTICS.md`)
 
 **Acceptance:** events contain no unnecessary personal data; analytics
-failure never breaks gameplay; run summaries recorded correctly.
+failure never breaks gameplay; run summaries recorded correctly. — met for the
+seam/taxonomy in Phase 6A; production SDK wiring pending.
+
+### Phase 6A — Analytics, diagnostics & monetization readiness (delivered)
+
+**Owner: Claude Code.** Pre-production instrumentation, entirely behind
+adapters; no production ad ids, live ad SDK, or consent UI.
+
+- [x] Typed `AnalyticsService` adapter + Noop (offline-safe) and in-memory
+      (test) implementations; provider + `useAnalytics` (safe, no-op default)
+- [x] Full event taxonomy (app/session, tutorial, run lifecycle, gameplay,
+      rewarded offers/results, `run_end`, results, themes, settings)
+- [x] Deduplication: turn-scoped events once per turn; terminal events
+      (`run_end`, `results_view`) once across restart/Back/remount/restore;
+      reward callbacks never double-log
+- [x] `ErrorReporter` adapter + Noop/in-memory impls + module bridge; app-level
+      `AppErrorBoundary` with recovery UI; persistence/reward failures reported
+      without exposing secrets or raw state
+- [x] Typed reward placements (`REWARD_PLACEMENTS`); mock Double Bolts on
+      Results, applied at most once per run (pure `applyDoubleBolts` + session
+      guard); offer/earned/closed/unavailable/failed analytics
+- [x] Docs: `ANALYTICS.md`, `ERROR_REPORTING.md`, `RELEASE_CHECKLIST.md`,
+      `TASKS.md`, `DECISIONS.md`
+- [x] Verified: typecheck, lint, test, coverage, format:check, expo-doctor,
+      Android export
 
 ---
 

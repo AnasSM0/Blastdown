@@ -42,8 +42,10 @@ export function AnalyticsSessionTracker({ now = Date.now }: { now?: () => number
     };
     const subscription = AppState.addEventListener("change", onChange);
     return () => {
-      subscription.remove();
+      // End the session before tearing down the listener, so a teardown error
+      // in the subscription can never drop the terminal event.
       endSession(now());
+      subscription.remove();
     };
     // Mount-once: `track` / `now` are stable for the app lifetime.
     // eslint-disable-next-line react-hooks/exhaustive-deps

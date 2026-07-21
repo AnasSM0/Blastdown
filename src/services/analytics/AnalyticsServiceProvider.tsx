@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  type ReactNode,
+} from "react";
 
 import { NoopAnalyticsService } from "./NoopAnalyticsService";
 import type { AnalyticsEvent, AnalyticsService } from "./types";
