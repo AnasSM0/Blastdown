@@ -45,6 +45,21 @@ describe("gameplay composition (P1-1)", () => {
     },
   );
 
+  it("threads the persisted best score into the HUD and renders the reactor background (P1-2)", async () => {
+    const result = await render(
+      <GameScreenContent controllerOptions={options} boardSize={320} best={42_130} />,
+    );
+    expect(result.getByTestId("best-value")).toHaveTextContent("42,130");
+    expect(result.getByTestId("reactor-background")).toBeTruthy();
+    // Board is still exactly 64 cells — the background is purely decorative.
+    expect(result.getAllByTestId(/^cell-\d+-\d+$/)).toHaveLength(64);
+  });
+
+  it("defaults the HUD best to 0 when no profile value is supplied", async () => {
+    const result = await render(<GameScreenContent controllerOptions={options} boardSize={320} />);
+    expect(result.getByTestId("best-value")).toHaveTextContent("0");
+  });
+
   it("keeps tap placement working after the layout restructure", async () => {
     const user = userEvent.setup();
     const result = await render(<GameScreenContent controllerOptions={options} boardSize={320} />);

@@ -169,3 +169,87 @@ height fraction is a tuning value — may want adjustment once P1-7 (3-slot tray
 and P1-8 (action dock) change the tray/dock heights; revisit then. (3) Very tall
 aspect ratios leave symmetric slack around the board (by design, via
 space-evenly) rather than a tight group — acceptable and consistent.
+
+---
+
+## Phase 1 · P1-2 — HUD and reactor background (2026-07-22)
+
+Second Phase 1 task, built on the P1-1 composition. Scope: real HUD best-score
+data, HUD visual hierarchy, and a restrained programmatic reactor background —
+no board/block/timer/rubble/tray/reward-control work.
+
+**Files changed:**
+
+- `src/ui/themes.ts` — added a `background` token block (`base`, `glow`, `seam`,
+  `grid`, `corner`) to `ThemePalette` and to all five palettes. Reactor's block
+  is nudged toward the Premium deep-navy/graphite reference (`base #070C16`);
+  the other four derive their background hues from their own existing tones so
+  none is broken. `appBackground` itself is unchanged.
+- `src/components/ReactorBackground/**` — new. A fully programmatic, static,
+  theme-aware surface: deep base fill, a soft central lift (large low-opacity
+  rounded panel approximating a vignette without a gradient lib), a faint 3×3
+  circuit grid of hairlines, two panel seams, and four corner brackets. All
+  positions are percentages (holds ≥320px), `pointerEvents="none"`, no
+  animation, no image, no blur, no shadow layers.
+- `src/components/ScoreHeader/ScoreHeader.tsx` — HUD is now theme-aware and
+  text-scaling-safe: BEST label + value use `theme.onSurfaceVariant` (secondary,
+  upper-left), the current score keeps `theme.score` + low glow (strongest,
+  centered), pause uses `theme.outlineVariant` (neutral, less dominant). Fixed
+  72px side columns keep the score truly centered; both score values are
+  flexible with `adjustsFontSizeToFit` + `numberOfLines={1}` (so a multi-digit
+  best shrinks rather than truncates) and cap OS font scaling, so columns can't
+  collide at large accessibility sizes.
+- `app/game.tsx` — renders `<ReactorBackground />` full-bleed behind the
+  safe-area content; wires the HUD best score from the **single** existing
+  profile read path (`useProfile().profile.bestScore` in the real `GameScreen`
+  route), threaded to `GameView`/`ScoreHeader` as `best` (defaults to 0 for the
+  pre-load/default-profile state and isolated renders). The `best={0}` stub is
+  gone.
+
+**HUD / data decisions:**
+
+- One profile read path only — the real route reads `useProfile`; `GameView`
+  takes `best` as a prop, so component tests stay provider-light and the default
+  profile (bestScore 0) is a safe pre-load display value.
+- Best is deliberately _secondary_ (dimmed `onSurfaceVariant`), not the
+  reference's brighter cyan, to honor "small and secondary" and keep the score
+  dominant.
+- Combo visibility unchanged (`ComboIndicator` still renders only when
+  `combo > 0`), pause label/role intact.
+
+**Token / background decisions:**
+
+- Background hues live in semantic `theme.background.*` tokens, not hardcoded in
+  the component — every theme stays low contrast and the board remains primary.
+- Reactor aligned toward Premium navy/graphite; the four other themes derive
+  their background from their own palette so Arctic/Magma/Void/Solar are
+  unaffected. Token changes limited strictly to what P1-2 needs — no
+  block/timer/rubble/tray/reward color changes.
+
+**Tests:** `themes.test.ts` validates the background token set (valid hex) for
+all five themes; `ReactorBackground.test.tsx` asserts it renders, is
+non-interactive, and paints the Reactor base; `ScoreHeader.test.tsx` adds a
+non-zero best (testID + a11y label), intact score/best/pause a11y labels, and
+the text-scale guards; `gameLayout.test.tsx` threads a persisted best into the
+HUD end-to-end, asserts the background renders alongside the still-exactly-64
+board, and that best defaults to 0. Full suite: **79 suites / 441 tests** green;
+coverage **89.57%** (new files 100%).
+
+**Verification:** typecheck ✅, lint ✅, test ✅, coverage ✅ 89.57%,
+format:check ✅, expo-doctor ✅ 20/20, `expo export --platform android` ✅.
+
+**Screenshot / device finding:** no Android device or emulator is available in
+this environment, so an after-capture at the baseline resolution
+(`docs/current game images/phase1-p2-hud-background-after.jpg`) was **not**
+produced — recorded here rather than fabricated. The Android export succeeds,
+confirming the HUD + background build. On-device visual confirmation is deferred
+to when a device/emulator is available.
+
+**Risks:** (1) The central-lift "glow" panel is a rounded-rect approximation of
+a radial gradient, not a true gradient — acceptable and cheap, but a real
+gradient (P1 has no gradient dep) would read smoother; revisit only if a
+dependency is later approved. (2) Background tokens for the four non-Reactor
+themes were derived, not visually tuned on-device — validate contrast against
+board cells when a device is available. (3) Extreme best scores (7+ digits)
+shrink to fit the fixed side column via `adjustsFontSizeToFit`; at some point the
+digits get small, but they stay legible and never truncate.

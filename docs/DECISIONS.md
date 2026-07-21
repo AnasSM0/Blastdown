@@ -740,3 +740,37 @@ balance, persistence, economy, analytics/diagnostics, reward logic, ad config,
 
 **Phase 6B (production ads/consent) stays paused** until Visual Polish Phases
 0–3 are approved.
+
+## 2026-07-22 — UI Polish Phase 1 · P1-2 (HUD + reactor background)
+
+**HUD best score — single read path via prop.** `GameView` is shared by the
+real route (`GameScreen`) and the provider-light `GameScreenContent` test entry.
+Rather than call `useProfile` inside `GameView` (which would force
+`ProfileProvider` into every gameplay test), the real route reads the _existing_
+`useProfile().profile.bestScore` and threads it down as a `best` prop
+(default 0). One profile read path is preserved (CLAUDE.md ownership), tests stay
+light, and the default profile's `bestScore 0` is a safe pre-load display value.
+
+**Best is secondary, not accent.** The Stitch reference renders BEST in bright
+cyan; we use dimmed `theme.onSurfaceVariant` instead so the current score stays
+dominant, per the P1-2 "small and secondary" requirement. Recorded as a
+deliberate deviation from the mockup.
+
+**Reactor background = programmatic, no gradient dependency.** Background depth
+is built from a handful of static, percentage-positioned `View`s (base fill +
+soft central rounded-panel lift + faint hairline grid + panel seams + corner
+brackets), `pointerEvents="none"`, no animation/image/blur/shadow. A true radial
+gradient would read smoother but needs a dependency (`expo-linear-gradient`),
+which Phase 1 forbids — the rounded-panel lift is the approved approximation.
+
+**Background tokens are semantic and per-theme.** Added a `background` block
+(`base/glow/seam/grid/corner`) to `ThemePalette`. Reactor's is aligned toward
+the Premium deep-navy/graphite reference; Arctic/Magma/Void/Solar derive theirs
+from their own existing tones so no theme is broken. `appBackground` is left
+unchanged (still the ultimate fallback fill). Token changes are strictly limited
+to P1-2 — no block/timer/rubble/tray/reward colors were touched.
+
+**Text-scaling safety.** The HUD survives large OS text scale without overlap:
+fixed 64px side columns keep the score centered, the score column is flexible
+with `adjustsFontSizeToFit` + `numberOfLines={1}`, and both scores cap the font
+multiplier so columns cannot collide at 320px width.

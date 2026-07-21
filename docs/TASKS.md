@@ -836,7 +836,9 @@ scoring, timer, persistence, economy, analytics, reward, or domain change.**
     at a min-width board size.
   - Verify: full battery + Android export.
 
-- [ ] **P1-2 HUD and reactor background**
+- [x] **P1-2 HUD and reactor background** — done 2026-07-22
+      (branch `phase-professional-polish-1-hud-background`). See
+      `docs/VISUAL_POLISH_REVIEW.md` §"Phase 1 · P1-2".
   - Allowed: `src/components/ScoreHeader/**`, `src/components/ComboIndicator/**`,
     a new `src/components/ReactorBackground/**`, `app/game.tsx` (wire real best +
     background), `src/ui/theme.ts` + `src/ui/themes.ts` (token alignment only).
@@ -849,6 +851,12 @@ scoring, timer, persistence, economy, analytics, reward, or domain change.**
   - Tests: `ScoreHeader` renders a non-zero best from its prop; HUD a11y labels
     intact; background renders under each theme.
   - Verify: full battery + Android export.
+  - Result: best wired from the single `useProfile` read path (prop-threaded
+    through `GameView`; default 0 pre-load); new `ReactorBackground` (static,
+    theme-aware, `pointerEvents="none"`, no asset/animation/blur); five-theme
+    `background` token set added (Reactor → Premium navy, others derived).
+    79 suites / 441 tests, coverage 89.57%, doctor 20/20, Android export ✅. No
+    device available → after-screenshot not captured (recorded, not fabricated).
 
 - [ ] **P1-3 Board frame and empty cells**
   - Allowed: `src/components/GameBoard/GameBoard.tsx` (frame),

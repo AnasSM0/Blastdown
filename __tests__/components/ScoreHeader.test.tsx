@@ -12,6 +12,38 @@ describe("ScoreHeader", () => {
     expect(result.getByText("1,234")).toBeTruthy();
   });
 
+  it("renders a non-zero best from its prop with an accessible label", async () => {
+    const result = await render(
+      <ScoreHeader score={0} best={42_130} combo={0} onPause={jest.fn()} />,
+    );
+    const best = result.getByTestId("best-value");
+    expect(best).toHaveTextContent("42,130");
+    expect(best.props.accessibilityLabel).toBe("Best score 42,130");
+  });
+
+  it("keeps the score and best accessibility labels intact", async () => {
+    const result = await render(
+      <ScoreHeader score={555} best={9876} combo={0} onPause={jest.fn()} />,
+    );
+    expect(result.getByLabelText("Score 555")).toBeTruthy();
+    expect(result.getByLabelText("Best score 9,876")).toBeTruthy();
+    expect(result.getByLabelText("Pause")).toBeTruthy();
+  });
+
+  it("guards against overlap at large text scale (shrink-to-fit + capped scaling)", async () => {
+    const result = await render(
+      <ScoreHeader score={1234} best={9876} combo={0} onPause={jest.fn()} />,
+    );
+    const score = result.getByTestId("score-value");
+    // The current score shrinks to fit its column and caps runaway OS scaling
+    // rather than overflowing into the side columns.
+    expect(score.props.numberOfLines).toBe(1);
+    expect(score.props.adjustsFontSizeToFit).toBe(true);
+    expect(score.props.maxFontSizeMultiplier).toBeLessThanOrEqual(1.5);
+    // The best value stays on one line so it can't wrap into the score.
+    expect(result.getByTestId("best-value").props.numberOfLines).toBe(1);
+  });
+
   it("hides the combo indicator at combo 0", async () => {
     const result = await render(<ScoreHeader score={0} best={0} combo={0} onPause={jest.fn()} />);
     expect(result.queryByTestId("combo-indicator")).toBeNull();
