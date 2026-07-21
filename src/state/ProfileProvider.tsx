@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { reportCaught } from "../services/diagnostics/reportError";
 import { loadProfile, saveProfile } from "../services/storage/progressStorage";
 import { defaultProfile, type PersistedProfile } from "../services/storage/schemas";
 import { useStorageService } from "../services/storage/StorageServiceProvider";
@@ -43,7 +44,19 @@ export function ProfileProvider({
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const stored = await loadProfile(storage, now());
+      let stored: PersistedProfile;
+      try {
+        stored = await loadProfile(storage, now());
+      } catch (error) {
+        // Load failure: keep the default profile (already in state) so the
+        // player is never blocked; record for diagnostics.
+        reportCaught("persistence", error, { op: "loadProfile" });
+        loadedRef.current = true;
+        if (!cancelled) {
+          setLoaded(true);
+        }
+        return;
+      }
       if (cancelled) {
         return;
       }
@@ -64,7 +77,9 @@ export function ProfileProvider({
         // Only persist after the initial load so a default never overwrites a
         // real profile mid-hydration.
         if (loadedRef.current) {
-          void saveProfile(storage, next);
+          void saveProfile(storage, next).catch((error) =>
+            reportCaught("persistence", error, { op: "saveProfile" }),
+          );
         }
         return next;
       });
