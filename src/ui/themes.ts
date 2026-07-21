@@ -15,6 +15,21 @@ export type ThemePalette = {
   boardBg: string;
   boardFrame: string;
   gridLine: string;
+
+  /** Board-frame depth (P1-3), all decorative and low contrast: `frameInner`
+   *  is a fine inner-border ring just inside the outer frame, `frameBevel` a
+   *  subtle top inset highlight, `frameCorner` the small theme-aware corner
+   *  accents. Never gameplay-critical. */
+  boardFrameInner: string;
+  boardFrameBevel: string;
+  boardFrameCorner: string;
+
+  /** Empty-cell presentation (P1-3): `emptyCell` is a subdued fill that reveals
+   *  the 8×8 structure (distinct from the board panel, rubble, and previews);
+   *  `emptyCellBorder` its subtle divider. */
+  emptyCell: string;
+  emptyCellBorder: string;
+
   onSurface: string;
   onSurfaceVariant: string;
   outline: string;
@@ -61,6 +76,11 @@ const reactor: ThemePalette = {
   boardBg: reactorColors.boardBg,
   boardFrame: reactorColors.boardFrame,
   gridLine: reactorColors.boardFrame,
+  boardFrameInner: "#38465F",
+  boardFrameBevel: "#454F63",
+  boardFrameCorner: "#3C7A86",
+  emptyCell: "#131D33",
+  emptyCellBorder: "#24314C",
   onSurface: reactorColors.onSurface,
   onSurfaceVariant: reactorColors.onSurfaceVariant,
   outline: reactorColors.outline,
@@ -98,6 +118,11 @@ const arctic: ThemePalette = {
   boardBg: "#0A1622",
   boardFrame: "#1E3A4C",
   gridLine: "#1E3A4C",
+  boardFrameInner: "#2E5065",
+  boardFrameBevel: "#3A5E73",
+  boardFrameCorner: "#4E86A0",
+  emptyCell: "#0E1E2E",
+  emptyCellBorder: "#26485C",
   onSurface: "#E6F6FF",
   onSurfaceVariant: "#A9C7D8",
   outline: "#5E8298",
@@ -128,6 +153,11 @@ const magma: ThemePalette = {
   boardBg: "#160A06",
   boardFrame: "#3A1D12",
   gridLine: "#3A1D12",
+  boardFrameInner: "#54301F",
+  boardFrameBevel: "#603824",
+  boardFrameCorner: "#8A5A34",
+  emptyCell: "#1E0F08",
+  emptyCellBorder: "#4A281A",
   onSurface: "#FFE9DC",
   onSurfaceVariant: "#D8A88F",
   outline: "#9A6146",
@@ -158,6 +188,11 @@ const voidTheme: ThemePalette = {
   boardBg: "#0C0817",
   boardFrame: "#241738",
   gridLine: "#241738",
+  boardFrameInner: "#3D2A5A",
+  boardFrameBevel: "#463263",
+  boardFrameCorner: "#6B4E90",
+  emptyCell: "#130D22",
+  emptyCellBorder: "#33244C",
   onSurface: "#ECE4FF",
   onSurfaceVariant: "#B6A6D2",
   outline: "#6B5990",
@@ -188,6 +223,11 @@ const solar: ThemePalette = {
   boardBg: "#181005",
   boardFrame: "#3E2C12",
   gridLine: "#3E2C12",
+  boardFrameInner: "#543D1C",
+  boardFrameBevel: "#604824",
+  boardFrameCorner: "#8A6A34",
+  emptyCell: "#20160A",
+  emptyCellBorder: "#4A3518",
   onSurface: "#FFF4DE",
   onSurfaceVariant: "#D8BE8C",
   outline: "#9A7A44",

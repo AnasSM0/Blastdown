@@ -1,4 +1,5 @@
 import { render } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 
 import { GameBoard } from "../../src/components/GameBoard";
 import { buildEffectPlan } from "../../src/ui/effects/eventEffects";
@@ -14,6 +15,21 @@ function makeEmptyGrid(size: number): GridCell[][] {
 describe("GameBoard", () => {
   it("renders exactly 64 cells", async () => {
     const result = await render(<GameBoard grid={makeEmptyGrid(8)} badges={[]} boardSize={328} />);
+    expect(result.getAllByTestId(/^cell-\d+-\d+$/)).toHaveLength(64);
+  });
+
+  it("stays square and renders the decorative frame layers without covering cells (P1-3)", async () => {
+    const result = await render(<GameBoard grid={makeEmptyGrid(8)} badges={[]} boardSize={328} />);
+    // Board is square (1:1) at every width.
+    const board = StyleSheet.flatten(result.getByTestId("game-board").props.style);
+    expect(board.aspectRatio).toBe(1);
+    // Frame depth is present…
+    expect(result.getByTestId("board-frame-inner")).toBeTruthy();
+    expect(result.getByTestId("board-frame-corners")).toBeTruthy();
+    // …and purely decorative — the inner ring and corner layer never intercept
+    // touches, so the 64 cells behind them stay fully interactive.
+    expect(result.getByTestId("board-frame-inner").props.pointerEvents).toBe("none");
+    expect(result.getByTestId("board-frame-corners").props.pointerEvents).toBe("none");
     expect(result.getAllByTestId(/^cell-\d+-\d+$/)).toHaveLength(64);
   });
 

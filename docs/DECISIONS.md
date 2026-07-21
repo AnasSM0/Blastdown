@@ -774,3 +774,29 @@ to P1-2 — no block/timer/rubble/tray/reward colors were touched.
 fixed 64px side columns keep the score centered, the score column is flexible
 with `adjustsFontSizeToFit` + `numberOfLines={1}`, and both scores cap the font
 multiplier so columns cannot collide at 320px width.
+
+## 2026-07-22 — UI Polish Phase 1 · P1-3 (board frame + empty cells)
+
+**Frame depth = additive overlays, zero box-model change.** The board's outer
+`borderWidth 2 + padding gridGutter` and therefore `BOARD_CONTENT_INSET` are the
+authoritative anchor for finger→cell drag mapping (`src/ui/boardGeometry.ts`),
+badge positioning, and cell-size math. To add a premium bezel without risking
+any of that, P1-3 draws depth as three decorative `pointerEvents="none"` layers
+that don't participate in layout: a hairline inner-border ring and a subtle top
+bevel behind the cells (inside the frame/gutter zone), and four short corner
+brackets on top. No change to border/padding, so geometry, squareness, and the
+64-cell grid are provably preserved.
+
+**Empty cell = fill + border only, no inner-highlight sub-View.** The empty case
+now uses dedicated `emptyCell`/`emptyCellBorder` tokens instead of the
+board-panel color, which is enough to reveal the 8×8 structure. A per-cell inner
+highlight would mean a 64× extra View for marginal gain; skipped to honor the
+performance rule (no unnecessary per-cell wrappers/blur). Recorded as the chosen
+tradeoff for the "optional inner highlight" clause.
+
+**Five new semantic tokens per theme, board-scoped only.** Added
+`boardFrameInner`, `boardFrameBevel`, `boardFrameCorner`, `emptyCell`,
+`emptyCellBorder` to `ThemePalette`. Reactor is the visual reference; Arctic /
+Magma / Void / Solar derive theirs from their own board tones so all five stay
+readable. No gameplay-critical color is hardcoded in `GameBoard`/`GridCell`, and
+no block/timer/rubble/tray/reward colors were touched (deferred to P1-4+).
