@@ -652,3 +652,60 @@ the on-device matrix (cyan/violet/amber × normal/warning/critical/frozen ×
 reduced-motion × Reactor+alt theme × tray→drag→placed × reload) and the real
 `android-placed-blocks-fixed.jpg` must be captured on the phone; the magenta
 binary diagnostic and one-shot cell log are provided for that run.
+
+## Phase 1 · P1-7 — Stable three-slot tray
+
+**Scope:** the piece tray renders exactly three fixed slots that never reflow as
+pieces are consumed; rebuilt on top of the Android placed-block visibility fix.
+
+**Structure:** `PieceTray` lays the shrinking domain hand over `HAND_SIZE` fixed
+slot wrappers via a pure `layoutSlots`, keeping each piece in the slot its
+`handId` (`hand-<refill>-<slot>`) encodes. A consumed piece leaves a dim recessed
+placeholder in place — no compaction/reorder; refill restores three. No domain
+change.
+
+**Styling:** theme-aware recessed slot (`surfaceBg` + `outlineVariant` + an
+`onSurface` inner top-highlight for depth); selected = brighter edge + glow +
+slight lift; consumed/empty = darker `boardBg`, low opacity, no glow,
+non-interactive; dragging source dimmed. Mini-shapes reuse the shared
+`BlockSurface`/`blockSurface` material. No new tokens.
+
+**Interaction:** tap select, pan-drag, drag ghost, invalid-drop return, a11y,
+haptics, analytics, and reduced motion preserved. Selection keys on `handId`, so
+it never jumps when another slot is consumed; empty placeholders are
+non-interactive (no button role / no piece testID).
+
+**Android black-box compatibility:** the slot sets no `overflow: hidden` (the
+inner highlight self-clips via its own top radius) and drops the lift transform
+under reduced motion — so a rounded slot on a hardware layer never renders black.
+
+**Responsive:** three fixed 64px slots with `space-evenly` fit within 320px; the
+tray keeps its place near the board and the fixed-size wrappers keep the tray
+height constant regardless of how many pieces remain, so the action region is
+never clipped. No device coordinates; P1-1 spacing untouched.
+
+**Themes:** the tray consumes existing semantic tokens (`surfaceBg`, `boardBg`,
+`outlineVariant`, `onSurface`), each already validated per-theme; it adds none,
+so all five themes remain readable.
+
+**Tests:** exactly three slots (full and partial); parametrized no-reflow on
+consuming slot 0/1/2 (via `within`); consumed placeholder non-interactive; refill
+restores three; selection survives another slot being consumed; an Android
+black-box guard (slots never set `overflow: hidden`); plus retained
+tap/drag/select/label/dim tests. Full suite: **84 suites / 491 tests** green;
+coverage **90.01%** (PieceTray 90.9%).
+
+**Verification:** typecheck ✅, lint ✅, tests ✅, coverage ✅, format ✅,
+expo-doctor 19/20 (one pre-existing upstream Expo patch-version drift, unrelated
+— no dependencies changed), Android export ✅.
+
+**Device finding:** no Android device on the build machine, so
+`docs/current game images/phase1-p7-tray-after.jpg` was **not** captured —
+recorded here, not fabricated. On-device confirmation deferred.
+
+**Risks:** (1) the stable-slot mapping depends on the `hand-<refill>-<slot>`
+`handId` format; if it changes the fallback still fills sequentially (no crash)
+but slot stability would regress — a targeted test guards the format. (2)
+Five-theme readability is asserted at the token level, not a rendered per-theme
+snapshot. (3) The pre-existing expo-doctor version drift should be addressed in a
+separate dependency-maintenance pass (out of P1-7 scope).

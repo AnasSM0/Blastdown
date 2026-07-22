@@ -1089,3 +1089,28 @@ Guarded by GridCell tests asserting the block tile and occupied cell never set
 `overflow: hidden` and that no transform is applied under reduced motion. Rubble
 keeps its own `overflow: hidden` (needed to clip crack geometry); on the
 reduced-motion device the cell transform is gone, so it is not layer-promoted.
+
+## Phase 1 · P1-7 — Stable three-slot tray (rebuilt on the Android fix, 2026-07-22)
+
+`PieceTray` renders exactly `HAND_SIZE` fixed slot wrappers and lays the
+shrinking domain hand over them with a pure `layoutSlots(hand)` that recovers
+each piece's slot from its authoritative `handId` (`hand-<refill>-<slot>`). A
+consumed piece leaves a dim recessed placeholder in place (no compaction or
+reorder); refill fills all three again. No domain change — the slot index is
+read, never written; `HAND_SIZE` is imported from `src/config/balance.ts`
+(read-only), not hardcoded. Selection keys on the authoritative `handId`, so it
+never jumps when another slot is consumed; empty placeholders have no button role
+or piece testID, so they cannot be selected or dragged. Tap, pan-drag, the drag
+ghost, haptics, analytics, accessibility, and reduced motion are all preserved.
+
+**Compatibility with the Android black-box fix (minimal).** The tray slot no
+longer sets `overflow: hidden` — a rounded, clipped view on an Android hardware
+layer (from the slot's lift transform) renders black (see the "turns black"
+entry). The inner-depth highlight self-clips via its own top radius, and the lift
+transform is dropped under reduced motion. Slots are theme-aware (`surfaceBg` +
+`outlineVariant` + `onSurface` inset; empty = darker `boardBg`); mini-shapes
+reuse the shared `blockSurface` material (no duplicated block rendering); no new
+tokens, no expensive shadow or animated slot background.
+
+**Ownership:** the Codex sandbox remains broken on this machine (2026-07-18
+entry), so the one allowed Codex UI task was done by Claude single-writer.

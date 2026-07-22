@@ -966,7 +966,9 @@ column)` — deterministic, never randomized at render — so a full rubble boar
     rubbleGeometry 100%, GridCell 97.36%), doctor 20/20, Android export ✅. No
     device → after-screenshot not captured (recorded, not fabricated).
 
-- [ ] **P1-7 Stable three-slot tray**
+- [x] **P1-7 Stable three-slot tray** — done 2026-07-22
+      (branch `phase-professional-polish-1-tray`, rebuilt on top of the Android
+      visibility fix). See `docs/VISUAL_POLISH_REVIEW.md` §"Phase 1 · P1-7".
   - Allowed: `src/components/PieceTray/**`.
   - Forbidden: domain hand/refill rules.
   - Depends on: P1-4 (block surface reused in mini-shapes).
@@ -976,6 +978,21 @@ column)` — deterministic, never randomized at render — so a full rubble boar
   - Tests: with a 1-piece hand, three slots render (two empty); select + drag
     callbacks still fire.
   - Verify: full battery.
+  - Result: `PieceTray` lays the shrinking domain hand over exactly `HAND_SIZE`
+    fixed slot wrappers via a pure `layoutSlots`, keeping each piece in the slot
+    its authoritative `handId` (`hand-<refill>-<slot>`) encodes — a consumed
+    piece leaves a dim recessed placeholder in place, no compaction/reorder;
+    refill fills all three; no domain change. Slots are theme-aware (`surfaceBg`
+    - `outlineVariant` + an `onSurface` inner top-highlight; empty = darker
+      `boardBg`, low opacity, no glow, non-interactive). Selection keys on `handId`
+      (never jumps on consume); tap/drag/ghost/haptics/analytics/reduced-motion
+      preserved. Compatibility with the Android black-box fix: the slot sets no
+      `overflow: hidden` (the inner highlight self-clips via its own top radius)
+      and drops the lift transform under reduced motion. New stable
+      `tray-slot-<i>`/`tray-slot-empty` testids. 84 suites / 491 tests, coverage
+      90.01% (PieceTray 90.9%), doctor 19/20 (pre-existing upstream Expo patch
+      drift, unrelated — no deps changed), Android export ✅. No device →
+      after-screenshot not captured (recorded, not fabricated).
 
 - [ ] **P1-8 Freeze/Defuse action dock**
   - Allowed: `src/components/RewardedActionButton/**`, `app/game.tsx` (dock
