@@ -955,3 +955,44 @@ else.
 **Deferred (unchanged from spec):** rubble creation/clear and settling
 animations remain Phase 3 work; Phase 1 rubble is static, so reduced motion needs
 no special handling.
+
+## Regression fix — placed-block visibility (2026-07-22)
+
+**Symptom:** on device, placed blocks turned very dark/discolored and sank into
+the board, while the same pieces were clearly visible in the tray and drag ghost;
+timer badges stayed visible above the blocks.
+
+**Root cause:** the P1-4 shared block material used a _translucent_ fill for the
+solid block variants — `normal` was `accent` at `0x2E` alpha (~18%). On the
+board, `GridCell` renders the block over a transparent pressable, so the tile
+composited 18% accent over the dark `boardBg`, producing a near-black tile with
+almost no hue. The tray only looked correct because its slot sits on the lighter
+`surfaceBg`, and empty cells are opaque — so placed blocks read _darker_ than the
+empty cells around them. It was a material bug (a translucent fill's appearance
+depends on its backing), not a layering, opacity-inheritance, z-index, overlay,
+or Android-shadow problem — those were all inspected and ruled out.
+
+**Fix (single shared-material change, no scattered hex):** in
+`src/ui/blockSurface.ts`, the solid variants (`normal`/`tray`/`selected`/
+`critical`) now build an **opaque** body by mixing the accent toward a deep
+near-black (`body(accent, darken)` via a pure `mix()` colour blend), so the hue
+reads identically over any backing. `normal` and `tray` share the same body
+(one material family); `selected`/`critical` are a touch brighter, with their
+existing thicker edge and stronger glow carrying the state — critical still
+preserves the block's colour (no recolour). The **preview** variants and the
+**disabled** (consumed/dragged) state keep their translucent/dim fills on
+purpose: previews are ghost overlays that must let the empty cell show through,
+and disabled is a de-emphasised copy. The saturated edge, inner highlight sheen,
+restrained glow, and all geometry/overlays (timer badge, contour) are unchanged —
+badges and contours overlay borders only and never cover the now-opaque body. No
+new tokens; the mix is theme-neutral because the visible hue is always the
+theme's own block accent. No blur or animated shadow added.
+
+**Guard:** `blockSurface.test.ts` and `GridCell.test.tsx` now assert placed
+blocks use an opaque body (`#RRGGBB`, `opacity: 1`), brighter than the empty-cell
+surface, and never the disabled/preview fill.
+
+**Device review:** requires an on-device before/after; no device/emulator was
+available, so `docs/current game images/placed-block-visibility-fixed.jpg` was
+not captured (not fabricated). The fix needs on-device approval before further
+polish resumes.

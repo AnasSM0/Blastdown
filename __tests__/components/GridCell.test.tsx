@@ -104,9 +104,25 @@ describe("GridCell premium block surfaces (P1-4)", () => {
     const criticalFill = fillOf(criticalResult.getByTestId("block-0-0"));
     // Distinct material…
     expect(criticalFill).not.toBe(normalFill);
-    // …but the same underlying color identity (both tints of the cyan accent).
-    expect(String(normalFill).startsWith(accent)).toBe(true);
-    expect(String(criticalFill).startsWith(accent)).toBe(true);
+    // …matching the shared material's normal/critical bodies (same cyan family,
+    // color preserved — the edge, not the body, carries the raw accent).
+    expect(normalFill).toBe(blockSurface(reactor, accent, "normal").fill);
+    expect(criticalFill).toBe(blockSurface(reactor, accent, "critical").fill);
+  });
+
+  it("renders every placed color with a solid body distinct from the empty cell (regression)", async () => {
+    // Guards the placed-block visibility regression: a normal placed block must
+    // use the visible normal material, never a translucent/disabled/preview fill.
+    for (const colorId of ["cyan", "purple", "amber"] as const) {
+      const result = await render(
+        <GridCell cell={{ kind: "normal", colorId }} row={0} column={0} size={40} />,
+      );
+      const fill = fillOf(result.getByTestId("block-0-0"));
+      expect(fill).toBe(blockSurface(reactor, blockColor(reactor, colorId), "normal").fill);
+      // Opaque body (7-char hex, no alpha) that is not the empty-cell surface.
+      expect(String(fill)).toMatch(/^#[0-9a-fA-F]{6}$/);
+      expect(fill).not.toBe(reactor.emptyCell);
+    }
   });
 
   it("strokes the piece contour in the block accent on boundary sides only (P1-5)", async () => {
