@@ -1,4 +1,14 @@
 import type { CellPosition } from "../domain/placement";
+import { spacing } from "./theme";
+
+/** Outer frame border width of the rendered board (px). */
+export const FRAME_WIDTH = 2;
+
+/** Frame + gutter offset from the board's outer edge to the first cell's edge.
+ *  Lives here, in the neutral geometry module, so both the board and the
+ *  effects overlay can share it without importing the GameBoard barrel (which
+ *  would form a require cycle). Must stay in sync with the board's box model. */
+export const BOARD_CONTENT_INSET = FRAME_WIDTH + spacing.gridGutter;
 
 /** Absolute (window-space) geometry of the rendered board's playable content
  *  area, measured at runtime — never hardcoded device pixels. Produced by the
