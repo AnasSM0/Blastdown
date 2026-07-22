@@ -955,3 +955,137 @@ else.
 **Deferred (unchanged from spec):** rubble creation/clear and settling
 animations remain Phase 3 work; Phase 1 rubble is static, so reduced motion needs
 no special handling.
+
+## Regression fix — placed-block visibility (2026-07-22)
+
+**Symptom:** on device, placed blocks turned very dark/discolored and sank into
+the board, while the same pieces were clearly visible in the tray and drag ghost;
+timer badges stayed visible above the blocks.
+
+**Root cause:** the P1-4 shared block material used a _translucent_ fill for the
+solid block variants — `normal` was `accent` at `0x2E` alpha (~18%). On the
+board, `GridCell` renders the block over a transparent pressable, so the tile
+composited 18% accent over the dark `boardBg`, producing a near-black tile with
+almost no hue. The tray only looked correct because its slot sits on the lighter
+`surfaceBg`, and empty cells are opaque — so placed blocks read _darker_ than the
+empty cells around them. It was a material bug (a translucent fill's appearance
+depends on its backing), not a layering, opacity-inheritance, z-index, overlay,
+or Android-shadow problem — those were all inspected and ruled out.
+
+**Fix (single shared-material change, no scattered hex):** in
+`src/ui/blockSurface.ts`, the solid variants (`normal`/`tray`/`selected`/
+`critical`) now build an **opaque** body by mixing the accent toward a deep
+near-black (`body(accent, darken)` via a pure `mix()` colour blend), so the hue
+reads identically over any backing. `normal` and `tray` share the same body
+(one material family); `selected`/`critical` are a touch brighter, with their
+existing thicker edge and stronger glow carrying the state — critical still
+preserves the block's colour (no recolour). The **preview** variants and the
+**disabled** (consumed/dragged) state keep their translucent/dim fills on
+purpose: previews are ghost overlays that must let the empty cell show through,
+and disabled is a de-emphasised copy. The saturated edge, inner highlight sheen,
+restrained glow, and all geometry/overlays (timer badge, contour) are unchanged —
+badges and contours overlay borders only and never cover the now-opaque body. No
+new tokens; the mix is theme-neutral because the visible hue is always the
+theme's own block accent. No blur or animated shadow added.
+
+**Guard:** `blockSurface.test.ts` and `GridCell.test.tsx` now assert placed
+blocks use an opaque body (`#RRGGBB`, `opacity: 1`), brighter than the empty-cell
+surface, and never the disabled/preview fill.
+
+**Device review:** requires an on-device before/after; no device/emulator was
+available, so `docs/current game images/placed-block-visibility-fixed.jpg` was
+not captured (not fabricated). The fix needs on-device approval before further
+polish resumes.
+
+**Body brightness + computed comparison (addendum).** The opaque body's `darken`
+factors were tuned so every hue clears the empty cell with margin, since violet
+(`#9D05FF`) is intrinsically dark: `normal`/`tray` = 0.30, `selected` = 0.18,
+`critical` = 0.24. Because no Android device/emulator is available, a truthful
+_computed_ before/after was generated from the real `blockSurface` color math
+composited over the actual Reactor `boardBg` — `docs/current game images/
+placed-block-visibility-comparison-computed.svg` (clearly labelled "computed, not
+a device screenshot"). Luminance over the empty cell (L=29): BEFORE placed cyan
+49 / violet 33 / amber 52 (violet ≈ empty → vanishes); AFTER 121 / 58 / 134. The
+on-device `placed-block-visibility-fixed.jpg` is still required for final
+approval; the computed SVG stands in only as analysis until a device is
+available.
+
+**Board-level render (addendum).** Since Chrome is available on the build
+machine, a faithful full-board before/after was also rasterized from an HTML
+replica using the exact `blockSurface` outputs (RN Views map 1:1 to CSS boxes):
+`docs/current game images/placed-block-visibility-comparison-render.png`. It
+reproduces the reported symptom — BEFORE, placed blocks are outline-only and sink
+into the board (matching "visible in tray/drag, dark after placement"); AFTER,
+the opaque body reads clearly for cyan/violet/amber. It is a Chrome render, still
+**not** an Android device screenshot; the on-device `placed-block-visibility-fixed.jpg`
+remains required for final sign-off (see `HOW-TO-CAPTURE-placed-block-visibility-fixed.md`).
+
+**After-image stand-in placed with consent (addendum).** On explicit user
+consent (no Android hardware being available), the required after-image
+`docs/current game images/placed-block-visibility-fixed.jpg` was populated with
+the faithful headless-Chrome render of the fixed board (the exact `blockSurface`
+outputs; RN Views ↔ CSS boxes). The provenance is baked into the image itself —
+it states it is a Chrome render, not an on-device Android capture — so it is not
+a misrepresentation. The file is PNG-encoded (no JPEG encoder on the machine).
+On-device verification remains recommended before shipping.
+
+## Android placed-block visibility — true root cause + require-cycle (2026-07-22)
+
+**Correction to the earlier entry.** Making the block fill opaque (above) was
+necessary but **not** the on-device cause. On the physical Android phone, placed
+blocks stayed hidden while tray/drag blocks and timer badges rendered. The
+differentiator: the board's `BlockSurface` applied a **glow with Android
+`elevation`**, and it sits inside `GridCell`'s animated `transform` parent
+(`scale` snap). On Android, an elevated child nested under a transformed ancestor
+is promoted to a detached hardware layer and commonly fails to render — so the
+block body disappeared. Tray mini-cells use no elevation (glow `null`) and stayed
+visible; badges are on the board's own layer, not under the cell transform, so
+they stayed visible too. This also fixed a spec violation (a per-cell shadow
+across 64 cells is the "expensive shadow" the brief forbids).
+
+**Fix:** `BlockSurface` no longer applies `surface.glow` to the block body — the
+body is a plain opaque View (fill + saturated edge + sheen), which always renders
+on Android and below the preview/highlight overlays. `blockSurface()` still
+returns `glow` for the single selected **tray slot** (not nested under a
+transform, one at a time), so that emphasis is unchanged. No per-cell blur or
+shadow remains.
+
+**Require cycle removed.** `EffectsLayer` imported `BOARD_CONTENT_INSET` from the
+`GameBoard` barrel, forming `GameBoard/index.ts → GameBoard.tsx → EffectsLayer.tsx
+→ GameBoard/index.ts`. `BOARD_CONTENT_INSET` and `FRAME_WIDTH` now live in the
+neutral `src/ui/boardGeometry.ts`; `EffectsLayer` and `GameBoard` both import them
+from there, and the `GameBoard` barrel re-exports `BOARD_CONTENT_INSET` (via the
+imported binding) so `app/game.tsx` is unaffected. `boardGeometry` imports only
+`theme`, so no cycle remains. Guarded by `__tests__/components/boardRequireCycle.test.ts`.
+
+**Ownership note:** the Codex sandbox remains broken on this machine (2026-07-18
+entry), so "Codex Task A" (the cycle refactor) was done by Claude single-writer.
+
+**Device status:** this machine has no Android device/SDK/emulator, so the
+on-device reproduction, the magenta binary diagnostic, and the real
+`android-placed-blocks-fixed.jpg` are the human's step — the diagnostics are
+provided for that run. The code fix + all static verification are complete.
+
+## Android placed-block "turns black" — the actual cause (2026-07-22)
+
+Removing the block-body elevation was still not enough: on the phone, dropped
+blocks **turned black** (no colour) and appeared to hide behind the grid. This is
+the well-known Android bug where a View with **`overflow: hidden` + `borderRadius`
+promoted to a hardware layer renders its background black** instead of its fill.
+The promotion came from `GridCell`'s `transform: [{ scale }]` (applied even under
+reduced motion, which the device has on, at identity scale). Tray mini-cells set
+no `overflow: hidden`, so they stayed coloured — matching the symptom exactly.
+
+**Fix:**
+
+- `BlockSurface` tile and the `GridCell` occupied cell no longer set
+  `overflow: hidden` (the child surfaces already match the cell size, so nothing
+  needs clipping). The sheen now self-clips via its own rounded top corners.
+- The cell `transform` is omitted entirely under reduced motion (no flash runs
+  then), so the reduced-motion device no longer promotes cells to a hardware
+  layer at all.
+
+Guarded by GridCell tests asserting the block tile and occupied cell never set
+`overflow: hidden` and that no transform is applied under reduced motion. Rubble
+keeps its own `overflow: hidden` (needed to clip crack geometry); on the
+reduced-motion device the cell transform is gone, so it is not layer-promoted.

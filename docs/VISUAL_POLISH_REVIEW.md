@@ -548,3 +548,107 @@ a device — confirm the ember stays restrained (not alarming) against each
 theme's base when a device is available. (3) The deterministic layout draws from
 four crack sets; large rubble fields will visibly repeat layouts — acceptable for
 Phase 1, expandable later if needed.
+
+## Regression fix — placed-block visibility
+
+**Reported:** placed blocks appear extremely dark/discolored on device and sink
+into the board, though they render correctly in the tray and drag ghost; timer
+badges stay visible above them. Reference: `docs/current game images/
+placed-block-visibility-regression.jpeg`.
+
+**Root cause:** the P1-4 block material's solid variants used a translucent fill
+(`normal` = accent at ~18% alpha). Over the dark board (the placed-cell pressable
+is transparent) that composited to near-black; the tray only looked right because
+it sits on the lighter panel. Placed blocks ended up darker than the opaque empty
+cells. Layering, opacity inheritance, z-index/overlay order, contour/badge
+overlays, alpha composition, overflow clipping, and Android shadows were all
+inspected and ruled out.
+
+**Fix:** `blockSurface.ts` now gives the solid variants (normal/tray/selected/
+critical) an **opaque** body — the accent mixed toward a deep near-black via a
+pure `mix()` — so a block's colour reads over any backing. Normal and tray share
+the body (one material family); selected/critical stay a touch brighter with
+their existing edge/glow emphasis; critical still preserves colour. Preview and
+disabled variants keep their translucent/dim fills by design. No new tokens, no
+scattered device-specific hex, no blur/animated shadow. Empty cells remain behind
+placed blocks and clearly weaker than them.
+
+**Tests:** `blockSurface.test.ts` — solid variants are opaque `#RRGGBB` and each
+is more luminous than the empty-cell surface; identity carried by the edge;
+critical distinct from normal but same family. `GridCell.test.tsx` — every placed
+colour renders the normal opaque body, distinct from the empty cell, never a
+disabled/preview fill. Full suite: **83 suites / 477 tests** green (the lone
+transient failure under full-parallel load is the pre-existing `gameNavigation`
+timing flake, which passes isolated); coverage **89.89%** (`blockSurface` 100%).
+
+**Verification:** typecheck ✅, lint ✅, test ✅, coverage ✅ 89.89%,
+format:check ✅, expo-doctor ✅ 20/20, `expo export --platform android` ✅.
+
+**Device finding:** no device/emulator available, so `docs/current game images/
+placed-block-visibility-fixed.jpg` was **not** captured — recorded here, not
+fabricated. This fix requires on-device before/after approval before polish
+resumes.
+
+**Risks:** (1) The opaque body's brightness (`darken` factors) is tuned by value,
+not on-device — the after-screenshot is needed to confirm the blocks read as
+"premium colored" rather than either too dark or too neon across all five themes.
+(2) The drag ghost stays translucent (a preview), so it is intentionally lighter
+than a placed block — validate that the tray→drag→placed progression still reads
+as one family on device.
+
+**Body tuning + computed comparison (addendum):** the opaque-body `darken`
+factors were set so each hue clears the empty cell with margin (violet is the
+limiting case): normal/tray 0.30, selected 0.18, critical 0.24. With no device
+available, a truthful computed before/after (real `blockSurface` math over the
+actual Reactor `boardBg`) is at `docs/current game
+images/placed-block-visibility-comparison-computed.svg` — clearly labelled as
+computed, not a device screenshot. Luminance vs the empty cell (L=29): BEFORE
+cyan 49 / violet 33 / amber 52; AFTER 121 / 58 / 134. The on-device
+`placed-block-visibility-fixed.jpg` remains required for final sign-off.
+
+**Board-level render (addendum):** a faithful full-board before/after was
+rasterized via headless Chrome from an HTML replica of the exact `blockSurface`
+outputs — `docs/current game images/placed-block-visibility-comparison-render.png`.
+BEFORE shows placed blocks as outline-only/dark (the reported regression); AFTER
+shows clearly-coloured opaque bodies. Chrome render, not an Android screenshot;
+the on-device capture is still required for sign-off.
+
+## Android placed-block visibility — true root cause + require-cycle fix
+
+**On-device finding:** the opaque-fill change was necessary but did not fix the
+physical Android phone — placed blocks stayed hidden while tray/drag blocks and
+badges rendered.
+
+**True root cause:** `BlockSurface` applied an Android `elevation` (from the
+block glow) on a View nested inside `GridCell`'s animated `transform` parent. On
+Android, an elevated child under a transformed ancestor is detached to its own
+hardware layer and often fails to render, so the block body vanished. Tray
+mini-cells (no elevation) and badges (own layer) were unaffected — matching the
+symptom exactly. A per-cell shadow across 64 cells was also the "expensive
+shadow" the brief forbids.
+
+**Fix:** the block body no longer carries `elevation`/glow — it is a plain opaque
+View (fill + edge + sheen) that always renders on Android, above the board
+background and below preview/highlight overlays. Contours stay border-only with
+transparent interiors; no parent opacity dims placed cells; reduced motion
+affects animation only. `blockSurface()` still returns glow for the single
+selected tray slot (not under a transform).
+
+**Require cycle:** `BOARD_CONTENT_INSET`/`FRAME_WIDTH` moved to the neutral
+`src/ui/boardGeometry.ts`; `EffectsLayer` imports them there instead of the
+`GameBoard` barrel, breaking `GameBoard → EffectsLayer → GameBoard barrel`.
+
+**Tests:** GridCell guards — placed body has no elevation/shadow, occupied cell
+paints no empty-cell chrome, contour interior transparent, placed block fully
+visible under reduced motion. `boardRequireCycle.test.ts` guards the cycle.
+Full suite: **84 suites / 483 tests** green; coverage 89.89% (BlockSurface +
+boardGeometry 100%).
+
+**Verification:** typecheck ✅, lint ✅, tests ✅, coverage ✅, format ✅,
+expo-doctor 20/20 ✅, Android export ✅, require-cycle absent ✅.
+
+**Device verification (human step):** no Android device on the build machine, so
+the on-device matrix (cyan/violet/amber × normal/warning/critical/frozen ×
+reduced-motion × Reactor+alt theme × tray→drag→placed × reload) and the real
+`android-placed-blocks-fixed.jpg` must be captured on the phone; the magenta
+binary diagnostic and one-shot cell log are provided for that run.

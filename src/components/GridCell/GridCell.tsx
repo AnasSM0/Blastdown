@@ -134,9 +134,16 @@ export function GridCell({
       break;
   }
 
+  // The scale transform promotes the cell to an Android hardware layer, which —
+  // combined with a rounded, clipped child — triggers the Android "black box"
+  // rendering bug (placed blocks turned black on-device). Under reduced motion
+  // no flash animation runs, so the transform is omitted entirely; otherwise it
+  // is only briefly non-identity during the placement snap.
+  const cellTransform = reducedMotion ? undefined : { transform: [{ scale: snap }] };
+
   return (
     <AnimatedPressable
-      style={[styles.cell, base, visual, { transform: [{ scale: snap }] }]}
+      style={[styles.cell, base, visual, cellTransform]}
       onPress={onPress}
       disabled={onPress === undefined}
       testID={`cell-${row}-${column}`}
@@ -215,7 +222,9 @@ export function GridCell({
 const styles = StyleSheet.create({
   cell: {
     borderRadius: radius.cell,
-    overflow: "hidden",
+    // No `overflow: hidden`: a rounded, clipped view on an Android hardware
+    // layer (from the cell transform) renders its background black. The child
+    // surfaces already match the cell size, so nothing needs clipping here.
   },
   contour: {
     position: "absolute",

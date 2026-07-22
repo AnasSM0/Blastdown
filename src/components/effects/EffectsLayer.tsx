@@ -2,9 +2,9 @@ import { View, StyleSheet } from "react-native";
 
 import type { CellPosition } from "../../domain/placement";
 import type { EffectPlan } from "../../ui/effects/eventEffects";
+import { BOARD_CONTENT_INSET } from "../../ui/boardGeometry";
 import { spacing } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
-import { BOARD_CONTENT_INSET } from "../GameBoard";
 import { BurstCell } from "./BurstCell";
 import { CellFlash } from "./CellFlash";
 import { FloatingText } from "./FloatingText";

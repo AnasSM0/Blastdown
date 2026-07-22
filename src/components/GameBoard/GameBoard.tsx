@@ -4,6 +4,7 @@ import { Animated, StyleSheet, View, type LayoutChangeEvent } from "react-native
 import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
 import type { PlacementPreview, TimerBadgePlacement } from "../../domain/selectors";
 import type { CellPosition } from "../../domain/placement";
+import { BOARD_CONTENT_INSET, FRAME_WIDTH } from "../../ui/boardGeometry";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import type { EffectPlan } from "../../ui/effects/eventEffects";
 import { getTimerVisualState } from "../../ui/timerStates";
@@ -69,18 +70,17 @@ function contourEdgesFor(
   };
 }
 
-const FRAME_WIDTH = 2;
-
 /** Corner-accent geometry (P1-3). Short, thin brackets inset just inside the
  *  frame; purely decorative and non-interactive. */
 const CORNER_LENGTH = 12;
 const CORNER_THICKNESS = 2;
 const CORNER_INSET = 3;
 
-/** Frame + gutter offset from the board's outer edge to the first cell's
- *  edge — the screen adds this to the measured window origin to locate the
- *  playable content area. */
-export const BOARD_CONTENT_INSET = FRAME_WIDTH + spacing.gridGutter;
+// FRAME_WIDTH and BOARD_CONTENT_INSET now live in ../../ui/boardGeometry (the
+// neutral module) so EffectsLayer can share them without importing this
+// component's barrel — which formed a require cycle. Re-exported (from the
+// imported binding) for the screen that reads it via the GameBoard barrel.
+export { BOARD_CONTENT_INSET };
 
 function GameBoardImpl(
   {

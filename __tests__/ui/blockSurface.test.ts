@@ -4,19 +4,45 @@ import { blockColor, THEMES, resolveTheme } from "../../src/ui/themes";
 const reactor = resolveTheme(undefined);
 const COLOR_IDS = ["cyan", "purple", "amber"] as const;
 const COLOR_HEX = /#[0-9a-fA-F]{6}/;
+const OPAQUE_HEX = /^#[0-9a-fA-F]{6}$/;
 
 describe("blockSurface material (P1-4)", () => {
   it("builds a premium tile for all three block colors, preserving identity", () => {
     for (const colorId of COLOR_IDS) {
       const accent = blockColor(reactor, colorId);
       const surface = blockSurface(reactor, accent, "normal");
-      // Fill and edge are tints of the block's own hue — color identity kept.
-      expect(surface.fill.startsWith(accent)).toBe(true);
+      // The edge carries the block's own hue — color identity kept…
       expect(surface.edge).toBe(accent);
+      // …and the body is a solid, opaque color (no alpha suffix) so it reads
+      // over the dark board instead of sinking into it (visibility regression).
+      expect(surface.fill).toMatch(OPAQUE_HEX);
       // Layered material: an edge, an inner highlight, and a restrained glow.
       expect(surface.borderWidth).toBeGreaterThan(0);
       expect(surface.highlight).not.toBeNull();
       expect(surface.glow).not.toBeNull();
+    }
+  });
+
+  it("gives placed blocks an opaque body clearly lighter than the empty cell (regression)", () => {
+    const luminance = (hex: string): number => {
+      const h = hex.slice(1);
+      return (
+        0.299 * parseInt(h.slice(0, 2), 16) +
+        0.587 * parseInt(h.slice(2, 4), 16) +
+        0.114 * parseInt(h.slice(4, 6), 16)
+      );
+    };
+    for (const colorId of COLOR_IDS) {
+      const accent = blockColor(reactor, colorId);
+      for (const variant of ["normal", "tray", "selected", "critical"] as const) {
+        const surface = blockSurface(reactor, accent, variant);
+        // Opaque body…
+        expect(surface.fill).toMatch(OPAQUE_HEX);
+        expect(surface.opacity).toBe(1);
+        // …visibly brighter than the empty-cell surface it sits over, so a
+        // placed block never disappears into the board.
+        expect(luminance(surface.fill)).toBeGreaterThan(luminance(reactor.emptyCell));
+      }
     }
   });
 
@@ -41,8 +67,12 @@ describe("blockSurface material (P1-4)", () => {
   it("preserves the original block color in the critical state (no recolor)", () => {
     const accent = blockColor(reactor, "amber");
     const critical = blockSurface(reactor, accent, "critical");
+    const normal = blockSurface(reactor, accent, "normal");
+    // Hue identity is carried by the edge; the body stays the same solid family
+    // (not a recolor) — distinct from normal only by brightness.
     expect(critical.edge).toBe(accent);
-    expect(critical.fill.startsWith(accent)).toBe(true);
+    expect(critical.fill).toMatch(OPAQUE_HEX);
+    expect(critical.fill).not.toBe(normal.fill);
     // The danger read is intensity, not hue: stronger glow than normal.
     expect(critical.glow).not.toBeNull();
   });
