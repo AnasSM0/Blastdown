@@ -91,7 +91,7 @@ export function blockSurface(
       // not a faint tint that sinks into it), a saturated edge, an inner
       // highlight, and a restrained glow.
       return {
-        fill: body(accent, 0.42),
+        fill: body(accent, 0.3),
         edge: accent,
         borderWidth: 1.5,
         highlight: withAlpha(accent, "66"),
@@ -103,7 +103,7 @@ export function blockSurface(
       // Same solid material as a placed block so the tray and board read as one
       // family; the board keeps its glow, the tray piece does not.
       return {
-        fill: body(accent, 0.42),
+        fill: body(accent, 0.3),
         edge: accent,
         borderWidth: 1,
         highlight: withAlpha(accent, "66"),
@@ -113,7 +113,7 @@ export function blockSurface(
       };
     case "selected":
       return {
-        fill: body(accent, 0.3),
+        fill: body(accent, 0.18),
         edge: accent,
         borderWidth: 2,
         highlight: withAlpha(accent, "88"),
@@ -126,7 +126,7 @@ export function blockSurface(
       // edge, a stronger glow, and a brighter inner highlight — never a recolor.
       // The body stays the same solid family, a touch brighter than normal.
       return {
-        fill: body(accent, 0.34),
+        fill: body(accent, 0.24),
         edge: accent,
         borderWidth: 2,
         highlight: withAlpha(accent, "AA"),

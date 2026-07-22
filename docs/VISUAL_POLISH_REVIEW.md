@@ -595,3 +595,13 @@ not on-device — the after-screenshot is needed to confirm the blocks read as
 (2) The drag ghost stays translucent (a preview), so it is intentionally lighter
 than a placed block — validate that the tray→drag→placed progression still reads
 as one family on device.
+
+**Body tuning + computed comparison (addendum):** the opaque-body `darken`
+factors were set so each hue clears the empty cell with margin (violet is the
+limiting case): normal/tray 0.30, selected 0.18, critical 0.24. With no device
+available, a truthful computed before/after (real `blockSurface` math over the
+actual Reactor `boardBg`) is at `docs/current game
+images/placed-block-visibility-comparison-computed.svg` — clearly labelled as
+computed, not a device screenshot. Luminance vs the empty cell (L=29): BEFORE
+cyan 49 / violet 33 / amber 52; AFTER 121 / 58 / 134. The on-device
+`placed-block-visibility-fixed.jpg` remains required for final sign-off.

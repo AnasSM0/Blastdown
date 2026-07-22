@@ -996,3 +996,16 @@ surface, and never the disabled/preview fill.
 available, so `docs/current game images/placed-block-visibility-fixed.jpg` was
 not captured (not fabricated). The fix needs on-device approval before further
 polish resumes.
+
+**Body brightness + computed comparison (addendum).** The opaque body's `darken`
+factors were tuned so every hue clears the empty cell with margin, since violet
+(`#9D05FF`) is intrinsically dark: `normal`/`tray` = 0.30, `selected` = 0.18,
+`critical` = 0.24. Because no Android device/emulator is available, a truthful
+_computed_ before/after was generated from the real `blockSurface` color math
+composited over the actual Reactor `boardBg` — `docs/current game images/
+placed-block-visibility-comparison-computed.svg` (clearly labelled "computed, not
+a device screenshot"). Luminance over the empty cell (L=29): BEFORE placed cyan
+49 / violet 33 / amber 52 (violet ≈ empty → vanishes); AFTER 121 / 58 / 134. The
+on-device `placed-block-visibility-fixed.jpg` is still required for final
+approval; the computed SVG stands in only as analysis until a device is
+available.
