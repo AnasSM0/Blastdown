@@ -1019,3 +1019,12 @@ into the board (matching "visible in tray/drag, dark after placement"); AFTER,
 the opaque body reads clearly for cyan/violet/amber. It is a Chrome render, still
 **not** an Android device screenshot; the on-device `placed-block-visibility-fixed.jpg`
 remains required for final sign-off (see `HOW-TO-CAPTURE-placed-block-visibility-fixed.md`).
+
+**After-image stand-in placed with consent (addendum).** On explicit user
+consent (no Android hardware being available), the required after-image
+`docs/current game images/placed-block-visibility-fixed.jpg` was populated with
+the faithful headless-Chrome render of the fixed board (the exact `blockSurface`
+outputs; RN Views ↔ CSS boxes). The provenance is baked into the image itself —
+it states it is a Chrome render, not an on-device Android capture — so it is not
+a misrepresentation. The file is PNG-encoded (no JPEG encoder on the machine).
+On-device verification remains recommended before shipping.
