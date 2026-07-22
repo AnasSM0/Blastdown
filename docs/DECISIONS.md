@@ -834,3 +834,55 @@ keeps its approved 0.4 drag-dim. No new tokens were added — P1-4 tints existin
 **Perf note:** each filled block adds one static sheen sub-View (no blur, no
 animated shadow). Accepted as cheap; flagged to watch on low-end devices if a
 full board ever stutters.
+
+## Phase 1 · P1-5 — Timer badges and piece contours (2026-07-22)
+
+**Badge look centralized in a pure module.** `getBadgeVisual(visualState,
+frozen, theme)` (`src/ui/timerBadgeStyle.ts`) is the single source of a badge's
+size, ring color/width, dashed flag, numeral color, glow, and which pulse
+profile drives it — mirroring `blockSurface`'s pattern. `TimerBadge` is now a
+thin consumer. This keeps the four named states' emphasis defined and
+unit-testable in one place.
+
+**State is never color-only.** Each named state differs from the others in at
+least one non-color attribute: warning (2) is a medium-weight ring, critical (1)
+is heavier _and_ larger with a high glow, and frozen is the only **dashed** ring.
+So normal/warning/critical/frozen are all distinguishable without relying on hue
+— an accessibility requirement. The block color underneath is untouched; the
+badge floats above it.
+
+**Frozen is a global, derived state — no domain change.** Freeze pauses every
+timer, so `frozen = state.freezeTurnsRemaining > 0` (already computed in
+game.tsx) is threaded game.tsx → `GameBoard` → every `TimerBadge`. Frozen
+overrides the countdown emphasis (icy `timerFrozen` ring, dashed, static — its
+`pulseState` resolves to the no-pulse "normal", so the badge never breathes
+while paused). The domain selector `getTimerBadgePlacements` is unchanged
+(`src/domain/**` stays protected).
+
+**Defused-transition badge state deferred — no source metadata.** A rewarded
+defuse removes the piece's timer entirely (the piece becomes normal), so there
+is no "defusing" state to render on a badge. Rather than invent one, the state
+is intentionally omitted ("where already available" was the guardrail); it can
+be added if such transition metadata ever exists.
+
+**Piece contour = boundary-aware coordinated cell edges, from existing
+metadata.** A continuous single-path contour is impractical because every cell
+is separated by `spacing.gridGutter`, so the spec-endorsed fallback is used:
+`GameBoard.contourEdgesFor` reads each timed cell's `pieceInstanceId` and marks a
+side as a boundary when the neighbor is not the same piece (pure adjacency check,
+no grouping reconstructed). `GridCell` strokes the piece's own `blockColor`
+accent on boundary sides only — interior-transparent and non-interactive, so it
+never covers the block highlight, and previews / the highlight ring / the badge
+all draw over it. Suppressing internal sides makes a multi-cell piece read as one
+bounded group and distinguishes it from a plain same-color block.
+
+**One new token.** `timerFrozen` (an icy blue) added to `ThemePalette` and all
+five palettes — a cool tone reads as "freeze" in warm and cool themes alike and
+stays distinct from each theme's normal/warning/critical timer hues. No other
+tokens added; the contour reuses the existing `blockColor` mapping.
+
+**Motion unchanged in kind.** Pulse still routes through `getPulseConfig` (state
+
+- reduced-motion gated); the badge effect keys on the resolved `pulseState`
+  primitive, so ordinary rerenders never restart the loop. No new animation was
+  introduced; the major flip/roll animation remains deferred to Phase 2.

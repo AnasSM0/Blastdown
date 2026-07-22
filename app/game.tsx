@@ -494,6 +494,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
                   effectKey={animator.effectKey}
                   highlightPieceId={defuseTarget?.id ?? null}
                   reducedMotion={reducedMotion}
+                  frozen={freezeActive}
                 />
               </View>
             ) : null}

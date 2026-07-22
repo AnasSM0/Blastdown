@@ -41,6 +41,10 @@ export type ThemePalette = {
   timerNormal: string;
   timerWarning: string;
   timerCritical: string;
+  /** Frozen-timer cue (P1-5): an icy tone for the paused/frozen badge ring and
+   *  numeral. A cool blue reads as "freeze" across every theme, warm or cool,
+   *  and stays distinct from the normal/warning/critical timer hues. */
+  timerFrozen: string;
 
   rubbleFill: string;
   rubbleCrack: string;
@@ -93,6 +97,7 @@ const reactor: ThemePalette = {
   timerNormal: reactorColors.cyanBlock,
   timerWarning: reactorColors.amberBlock,
   timerCritical: reactorColors.urgentRed,
+  timerFrozen: "#9FEBFF",
   rubbleFill: reactorColors.boardFrame,
   rubbleCrack: reactorColors.outline,
   score: reactorColors.scoreOrange,
@@ -131,6 +136,7 @@ const arctic: ThemePalette = {
   timerNormal: "#7DE3FF",
   timerWarning: "#FFD27D",
   timerCritical: "#FF6B8B",
+  timerFrozen: "#CFF3FF",
   rubbleFill: "#20323F",
   rubbleCrack: "#5E8298",
   score: "#7DE3FF",
@@ -166,6 +172,7 @@ const magma: ThemePalette = {
   timerNormal: "#FFB347",
   timerWarning: "#FF7A1A",
   timerCritical: "#FF2E2E",
+  timerFrozen: "#9AD9FF",
   rubbleFill: "#2A1811",
   rubbleCrack: "#9A6146",
   score: "#FF7A1A",
@@ -201,6 +208,7 @@ const voidTheme: ThemePalette = {
   timerNormal: "#C77DFF",
   timerWarning: "#FFB86C",
   timerCritical: "#FF4D6D",
+  timerFrozen: "#A9DBFF",
   rubbleFill: "#1C1430",
   rubbleCrack: "#6B5990",
   score: "#C77DFF",
@@ -236,6 +244,7 @@ const solar: ThemePalette = {
   timerNormal: "#FFD447",
   timerWarning: "#FF9E2C",
   timerCritical: "#FF5230",
+  timerFrozen: "#8FD8FF",
   rubbleFill: "#2A1E0C",
   rubbleCrack: "#9A7A44",
   score: "#FFD447",
