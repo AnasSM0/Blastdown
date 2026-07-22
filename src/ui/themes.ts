@@ -46,8 +46,16 @@ export type ThemePalette = {
    *  and stays distinct from the normal/warning/critical timer hues. */
   timerFrozen: string;
 
+  /** Cracked-rubble material (P1-6). `rubbleFill` is the graphite/basalt base,
+   *  `rubbleEdge` a darker border for the damaged tile, `rubbleFacet` a subtle
+   *  broken-surface patch for depth, `rubbleCrack` the dark fracture lines, and
+   *  `rubbleFissure` a restrained warm ember seam. Low visual priority — rubble
+   *  reads as blocked/damaged, never as a normal block. */
   rubbleFill: string;
+  rubbleEdge: string;
+  rubbleFacet: string;
   rubbleCrack: string;
+  rubbleFissure: string;
 
   score: string;
   accent: string;
@@ -99,7 +107,10 @@ const reactor: ThemePalette = {
   timerCritical: reactorColors.urgentRed,
   timerFrozen: "#9FEBFF",
   rubbleFill: reactorColors.boardFrame,
-  rubbleCrack: reactorColors.outline,
+  rubbleEdge: "#161619",
+  rubbleFacet: "#383842",
+  rubbleCrack: "#111114",
+  rubbleFissure: "#C05A34",
   score: reactorColors.scoreOrange,
   accent: reactorColors.cyanBlock,
   // Reactor is nudged toward the Premium deep navy/graphite reference here:
@@ -138,7 +149,10 @@ const arctic: ThemePalette = {
   timerCritical: "#FF6B8B",
   timerFrozen: "#CFF3FF",
   rubbleFill: "#20323F",
-  rubbleCrack: "#5E8298",
+  rubbleEdge: "#122029",
+  rubbleFacet: "#294050",
+  rubbleCrack: "#0E1A22",
+  rubbleFissure: "#C77A5A",
   score: "#7DE3FF",
   accent: "#8AB4FF",
   background: {
@@ -174,7 +188,10 @@ const magma: ThemePalette = {
   timerCritical: "#FF2E2E",
   timerFrozen: "#9AD9FF",
   rubbleFill: "#2A1811",
-  rubbleCrack: "#9A6146",
+  rubbleEdge: "#160B07",
+  rubbleFacet: "#3A241A",
+  rubbleCrack: "#140A06",
+  rubbleFissure: "#D2662E",
   score: "#FF7A1A",
   accent: "#FFB347",
   background: {
@@ -210,7 +227,10 @@ const voidTheme: ThemePalette = {
   timerCritical: "#FF4D6D",
   timerFrozen: "#A9DBFF",
   rubbleFill: "#1C1430",
-  rubbleCrack: "#6B5990",
+  rubbleEdge: "#0E0A1B",
+  rubbleFacet: "#271B40",
+  rubbleCrack: "#0C0818",
+  rubbleFissure: "#B4506A",
   score: "#C77DFF",
   accent: "#FF6EC7",
   background: {
@@ -246,7 +266,10 @@ const solar: ThemePalette = {
   timerCritical: "#FF5230",
   timerFrozen: "#8FD8FF",
   rubbleFill: "#2A1E0C",
-  rubbleCrack: "#9A7A44",
+  rubbleEdge: "#160F05",
+  rubbleFacet: "#392A12",
+  rubbleCrack: "#130D04",
+  rubbleFissure: "#CF6A2E",
   score: "#FFD447",
   accent: "#FF9E2C",
   background: {

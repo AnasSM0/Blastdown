@@ -23,7 +23,10 @@ const REQUIRED_COLOR_FIELDS: (keyof ThemePalette)[] = [
   "timerWarning",
   "timerCritical",
   "rubbleFill",
+  "rubbleEdge",
+  "rubbleFacet",
   "rubbleCrack",
+  "rubbleFissure",
   "score",
   "accent",
 ];
@@ -81,6 +84,21 @@ describe("theme palettes", () => {
       expect(theme.emptyCell).not.toBe(theme.boardBg);
       expect(theme.emptyCell).not.toBe(theme.rubbleFill);
       expect(theme.emptyCellBorder).not.toBe(theme.emptyCell);
+    }
+  });
+
+  it("defines a readable, layered rubble material for every theme (P1-6)", () => {
+    for (const theme of THEMES) {
+      // The rubble tile reads via contrast between its own layers…
+      expect(theme.rubbleEdge).not.toBe(theme.rubbleFill);
+      expect(theme.rubbleCrack).not.toBe(theme.rubbleFill);
+      expect(theme.rubbleFacet).not.toBe(theme.rubbleFill);
+      // …and stays distinct from empty cells and the three block hues so rubble
+      // never reads as a normal block.
+      expect(theme.rubbleFill).not.toBe(theme.emptyCell);
+      expect(theme.rubbleFill).not.toBe(theme.block.cyan);
+      expect(theme.rubbleFill).not.toBe(theme.block.purple);
+      expect(theme.rubbleFill).not.toBe(theme.block.amber);
     }
   });
 });

@@ -7,6 +7,7 @@ import { useTheme } from "../../ui/ThemeProvider";
 import { blockColor } from "../../ui/themes";
 import { blockSurface, type BlockVariant } from "../../ui/blockSurface";
 import { BlockSurface } from "../BlockSurface";
+import { RubbleSurface } from "../RubbleSurface";
 
 export type CellPreviewState = "valid" | "invalid" | "conflict";
 
@@ -125,17 +126,10 @@ export function GridCell({
       };
       break;
     case "rubble":
-      visual = {
-        backgroundColor: theme.rubbleFill,
-        borderWidth: 1,
-        borderColor: theme.outlineVariant,
-        alignItems: "center" as const,
-        justifyContent: "center" as const,
-      };
-      break;
     case "timed":
     case "normal":
-      // Transparent pressable; the BlockSurface child paints the tile.
+      // Transparent pressable; a child surface (BlockSurface / RubbleSurface)
+      // paints the tile.
       visual = undefined;
       break;
   }
@@ -179,10 +173,7 @@ export function GridCell({
         />
       ) : null}
       {cell.kind === "rubble" ? (
-        <>
-          <View style={[styles.crackA, { backgroundColor: theme.rubbleCrack }]} />
-          <View style={[styles.crackB, { backgroundColor: theme.rubbleCrack }]} />
-        </>
+        <RubbleSurface size={size} row={row} column={column} testID={`rubble-${row}-${column}`} />
       ) : null}
       {previewState
         ? (() => {
@@ -225,20 +216,6 @@ const styles = StyleSheet.create({
   cell: {
     borderRadius: radius.cell,
     overflow: "hidden",
-  },
-  crackA: {
-    position: "absolute",
-    width: "120%",
-    height: 1.5,
-    transform: [{ rotate: "35deg" }],
-    opacity: 0.7,
-  },
-  crackB: {
-    position: "absolute",
-    width: "80%",
-    height: 1.5,
-    transform: [{ rotate: "-50deg" }],
-    opacity: 0.5,
   },
   contour: {
     position: "absolute",

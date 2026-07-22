@@ -135,6 +135,27 @@ describe("GameBoard", () => {
     expect(result.getByLabelText(/game board/i)).toBeTruthy();
   });
 
+  it("renders a full board of rubble stably without warnings (P1-6)", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    const grid = Array.from({ length: 8 }, (_, row) =>
+      Array.from({ length: 8 }, (_unused, column): GridCell => ({
+        kind: "rubble",
+        explosionId: `e-${row}-${column}`,
+      })),
+    );
+
+    const result = await render(<GameBoard grid={grid} badges={[]} boardSize={328} />);
+
+    // Every cell is a rubble tile, board still exactly 64 cells, no console noise.
+    expect(result.getAllByTestId(/^cell-\d+-\d+$/)).toHaveLength(64);
+    expect(result.getAllByTestId(/^rubble-\d+-\d+$/)).toHaveLength(64);
+    expect(warn).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+    warn.mockRestore();
+    error.mockRestore();
+  });
+
   it("renders the explosion effect overlay over the rubble it produced", async () => {
     const grid = makeEmptyGrid(8);
     grid[4][4] = { kind: "rubble", explosionId: "e-1" };
