@@ -886,3 +886,33 @@ tokens added; the contour reuses the existing `blockColor` mapping.
 - reduced-motion gated); the badge effect keys on the resolved `pulseState`
   primitive, so ordinary rerenders never restart the loop. No new animation was
   introduced; the major flip/roll animation remains deferred to Phase 2.
+
+### P1-5 file-boundary reconciliation (2026-07-22)
+
+A stop-time review flagged that the P1-5 implementation commit (`1faabad`)
+edited files outside the task's original `Allowed` list. Reviewed against the
+governing constraints — none touched a PROTECTED path (`src/domain/**`, balance,
+persistence, economy, analytics/diagnostics, reward logic, ad config,
+`BUILD_SPEC.md`) or any DO-NOT item — and reconciled as follows:
+
+- `src/ui/timerBadgeStyle.ts` → **moved** to
+  `src/components/TimerBadge/timerBadgeStyle.ts` (test likewise to
+  `__tests__/components/`). It is consumed only by `TimerBadge`, so co-locating
+  it puts it squarely inside the allowed `src/components/TimerBadge/**` boundary.
+  (Unlike P1-4's `blockSurface.ts`, which is shared by GridCell/PieceTray/
+  DragGhost and correctly lives in `src/ui/`.)
+- `src/ui/themes.ts` — **kept**, boundary widened. The `timerFrozen` semantic
+  token is required by P1-5's own "use semantic tokens / verify five themes"
+  acceptance; hardcoding an icy color outside the theme system would violate it.
+- `app/game.tsx` — **kept**, boundary widened. A single line threads the
+  already-computed global `freezeActive` boolean to `GameBoard` so badges can
+  show the frozen cue. Freeze is global state; this is wiring, not a Freeze/
+  Defuse redesign (which remains forbidden). Mirrors the P1-2 precedent of
+  wiring HUD data through `game.tsx`.
+- `src/components/GridCell/index.ts` — **kept**, mechanical. Re-exports the new
+  `CellEdges` type declared in the allowed `GridCell.tsx` so the allowed
+  `GameBoard.tsx` can import it.
+
+The `docs/TASKS.md` P1-5 `Allowed` list has been updated to record this widened
+boundary. No functional code changed in the reconciliation beyond the file move
+and its import-path fixups.

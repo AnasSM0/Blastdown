@@ -1,4 +1,4 @@
-import { getBadgeVisual } from "../../src/ui/timerBadgeStyle";
+import { getBadgeVisual } from "../../src/components/TimerBadge/timerBadgeStyle";
 import { getPulseConfig } from "../../src/ui/timerPulse";
 import { THEMES, resolveTheme } from "../../src/ui/themes";
 

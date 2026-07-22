@@ -4,7 +4,7 @@ import { Animated, StyleSheet, Text } from "react-native";
 import { useTheme } from "../../ui/ThemeProvider";
 import { getTimerVisualState } from "../../ui/timerStates";
 import { getPulseConfig } from "../../ui/timerPulse";
-import { getBadgeVisual } from "../../ui/timerBadgeStyle";
+import { getBadgeVisual } from "./timerBadgeStyle";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 
 type TimerBadgeProps = {

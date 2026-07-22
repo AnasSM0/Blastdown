@@ -1,7 +1,7 @@
 import type { ViewStyle } from "react-native";
 
-import { glowFor, type ThemePalette } from "./themes";
-import type { TimerVisualState } from "./timerStates";
+import { glowFor, type ThemePalette } from "../../ui/themes";
+import type { TimerVisualState } from "../../ui/timerStates";
 
 /** The flattened visual description of a timer badge for one countdown/frozen
  *  state. Pure and theme-driven so the mapping is unit-testable without
