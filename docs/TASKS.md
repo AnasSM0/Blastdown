@@ -939,15 +939,32 @@ scoring, timer, persistence, economy, analytics, reward, or domain change.**
     no source metadata (defuse removes the timer), so it is intentionally not a
     distinct badge state — left for whenever such metadata exists.
 
-- [ ] **P1-6 Cracked rubble**
-  - Allowed: `src/components/GridCell/GridCell.tsx` (rubble case), theme tokens
-    (`rubbleFill`/`rubbleCrack`).
+- [x] **P1-6 Cracked rubble** — done 2026-07-22
+      (branch `phase-professional-polish-1-rubble`). See
+      `docs/VISUAL_POLISH_REVIEW.md` §"Phase 1 · P1-6".
+  - Allowed: `src/components/GridCell/GridCell.tsx` (rubble case) + a new
+    co-located `src/components/RubbleSurface/**` (tile + pure geometry helper),
+    rubble theme tokens.
   - Forbidden: domain rubble rules.
   - Depends on: P1-3.
   - Acceptance: cracked-stone treatment (base fill + branching cracks) replaces
     the "X"; visually distinct from blocks and empty cells; theme-aware; cheap.
   - Tests: rubble cell renders crack elements and keeps its "Rubble" a11y label.
   - Verify: full battery.
+  - Result: new `src/components/RubbleSurface/**` — a programmatic cracked-
+    graphite tile (basalt base + darker edge + subtle facets for depth + two or
+    three irregular dark cracks, one carrying a restrained warm ember seam), all
+    static Views (no image/SVG/blur/large shadow), `pointerEvents="none"`, small
+    `radius.cell`. Crack/facet layout comes from a pure `getRubbleGeometry(row,
+column)` — deterministic, never randomized at render — so a full rubble board
+    looks varied but stable. `GridCell` rubble case now renders a transparent
+    pressable + `<RubbleSurface>` (the placeholder X is gone), keeping the
+    "Rubble" a11y label, hit testing, and placement rejection. Three new rubble
+    tokens (`rubbleEdge`/`rubbleFacet`/`rubbleFissure`) + darkened `rubbleCrack`
+    across all five themes; Reactor is the reference, fissure warm but restrained
+    per theme. 83 suites / 475 tests, coverage 89.83% (RubbleSurface +
+    rubbleGeometry 100%, GridCell 97.36%), doctor 20/20, Android export ✅. No
+    device → after-screenshot not captured (recorded, not fabricated).
 
 - [ ] **P1-7 Stable three-slot tray**
   - Allowed: `src/components/PieceTray/**`.

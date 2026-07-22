@@ -916,3 +916,42 @@ persistence, economy, analytics/diagnostics, reward logic, ad config,
 The `docs/TASKS.md` P1-5 `Allowed` list has been updated to record this widened
 boundary. No functional code changed in the reconciliation beyond the file move
 and its import-path fixups.
+
+## Phase 1 · P1-6 — Cracked rubble (2026-07-22)
+
+**Rubble is a dedicated programmatic tile, co-located with its consumer.** New
+`src/components/RubbleSurface/**` renders a "cracked graphite" cell: a basalt
+base (`rubbleFill`), a darker border (`rubbleEdge`), one or two subtle angular
+facets (`rubbleFacet`, low opacity) for broken-surface depth, and two or three
+irregular dark cracks (`rubbleCrack`) — one of them carrying a thin warm ember
+seam (`rubbleFissure`). All static Views; `overflow: hidden` clips every crack
+inside the cell. This replaces the two-bar "X" placeholder, which read as a
+marker, not damage. The module lives beside `GridCell` (its only consumer),
+following the single-consumer precedent set when P1-5's `timerBadgeStyle.ts` was
+co-located.
+
+**Damage is deterministic, never randomized at render.** `getRubbleGeometry(row,
+column)` picks a crack set and a facet set by a pure function of the cell
+coordinates (`(row*3 + column*7) % n` and `(row+column) % m`). The same cell
+always draws the same damage — no `Math.random` in render, so there is no
+flicker on rerender and a full board of rubble still looks varied. No image
+textures, SVG dependency, blur, or large shadow is used.
+
+**Rubble stays low-priority and distinct.** The graphite base is darker and
+desaturated versus the block accents and the empty-cell fill, so rubble never
+reads as a normal block; badges and piece contours are only computed for timed
+cells, so neither is ever drawn on rubble. The `RubbleSurface` is
+`pointerEvents="none"`, so the pressable behind it keeps hit testing and the
+domain's placement rejection unchanged (no gameplay or event change).
+
+**Three new tokens, one darkened.** Added `rubbleEdge`, `rubbleFacet`, and
+`rubbleFissure` to `ThemePalette` and all five palettes, and darkened the
+existing `rubbleCrack` (previously a light outline used by the X) to a true
+fracture tone. Reactor is the reference; each theme's fissure is a restrained
+warm ember (cool themes included, since damage reads as warmth). `rubbleFill` is
+unchanged. Tokens are rubble-only, so darkening `rubbleCrack` affects nothing
+else.
+
+**Deferred (unchanged from spec):** rubble creation/clear and settling
+animations remain Phase 3 work; Phase 1 rubble is static, so reduced motion needs
+no special handling.

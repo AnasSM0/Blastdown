@@ -53,14 +53,32 @@ describe("GridCell premium block surfaces (P1-4)", () => {
 
   it("keeps empty, filled, and rubble surfaces visually distinct", async () => {
     const empty = fillOf(await renderCell({ kind: "empty" }));
-    const rubble = fillOf(await renderCell({ kind: "rubble", explosionId: "e1" }));
+    const rubbleResult = await render(
+      <GridCell cell={{ kind: "rubble", explosionId: "e1" }} row={0} column={0} size={40} />,
+    );
+    const rubble = fillOf(rubbleResult.getByTestId("rubble-0-0"));
     const filledResult = await render(
       <GridCell cell={{ kind: "normal", colorId: "cyan" }} row={0} column={0} size={40} />,
     );
     const filled = fillOf(filledResult.getByTestId("block-0-0"));
+    // Rubble uses its own graphite base, distinct from the empty cell and blocks.
+    expect(rubble).toBe(reactor.rubbleFill);
     expect(empty).not.toBe(filled);
     expect(empty).not.toBe(rubble);
     expect(filled).not.toBe(rubble);
+  });
+
+  it("renders the cracked rubble surface (no placeholder X) as a non-interactive tile", async () => {
+    const result = await render(
+      <GridCell cell={{ kind: "rubble", explosionId: "e1" }} row={2} column={3} size={40} />,
+    );
+    const tile = result.getByTestId("rubble-2-3");
+    expect(tile).toBeTruthy();
+    // The rubble surface never intercepts touches; the pressable behind it does.
+    expect(tile.props.pointerEvents).toBe("none");
+    // It is not a block tile and keeps its blocked/rubble label.
+    expect(result.queryByTestId("block-2-3")).toBeNull();
+    expect(result.getByLabelText(/rubble.*row 3.*column 4/i)).toBeTruthy();
   });
 
   it("intensifies a critical timed block without losing its color", async () => {

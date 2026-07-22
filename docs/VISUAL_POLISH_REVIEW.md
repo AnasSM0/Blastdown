@@ -484,3 +484,67 @@ it looks too subtle, lightening the contour tone or a dedicated `timerContour`
 token is the follow-up. (3) Frozen is driven by the global freeze flag, so all
 badges show frozen together (correct — freeze pauses all timers); if per-piece
 freeze is ever added, thread a per-badge flag instead.
+
+## Phase 1 · P1-6 — Cracked rubble
+
+**Scope:** replace the placeholder X/cross rubble mark with a premium cracked-
+graphite tile, without touching explosion/rubble gameplay or clear rules.
+
+**Rubble material decisions:**
+
+- New `src/components/RubbleSurface/**`: a static "cracked graphite" tile — dark
+  basalt base (`rubbleFill`), darker edge (`rubbleEdge`), one or two subtle
+  angular facets (`rubbleFacet`) for broken-surface depth, two or three irregular
+  dark cracks (`rubbleCrack`), and a restrained warm ember seam (`rubbleFissure`)
+  along the main fissure. Small `radius.cell`, low visual priority — reads as
+  damaged/blocked, never as a normal block.
+- All cheap static Views: no image texture, SVG dependency, blur, or large
+  shadow. `overflow: hidden` clips cracks to the cell bounds.
+- Layout is chosen by a pure `getRubbleGeometry(row, column)` — deterministic per
+  cell, never randomized at render — so a full board of rubble looks varied but
+  renders identically each frame.
+
+**State distinction:** the graphite base is desaturated and darker than the block
+accents and the empty-cell fill, so rubble stays distinct from empty cells,
+filled blocks, valid/invalid previews (accent-tinted overlays), critical timed
+blocks, and line-clear/defuse effects. Countdown badges and piece contours are
+computed only for timed cells, so neither is ever placed on rubble.
+
+**Accessibility / performance:** the "Rubble, row R, column C" a11y label is
+preserved; `RubbleSurface` is `pointerEvents="none"`, so the pressable behind it
+keeps hit testing and the domain's placement rejection intact. A full 64-cell
+rubble board renders with no warnings (tested). Phase 1 rubble is static, so
+reduced motion needs no special handling; creation/clear animations remain Phase 3.
+
+**Themes:** three new rubble tokens (`rubbleEdge`, `rubbleFacet`,
+`rubbleFissure`) added to all five palettes; `rubbleCrack` darkened from the old
+light outline to a true fracture tone. Reactor is the reference; each theme's
+fissure is a restrained warm ember (Arctic/Magma/Void/Solar included). Only the
+tokens the rubble material needs were added.
+
+**Tests:** `rubbleGeometry.test.ts` (new) — determinism, per-board variation, two
+or three cracks with exactly one fissure, anchors within bounds;
+`GridCell.test.tsx` — rubble renders the `RubbleSurface` tile (no placeholder X),
+non-interactive, keeps its label, base fill distinct from empty and blocks, no
+`BlockSurface`; `GameBoard.test.tsx` — a full 64-cell rubble board renders
+stably with no console warnings/errors; `themes.test.ts` — the new rubble tokens
+are valid and the material is layered and distinct in every theme. Full suite:
+**83 suites / 475 tests** green; coverage **89.83%** (RubbleSurface +
+rubbleGeometry 100%, GridCell 97.36%).
+
+**Verification:** typecheck ✅, lint ✅, test ✅, coverage ✅ 89.83%,
+format:check ✅, expo-doctor ✅ 20/20, `expo export --platform android` ✅.
+
+**Screenshot / device finding:** no Android device/emulator available, so
+`docs/current game images/phase1-p6-rubble-after.jpg` was **not** produced —
+recorded here, not fabricated. Android export succeeds. On-device visual
+confirmation deferred.
+
+**Risks:** (1) The rubble tile adds up to ~6 static sub-Views per cell (facets +
+cracks + fissure); a full 64-cell rubble board is well within budget (tested
+warning-free) but is the heaviest per-cell surface so far — watch on low-end
+devices. (2) Fissure tones are alpha/lightness-tuned per theme, not validated on
+a device — confirm the ember stays restrained (not alarming) against each
+theme's base when a device is available. (3) The deterministic layout draws from
+four crack sets; large rubble fields will visibly repeat layouts — acceptable for
+Phase 1, expandable later if needed.
