@@ -50,9 +50,12 @@ export function BlockSurface({ size, surface, children, testID }: BlockSurfacePr
 }
 
 const styles = StyleSheet.create({
+  // No `overflow: hidden`: a rounded, clipped View on an Android hardware layer
+  // (the parent cell's transform) renders its background black instead of the
+  // fill — the placed-block "turns black" bug. The sheen self-clips via its own
+  // rounded top corners instead of relying on the tile clipping it.
   tile: {
     borderRadius: radius.cell,
-    overflow: "hidden",
   },
   // Upper-inner highlight: a soft sheen across the top of the tile that fades
   // by sitting at low opacity, giving the block a lit, slightly inset feel.
@@ -63,5 +66,7 @@ const styles = StyleSheet.create({
     right: 0,
     height: "45%",
     opacity: 0.22,
+    borderTopLeftRadius: radius.cell,
+    borderTopRightRadius: radius.cell,
   },
 });

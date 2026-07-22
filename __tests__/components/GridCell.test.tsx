@@ -171,6 +171,9 @@ describe("GridCell premium block surfaces (P1-4)", () => {
     expect(tile.elevation).toBeUndefined();
     expect(tile.shadowColor).toBeUndefined();
     expect(tile.shadowRadius).toBeUndefined();
+    // No `overflow: hidden`: a rounded clipped view on an Android hardware layer
+    // renders black — the placed-block "turns black" bug. It must not be set.
+    expect(tile.overflow).not.toBe("hidden");
     // Body is fully opaque and uses the normal (not disabled/preview) material.
     expect(tile.opacity).toBe(1);
     expect(tile.backgroundColor).toBe(
@@ -178,15 +181,32 @@ describe("GridCell premium block surfaces (P1-4)", () => {
     );
   });
 
-  it("does not paint empty-cell chrome on an occupied cell (device regression)", async () => {
+  it("does not paint empty-cell chrome or clip an occupied cell (device regression)", async () => {
     // The occupied cell's pressable stays transparent so nothing renders above
-    // the block body; the empty-cell fill must never appear on a placed cell.
+    // the block body; the empty-cell fill must never appear on a placed cell,
+    // and the cell must not clip (overflow:hidden → Android black box).
     const result = await render(
       <GridCell cell={{ kind: "normal", colorId: "cyan" }} row={0} column={0} size={40} />,
     );
     const cell = styleOf(result.getByTestId("cell-0-0"));
     expect(cell.backgroundColor).toBeUndefined();
     expect(cell.backgroundColor).not.toBe(reactor.emptyCell);
+    expect(cell.overflow).not.toBe("hidden");
+  });
+
+  it("omits the cell transform under reduced motion (no needless hardware layer)", async () => {
+    // Under reduced motion no flash runs, so no transform is applied — avoiding
+    // the Android hardware layer that triggers the rounded-view black box.
+    const result = await render(
+      <GridCell
+        cell={{ kind: "normal", colorId: "cyan" }}
+        row={0}
+        column={0}
+        size={40}
+        reducedMotion
+      />,
+    );
+    expect(styleOf(result.getByTestId("cell-0-0")).transform).toBeUndefined();
   });
 
   it("keeps a timed piece's contour border-only with a transparent interior", async () => {

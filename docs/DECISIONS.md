@@ -1065,3 +1065,27 @@ entry), so "Codex Task A" (the cycle refactor) was done by Claude single-writer.
 on-device reproduction, the magenta binary diagnostic, and the real
 `android-placed-blocks-fixed.jpg` are the human's step — the diagnostics are
 provided for that run. The code fix + all static verification are complete.
+
+## Android placed-block "turns black" — the actual cause (2026-07-22)
+
+Removing the block-body elevation was still not enough: on the phone, dropped
+blocks **turned black** (no colour) and appeared to hide behind the grid. This is
+the well-known Android bug where a View with **`overflow: hidden` + `borderRadius`
+promoted to a hardware layer renders its background black** instead of its fill.
+The promotion came from `GridCell`'s `transform: [{ scale }]` (applied even under
+reduced motion, which the device has on, at identity scale). Tray mini-cells set
+no `overflow: hidden`, so they stayed coloured — matching the symptom exactly.
+
+**Fix:**
+
+- `BlockSurface` tile and the `GridCell` occupied cell no longer set
+  `overflow: hidden` (the child surfaces already match the cell size, so nothing
+  needs clipping). The sheen now self-clips via its own rounded top corners.
+- The cell `transform` is omitted entirely under reduced motion (no flash runs
+  then), so the reduced-motion device no longer promotes cells to a hardware
+  layer at all.
+
+Guarded by GridCell tests asserting the block tile and occupied cell never set
+`overflow: hidden` and that no transform is applied under reduced motion. Rubble
+keeps its own `overflow: hidden` (needed to clip crack geometry); on the
+reduced-motion device the cell transform is gone, so it is not layer-promoted.
