@@ -1009,3 +1009,13 @@ a device screenshot"). Luminance over the empty cell (L=29): BEFORE placed cyan
 on-device `placed-block-visibility-fixed.jpg` is still required for final
 approval; the computed SVG stands in only as analysis until a device is
 available.
+
+**Board-level render (addendum).** Since Chrome is available on the build
+machine, a faithful full-board before/after was also rasterized from an HTML
+replica using the exact `blockSurface` outputs (RN Views map 1:1 to CSS boxes):
+`docs/current game images/placed-block-visibility-comparison-render.png`. It
+reproduces the reported symptom — BEFORE, placed blocks are outline-only and sink
+into the board (matching "visible in tray/drag, dark after placement"); AFTER,
+the opaque body reads clearly for cyan/violet/amber. It is a Chrome render, still
+**not** an Android device screenshot; the on-device `placed-block-visibility-fixed.jpg`
+remains required for final sign-off (see `HOW-TO-CAPTURE-placed-block-visibility-fixed.md`).

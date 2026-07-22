@@ -605,3 +605,10 @@ images/placed-block-visibility-comparison-computed.svg` — clearly labelled as
 computed, not a device screenshot. Luminance vs the empty cell (L=29): BEFORE
 cyan 49 / violet 33 / amber 52; AFTER 121 / 58 / 134. The on-device
 `placed-block-visibility-fixed.jpg` remains required for final sign-off.
+
+**Board-level render (addendum):** a faithful full-board before/after was
+rasterized via headless Chrome from an HTML replica of the exact `blockSurface`
+outputs — `docs/current game images/placed-block-visibility-comparison-render.png`.
+BEFORE shows placed blocks as outline-only/dark (the reported regression); AFTER
+shows clearly-coloured opaque bodies. Chrome render, not an Android screenshot;
+the on-device capture is still required for sign-off.
