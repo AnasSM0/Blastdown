@@ -12,6 +12,10 @@ function fillOf(node: { props: Record<string, unknown> }): unknown {
   return StyleSheet.flatten(node.props.style as ViewStyle)?.backgroundColor;
 }
 
+function styleOf(node: { props: Record<string, unknown> }): ViewStyle {
+  return (StyleSheet.flatten(node.props.style as ViewStyle) ?? {}) as ViewStyle;
+}
+
 async function renderCell(cell: DomainGridCell, extra?: Record<string, unknown>) {
   const result = await render(
     <GridCell cell={cell} row={0} column={0} size={40} onPress={() => {}} {...extra} />,
@@ -155,6 +159,67 @@ describe("GridCell premium block surfaces (P1-4)", () => {
       <GridCell cell={{ kind: "normal", colorId: "cyan" }} row={0} column={0} size={40} />,
     );
     expect(result.queryByTestId("contour-0-0")).toBeNull();
+  });
+
+  it("renders the placed block body with no Android elevation/shadow (device regression)", async () => {
+    // An elevated child inside the cell's animated transform parent fails to
+    // render on Android; the body must stay a plain opaque layer.
+    const result = await render(
+      <GridCell cell={{ kind: "normal", colorId: "cyan" }} row={0} column={0} size={40} />,
+    );
+    const tile = styleOf(result.getByTestId("block-0-0"));
+    expect(tile.elevation).toBeUndefined();
+    expect(tile.shadowColor).toBeUndefined();
+    expect(tile.shadowRadius).toBeUndefined();
+    // Body is fully opaque and uses the normal (not disabled/preview) material.
+    expect(tile.opacity).toBe(1);
+    expect(tile.backgroundColor).toBe(
+      blockSurface(reactor, blockColor(reactor, "cyan"), "normal").fill,
+    );
+  });
+
+  it("does not paint empty-cell chrome on an occupied cell (device regression)", async () => {
+    // The occupied cell's pressable stays transparent so nothing renders above
+    // the block body; the empty-cell fill must never appear on a placed cell.
+    const result = await render(
+      <GridCell cell={{ kind: "normal", colorId: "cyan" }} row={0} column={0} size={40} />,
+    );
+    const cell = styleOf(result.getByTestId("cell-0-0"));
+    expect(cell.backgroundColor).toBeUndefined();
+    expect(cell.backgroundColor).not.toBe(reactor.emptyCell);
+  });
+
+  it("keeps a timed piece's contour border-only with a transparent interior", async () => {
+    const result = await render(
+      <GridCell
+        cell={{ kind: "timed", colorId: "cyan", pieceInstanceId: "p1" }}
+        row={0}
+        column={0}
+        size={40}
+        contourEdges={{ top: true, right: true, bottom: true, left: true }}
+      />,
+    );
+    const contour = styleOf(result.getByTestId("contour-0-0"));
+    // No fill — the block body shows through the contour's interior.
+    expect(contour.backgroundColor).toBeUndefined();
+  });
+
+  it("keeps the placed block fully visible under reduced motion (device regression)", async () => {
+    // Reduced motion must affect animation only, never static visibility.
+    const result = await render(
+      <GridCell
+        cell={{ kind: "normal", colorId: "amber" }}
+        row={0}
+        column={0}
+        size={40}
+        reducedMotion
+      />,
+    );
+    const tile = styleOf(result.getByTestId("block-0-0"));
+    expect(tile.opacity).toBe(1);
+    expect(tile.backgroundColor).toBe(
+      blockSurface(reactor, blockColor(reactor, "amber"), "normal").fill,
+    );
   });
 
   it("does not render a block tile for empty or rubble cells", async () => {
