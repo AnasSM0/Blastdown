@@ -324,3 +324,82 @@ intentional. (2) The hairline inner ring at very small board widths (≈320px)
 sits close to the outer frame; still legible, revisit if it reads as a double
 line on-device. (3) Non-Reactor frame/empty tokens were derived, not tuned
 on-device — validate contrast against blocks/rubble when a device is available.
+
+---
+
+## Phase 1 · P1-4 — Premium block surfaces (2026-07-22)
+
+Fourth Phase 1 task. Scope: replace the outline-only filled cells with a shared,
+layered "energy tile" material and give every block state a distinct, readable
+treatment — no timer, rubble, tray-restructure, action-dock, or animation work.
+
+**Files changed:**
+
+- `src/ui/blockSurface.ts` — new. Pure `blockSurface(theme, accent, variant)`
+  returning a flattened surface (`fill`, `edge`, `borderWidth`, `highlight`,
+  `glow`, `opacity`, `dashed`) for eight states: `normal`, `tray`, `selected`,
+  `critical`, `disabled`, `previewValid`, `previewInvalid`, `previewConflict`.
+  All alpha/tint math lives here, so components hold no scattered hex.
+- `src/components/BlockSurface/**` — new. Renders one layered tile: dark
+  translucent themed fill + saturated edge + restrained glow + an upper-inner
+  highlight sheen, small consistent radius. Static Views only (no blur, image,
+  or animated shadow).
+- `src/components/GridCell/GridCell.tsx` — filled `timed`/`normal` cells now
+  render a `BlockSurface` (variant `critical` when flagged, else `normal`);
+  empty/rubble keep their P1-3 treatments. Preview overlays route through the
+  shared variants: valid = solid accent, invalid/conflict = the theme's danger
+  hue with a **dashed** edge (the non-color cue).
+- `src/components/GameBoard/GameBoard.tsx` — derives the set of urgent piece ids
+  from the badge data already supplied (`getTimerVisualState(remainingTurns) ===
+"urgent"`) and passes `critical` to those pieces' timed cells. No new timer
+  logic, no piece-grouping logic — just reads existing metadata.
+- `src/components/PieceTray/PieceTray.tsx` — tray mini-cells use the shared `tray`
+  material; the dragged piece's tray copy uses the `disabled` material
+  (consumed: no glow, reduced priority); the selected slot uses the `selected`
+  material (saturated edge + stronger glow).
+- `src/components/DragGhost/DragGhost.tsx` — the dragged ghost uses `previewValid`
+  (solid) / `previewInvalid` (dashed danger edge) so a bad drop is unmistakable
+  while the piece color identity is retained in the fill.
+
+**Material / state decisions:**
+
+- One shared material across board, tray, and ghost, keyed on the piece's
+  `colorId` → `blockColor` accent, so cyan/violet/amber identity is preserved
+  everywhere and cells of one piece read as related (same material + edge
+  intensity) without any UI-side grouping logic.
+- Critical preserves color: the danger read is a thicker saturated edge + a
+  stronger glow + a brighter highlight, never a recolor.
+- Disabled/consumed loses glow and drops opacity — clearly de-emphasized.
+- Valid vs invalid preview differ by pattern (solid vs dashed), not color alone
+  — an accessibility-safe non-color cue.
+
+**Token changes:** none added — P1-4 reuses existing `blockColor` mapping and the
+per-theme `accent`/`timerCritical`/glow tokens; the new `blockSurface` module is
+the single place that tints them. No gameplay-critical color is hardcoded in a
+component.
+
+**Tests:** `blockSurface.test.ts` (new) — premium material for all three colors,
+normal/selected/critical/disabled distinct, critical keeps color, dashed
+non-color cue for invalid/conflict, valid strings for every state under all five
+themes; `GridCell.test.tsx` — filled cells render the shared tile per color,
+empty/filled/rubble distinct, critical intensifies without recolor, no tile for
+empty/rubble; `GameBoard.test.tsx` — critical material applies only to urgent
+timed pieces; `PieceTray.test.tsx` (unchanged) — selection, drag-dim (opacity
+0.4), tap all still pass. Full suite: **81 suites / 457 tests** green; coverage
+**89.61%** (`blockSurface` 100%).
+
+**Verification:** typecheck ✅, lint ✅, test ✅, coverage ✅ 89.61%,
+format:check ✅, expo-doctor ✅ 20/20, `expo export --platform android` ✅.
+
+**Screenshot / device finding:** no Android device/emulator available, so
+`docs/current game images/phase1-p4-block-surfaces-after.jpg` was **not**
+produced — recorded here, not fabricated. Android export succeeds, confirming
+the block surfaces build. On-device visual confirmation deferred.
+
+**Risks:** (1) Each filled block adds one static sheen sub-View; on a very full
+board that is up to ~64 extra Views — static and cheap (no blur/animation), but
+worth watching on low-end devices. (2) The "critical" threshold reuses the
+existing urgent visual state (≤1 move); if design later wants warning (2 moves)
+to also intensify, extend `criticalPieceIds`. (3) Non-Reactor block materials
+are alpha-tinted from each theme's accents, not tuned on-device — validate
+contrast against empty cells and rubble when a device is available.

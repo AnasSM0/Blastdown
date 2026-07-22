@@ -5,6 +5,7 @@ import { getShapeById } from "../../domain/shapes";
 import { spacing } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import { blockColor } from "../../ui/themes";
+import { blockSurface } from "../../ui/blockSurface";
 
 /** How far above the fingertip the dragged piece floats so it stays visible
  *  under the thumb (BUILD_SPEC.md §6.5 drag ergonomics). Exported so the
@@ -90,6 +91,11 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
   }
 
   const accent = blockColor(theme, colorId);
+  // Shared preview material: valid = solid piece accent; invalid = a dashed
+  // edge in the theme's danger hue (the non-color cue), fill keeps the piece
+  // identity so the player still recognizes which piece is being dragged.
+  const surface = blockSurface(theme, accent, valid ? "previewValid" : "previewInvalid");
+  const cellBorderColor = valid ? surface.edge : theme.timerCritical;
   const maxRow = Math.max(...shape.cells.map((cell) => cell.row));
   const maxColumn = Math.max(...shape.cells.map((cell) => cell.column));
   const pitch = cellSize + GUTTER;
@@ -117,7 +123,8 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
               top: cell.row * pitch,
               left: cell.column * pitch,
               backgroundColor: `${accent}55`,
-              borderColor: valid ? accent : "#FFB4AB",
+              borderColor: cellBorderColor,
+              borderStyle: surface.dashed ? "dashed" : "solid",
             },
           ]}
         />

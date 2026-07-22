@@ -6,6 +6,7 @@ import type { PlacementPreview, TimerBadgePlacement } from "../../domain/selecto
 import type { CellPosition } from "../../domain/placement";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import type { EffectPlan } from "../../ui/effects/eventEffects";
+import { getTimerVisualState } from "../../ui/timerStates";
 import { radius, spacing } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import { EffectsLayer } from "../effects/EffectsLayer";
@@ -100,6 +101,15 @@ function GameBoardImpl(
 
   const placedSet = new Set((placedCells ?? []).map((cell) => `${cell.row},${cell.column}`));
 
+  // Pieces whose countdown is urgent, from the badge data already supplied —
+  // drives the "critical" block material on their cells. Reuses the existing
+  // visual-state threshold; no new timer logic or piece grouping is introduced.
+  const criticalPieceIds = new Set(
+    badges
+      .filter((badge) => getTimerVisualState(badge.remainingTurns) === "urgent")
+      .map((badge) => badge.pieceId),
+  );
+
   const previewMap = new Map<string, CellPreviewState>();
   if (preview) {
     for (const cell of preview.cells) {
@@ -174,6 +184,7 @@ function GameBoardImpl(
                       cell.kind === "timed" &&
                       cell.pieceInstanceId === highlightPieceId
                     }
+                    critical={cell.kind === "timed" && criticalPieceIds.has(cell.pieceInstanceId)}
                     onPress={onCellPress ? () => onCellPress({ row, column }) : undefined}
                     flashNonce={placedSet.has(`${row},${column}`) ? placementNonce : undefined}
                     reducedMotion={reducedMotion}

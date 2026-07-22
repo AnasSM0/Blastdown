@@ -8,7 +8,8 @@ import { useReducedMotion } from "../../hooks/useReducedMotion";
 import type { Point } from "../../ui/boardGeometry";
 import { colors, radius, spacing } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
-import { blockColor, glowFor } from "../../ui/themes";
+import { blockColor } from "../../ui/themes";
+import { blockSurface } from "../../ui/blockSurface";
 
 type PieceTrayProps = {
   hand: readonly HandPiece[];
@@ -33,13 +34,24 @@ const DRAG_ACTIVATION_DISTANCE = 8;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-function MiniShape({ shapeId, colorId }: { shapeId: string; colorId: string }) {
+function MiniShape({
+  shapeId,
+  colorId,
+  dragging,
+}: {
+  shapeId: string;
+  colorId: string;
+  dragging: boolean;
+}) {
   const theme = useTheme();
   const shape = getShapeById(shapeId);
   if (!shape) {
     return null;
   }
   const accent = blockColor(theme, colorId);
+  // Tray blocks share the board's energy-tile material; while the piece is being
+  // dragged its tray copy reads as consumed (disabled variant: no glow/priority).
+  const surface = blockSurface(theme, accent, dragging ? "disabled" : "tray");
   const maxRow = Math.max(...shape.cells.map((cell) => cell.row));
   const maxColumn = Math.max(...shape.cells.map((cell) => cell.column));
   const width = (maxColumn + 1) * (MINI_CELL + MINI_GAP) - MINI_GAP;
@@ -55,8 +67,9 @@ function MiniShape({ shapeId, colorId }: { shapeId: string; colorId: string }) {
             {
               top: cell.row * (MINI_CELL + MINI_GAP),
               left: cell.column * (MINI_CELL + MINI_GAP),
-              backgroundColor: `${accent}33`,
-              borderColor: accent,
+              backgroundColor: surface.fill,
+              borderColor: surface.edge,
+              opacity: surface.opacity,
             },
           ]}
         />
@@ -107,13 +120,16 @@ function TraySlot({
     return () => animation.stop();
   }, [selected, reducedMotion, lift]);
 
+  // The selected tray piece takes the shared "selected" block material — a
+  // saturated edge and a stronger glow keyed to its own color.
+  const selectedSurface = blockSurface(theme, blockColor(theme, piece.colorId), "selected");
   const slot = (
     <AnimatedPressable
       onPress={() => onSelect(piece.handId)}
       style={[
         styles.slot,
-        selected && styles.slotSelected,
-        selected && glowFor(theme, blockColor(theme, piece.colorId), "low"),
+        selected && { borderColor: selectedSurface.edge },
+        selected && selectedSurface.glow,
         dragging && styles.slotDragging,
         { transform: [{ scale: lift }] },
       ]}
@@ -123,7 +139,7 @@ function TraySlot({
       accessibilityState={{ selected }}
       testID={`tray-piece-${piece.handId}`}
     >
-      <MiniShape shapeId={piece.shapeId} colorId={piece.colorId} />
+      <MiniShape shapeId={piece.shapeId} colorId={piece.colorId} dragging={dragging} />
     </AnimatedPressable>
   );
 
@@ -192,9 +208,6 @@ const styles = StyleSheet.create({
     borderColor: colors.outlineVariant,
     alignItems: "center",
     justifyContent: "center",
-  },
-  slotSelected: {
-    borderColor: colors.onSurface,
   },
   slotDragging: {
     opacity: 0.4,

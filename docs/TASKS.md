@@ -878,7 +878,9 @@ scoring, timer, persistence, economy, analytics, reward, or domain change.**
     448 tests, coverage 89.59%, doctor 20/20, Android export ✅. No device →
     after-screenshot not captured (recorded, not fabricated).
 
-- [ ] **P1-4 Premium block surfaces**
+- [x] **P1-4 Premium block surfaces** — done 2026-07-22
+      (branch `phase-professional-polish-1-block-surfaces`). See
+      `docs/VISUAL_POLISH_REVIEW.md` §"Phase 1 · P1-4".
   - Allowed: `src/components/GridCell/GridCell.tsx` (timed/normal), an optional
     `BlockSurface` subcomponent, theme tokens.
   - Forbidden: domain, timer/rubble logic.
@@ -888,6 +890,15 @@ scoring, timer, persistence, economy, analytics, reward, or domain change.**
     5 themes; distinguishable by hue+brightness (colorblind-safe), not color alone.
   - Tests: block renders a fill for each `colorId`; snapshot of the three hues.
   - Verify: full battery.
+  - Result: new pure `src/ui/blockSurface.ts` (8 variants: normal/tray/selected/
+    critical/disabled/previewValid/previewInvalid/previewConflict) + new
+    `BlockSurface` tile (fill+edge+glow+inner sheen, static, no blur). Shared
+    across board/tray/ghost keyed on `blockColor`; critical preserves color
+    (intensity only); invalid preview uses a dashed non-color cue; disabled loses
+    glow+priority. Critical wired from existing badge data (urgent visual state).
+    No new tokens. 81 suites / 457 tests, coverage 89.61%, doctor 20/20, Android
+    export ✅. No device → after-screenshot not captured (recorded, not
+    fabricated).
 
 - [ ] **P1-5 Timer badges and piece contours**
   - Allowed: `src/components/TimerBadge/**`, `src/components/GameBoard/GameBoard.tsx`

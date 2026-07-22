@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, View } from "react-native";
 
 import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
-import { colors, radius } from "../../ui/theme";
+import { radius } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import { blockColor } from "../../ui/themes";
+import { blockSurface, type BlockVariant } from "../../ui/blockSurface";
+import { BlockSurface } from "../BlockSurface";
 
 export type CellPreviewState = "valid" | "invalid" | "conflict";
 
@@ -16,12 +18,23 @@ type GridCellProps = {
   previewState?: CellPreviewState;
   /** Solid accent ring marking a rewarded-defuse target piece (Stitch 07). */
   highlighted?: boolean;
+  /** True when this cell belongs to a timed piece whose countdown is urgent —
+   *  drives the "critical" block material (color preserved, intensified edge +
+   *  glow). Derived from existing badge metadata by the board, not here. */
+  critical?: boolean;
   onPress?: () => void;
   /** Changes each turn a piece lands on this cell, triggering a brief settle
    *  "snap" (docs/ANIMATION_SPEC.md "Placement feedback"). Undefined = no
    *  recent placement here. */
   flashNonce?: number;
   reducedMotion?: boolean;
+};
+
+/** Maps a cell preview state to its shared block-surface variant. */
+const PREVIEW_VARIANT: Record<CellPreviewState, BlockVariant> = {
+  valid: "previewValid",
+  invalid: "previewInvalid",
+  conflict: "previewConflict",
 };
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -50,6 +63,7 @@ export function GridCell({
   size,
   previewState,
   highlighted,
+  critical,
   onPress,
   flashNonce,
   reducedMotion,
@@ -77,6 +91,15 @@ export function GridCell({
     return () => animation.stop();
   }, [flashNonce, reducedMotion, snap]);
 
+  // Filled blocks (timed/normal) render as a shared premium "energy tile"
+  // surface; empty and rubble cells keep their own flat treatments applied
+  // directly to the pressable. Cells of one piece share a colorId, so they get
+  // the same material and edge intensity and read as related — no grouping
+  // logic here, just the shared surface.
+  const isBlock = cell.kind === "timed" || cell.kind === "normal";
+  const blockAccent = isBlock ? blockColor(theme, cell.colorId) : null;
+  const blockVariant: BlockVariant = critical ? "critical" : "normal";
+
   let visual;
   switch (cell.kind) {
     case "empty":
@@ -98,11 +121,10 @@ export function GridCell({
       };
       break;
     case "timed":
-    case "normal": {
-      const accent = blockColor(theme, cell.colorId);
-      visual = { backgroundColor: `${accent}22`, borderWidth: 1, borderColor: accent };
+    case "normal":
+      // Transparent pressable; the BlockSurface child paints the tile.
+      visual = undefined;
       break;
-    }
   }
 
   return (
@@ -115,24 +137,42 @@ export function GridCell({
       accessibilityRole={onPress ? "button" : undefined}
       accessible
     >
+      {isBlock && blockAccent ? (
+        <BlockSurface
+          size={size}
+          surface={blockSurface(theme, blockAccent, blockVariant)}
+          testID={`block-${row}-${column}`}
+        />
+      ) : null}
       {cell.kind === "rubble" ? (
         <>
           <View style={[styles.crackA, { backgroundColor: theme.rubbleCrack }]} />
           <View style={[styles.crackB, { backgroundColor: theme.rubbleCrack }]} />
         </>
       ) : null}
-      {previewState ? (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.preview,
-            previewState === "valid"
-              ? { borderColor: theme.accent, backgroundColor: `${theme.accent}26` }
-              : previewStyles[previewState],
-          ]}
-          testID={`preview-${previewState}-${row}-${column}`}
-        />
-      ) : null}
+      {previewState
+        ? (() => {
+            // Valid = the block accent (solid); invalid/conflict = the theme's
+            // danger hue with a dashed edge — the non-color cue distinguishing
+            // an unplaceable ghost from a placeable one.
+            const previewAccent = previewState === "valid" ? theme.accent : theme.timerCritical;
+            const surface = blockSurface(theme, previewAccent, PREVIEW_VARIANT[previewState]);
+            return (
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.preview,
+                  {
+                    borderColor: surface.edge,
+                    backgroundColor: surface.fill,
+                    borderStyle: surface.dashed ? "dashed" : "solid",
+                  },
+                ]}
+                testID={`preview-${previewState}-${row}-${column}`}
+              />
+            );
+          })()
+        : null}
       {highlighted ? (
         <View
           pointerEvents="none"
@@ -173,7 +213,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderWidth: 1.5,
-    borderStyle: "dashed",
     borderRadius: radius.cell,
   },
   highlight: {
@@ -184,20 +223,5 @@ const styles = StyleSheet.create({
     bottom: 0,
     borderWidth: 2,
     borderRadius: radius.cell,
-  },
-});
-
-const previewStyles = StyleSheet.create({
-  valid: {
-    borderColor: colors.cyanBlock,
-    backgroundColor: `${colors.cyanBlock}26`,
-  },
-  invalid: {
-    borderColor: colors.error,
-    backgroundColor: `${colors.error}1A`,
-  },
-  conflict: {
-    borderColor: colors.error,
-    backgroundColor: `${colors.error}59`,
   },
 });
