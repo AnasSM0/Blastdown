@@ -13,10 +13,17 @@ type BlockSurfaceProps = {
   testID?: string;
 };
 
-/** A single layered "energy tile": a dark translucent themed fill, a saturated
- *  edge, a restrained glow, and a brighter inner/upper highlight for tactile
- *  depth — all programmatic (no blur, image, or animated shadow). Shared across
- *  the board so every filled block reads as the same material. */
+/** A single layered "energy tile": an opaque themed body, a saturated edge, and
+ *  a brighter inner/upper highlight for tactile depth — all programmatic (no
+ *  blur, image, or shadow). Shared across the board so every filled block reads
+ *  as the same material.
+ *
+ *  The block body deliberately carries NO Android `elevation`/shadow: an
+ *  elevated child inside the cell's animated `transform` parent fails to render
+ *  on Android (placed blocks vanished on-device), and a per-cell shadow across
+ *  64 cells is the "expensive shadow" the spec forbids. Depth now comes from the
+ *  opaque body + edge + sheen only. (`surface.glow` is still used elsewhere for
+ *  the single selected tray slot, which is not nested under a transform.) */
 export function BlockSurface({ size, surface, children, testID }: BlockSurfaceProps) {
   return (
     <View
@@ -32,7 +39,6 @@ export function BlockSurface({ size, surface, children, testID }: BlockSurfacePr
           borderStyle: surface.dashed ? "dashed" : "solid",
           opacity: surface.opacity,
         },
-        surface.glow ?? null,
       ]}
     >
       {surface.highlight ? (

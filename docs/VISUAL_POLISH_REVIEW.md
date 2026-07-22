@@ -612,3 +612,43 @@ outputs — `docs/current game images/placed-block-visibility-comparison-render.
 BEFORE shows placed blocks as outline-only/dark (the reported regression); AFTER
 shows clearly-coloured opaque bodies. Chrome render, not an Android screenshot;
 the on-device capture is still required for sign-off.
+
+## Android placed-block visibility — true root cause + require-cycle fix
+
+**On-device finding:** the opaque-fill change was necessary but did not fix the
+physical Android phone — placed blocks stayed hidden while tray/drag blocks and
+badges rendered.
+
+**True root cause:** `BlockSurface` applied an Android `elevation` (from the
+block glow) on a View nested inside `GridCell`'s animated `transform` parent. On
+Android, an elevated child under a transformed ancestor is detached to its own
+hardware layer and often fails to render, so the block body vanished. Tray
+mini-cells (no elevation) and badges (own layer) were unaffected — matching the
+symptom exactly. A per-cell shadow across 64 cells was also the "expensive
+shadow" the brief forbids.
+
+**Fix:** the block body no longer carries `elevation`/glow — it is a plain opaque
+View (fill + edge + sheen) that always renders on Android, above the board
+background and below preview/highlight overlays. Contours stay border-only with
+transparent interiors; no parent opacity dims placed cells; reduced motion
+affects animation only. `blockSurface()` still returns glow for the single
+selected tray slot (not under a transform).
+
+**Require cycle:** `BOARD_CONTENT_INSET`/`FRAME_WIDTH` moved to the neutral
+`src/ui/boardGeometry.ts`; `EffectsLayer` imports them there instead of the
+`GameBoard` barrel, breaking `GameBoard → EffectsLayer → GameBoard barrel`.
+
+**Tests:** GridCell guards — placed body has no elevation/shadow, occupied cell
+paints no empty-cell chrome, contour interior transparent, placed block fully
+visible under reduced motion. `boardRequireCycle.test.ts` guards the cycle.
+Full suite: **84 suites / 483 tests** green; coverage 89.89% (BlockSurface +
+boardGeometry 100%).
+
+**Verification:** typecheck ✅, lint ✅, tests ✅, coverage ✅, format ✅,
+expo-doctor 20/20 ✅, Android export ✅, require-cycle absent ✅.
+
+**Device verification (human step):** no Android device on the build machine, so
+the on-device matrix (cyan/violet/amber × normal/warning/critical/frozen ×
+reduced-motion × Reactor+alt theme × tray→drag→placed × reload) and the real
+`android-placed-blocks-fixed.jpg` must be captured on the phone; the magenta
+binary diagnostic and one-shot cell log are provided for that run.

@@ -1028,3 +1028,40 @@ outputs; RN Views ↔ CSS boxes). The provenance is baked into the image itself 
 it states it is a Chrome render, not an on-device Android capture — so it is not
 a misrepresentation. The file is PNG-encoded (no JPEG encoder on the machine).
 On-device verification remains recommended before shipping.
+
+## Android placed-block visibility — true root cause + require-cycle (2026-07-22)
+
+**Correction to the earlier entry.** Making the block fill opaque (above) was
+necessary but **not** the on-device cause. On the physical Android phone, placed
+blocks stayed hidden while tray/drag blocks and timer badges rendered. The
+differentiator: the board's `BlockSurface` applied a **glow with Android
+`elevation`**, and it sits inside `GridCell`'s animated `transform` parent
+(`scale` snap). On Android, an elevated child nested under a transformed ancestor
+is promoted to a detached hardware layer and commonly fails to render — so the
+block body disappeared. Tray mini-cells use no elevation (glow `null`) and stayed
+visible; badges are on the board's own layer, not under the cell transform, so
+they stayed visible too. This also fixed a spec violation (a per-cell shadow
+across 64 cells is the "expensive shadow" the brief forbids).
+
+**Fix:** `BlockSurface` no longer applies `surface.glow` to the block body — the
+body is a plain opaque View (fill + saturated edge + sheen), which always renders
+on Android and below the preview/highlight overlays. `blockSurface()` still
+returns `glow` for the single selected **tray slot** (not nested under a
+transform, one at a time), so that emphasis is unchanged. No per-cell blur or
+shadow remains.
+
+**Require cycle removed.** `EffectsLayer` imported `BOARD_CONTENT_INSET` from the
+`GameBoard` barrel, forming `GameBoard/index.ts → GameBoard.tsx → EffectsLayer.tsx
+→ GameBoard/index.ts`. `BOARD_CONTENT_INSET` and `FRAME_WIDTH` now live in the
+neutral `src/ui/boardGeometry.ts`; `EffectsLayer` and `GameBoard` both import them
+from there, and the `GameBoard` barrel re-exports `BOARD_CONTENT_INSET` (via the
+imported binding) so `app/game.tsx` is unaffected. `boardGeometry` imports only
+`theme`, so no cycle remains. Guarded by `__tests__/components/boardRequireCycle.test.ts`.
+
+**Ownership note:** the Codex sandbox remains broken on this machine (2026-07-18
+entry), so "Codex Task A" (the cycle refactor) was done by Claude single-writer.
+
+**Device status:** this machine has no Android device/SDK/emulator, so the
+on-device reproduction, the magenta binary diagnostic, and the real
+`android-placed-blocks-fixed.jpg` are the human's step — the diagnostics are
+provided for that run. The code fix + all static verification are complete.
