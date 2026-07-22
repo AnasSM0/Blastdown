@@ -900,17 +900,44 @@ scoring, timer, persistence, economy, analytics, reward, or domain change.**
     export ✅. No device → after-screenshot not captured (recorded, not
     fabricated).
 
-- [ ] **P1-5 Timer badges and piece contours**
-  - Allowed: `src/components/TimerBadge/**`, `src/components/GameBoard/GameBoard.tsx`
-    (contour overlay), `src/components/GridCell/GridCell.tsx` (contour),
-    `src/ui/timerStates.ts`, `src/ui/timerPulse.ts` (visual thresholds only).
-  - Forbidden: domain timer rules/values.
+- [x] **P1-5 Timer badges and piece contours** — done 2026-07-22
+      (branch `phase-professional-polish-1-timers-contours`). See
+      `docs/VISUAL_POLISH_REVIEW.md` §"Phase 1 · P1-5".
+  - Allowed: `src/components/TimerBadge/**` (incl. the new co-located pure
+    `timerBadgeStyle.ts`), `src/components/GameBoard/GameBoard.tsx` (contour
+    overlay), `src/components/GridCell/GridCell.tsx` (contour) + its `index.ts`
+    barrel (re-export the new `CellEdges` type), `src/ui/timerStates.ts`,
+    `src/ui/timerPulse.ts` (visual thresholds only), `src/ui/themes.ts` (add the
+    `timerFrozen` semantic token to all five palettes — required by the "use
+    semantic tokens / verify five themes" acceptance), and a one-line thread in
+    `app/game.tsx` passing the already-computed global `freezeActive` boolean to
+    `GameBoard` (no Freeze/Defuse redesign). This boundary was widened from the
+    original plan during execution to cover the semantic token and the frozen
+    state, which is global; see `docs/DECISIONS.md` "P1-5 file-boundary
+    reconciliation".
+  - Forbidden: domain timer rules/values; any Freeze/Defuse redesign.
   - Depends on: P1-4.
   - Acceptance: a contour visually groups a timed piece's cells so ownership is
     unambiguous; badge refined and theme-aware; numeral always legible; pulse
     reduced-motion gated; never color-only.
   - Tests: badge digit renders; a multi-cell timed piece shows a grouping contour.
   - Verify: full battery.
+  - Result: new pure `src/components/TimerBadge/timerBadgeStyle.ts`
+    (`getBadgeVisual`, co-located with its sole consumer) maps
+    normal / warning-2 / critical-1 / frozen to ring color+width, size, dashed,
+    glow, and pulse state — every named pair differs in a non-color attribute
+    (width/size/dashed), never color alone. `TimerBadge` rewritten to consume it
+    plus a new `frozen` prop (icy dashed static ring, timers paused). Frozen is
+    global (`state.freezeTurnsRemaining > 0`), threaded game.tsx → GameBoard →
+    every badge; no domain change. New per-piece contour: GameBoard computes each
+    timed cell's boundary sides from existing `pieceInstanceId` adjacency and
+    passes `contourEdges` to `GridCell`, which strokes the piece's own accent on
+    outer sides only (interior transparent; previews/highlight/badge draw over
+    it). One new `timerFrozen` token per theme (all 5). 82 suites / 468 tests,
+    coverage 89.71%, doctor 20/20, Android export ✅. No device → after-screenshot
+    not captured (recorded, not fabricated). Defused-transition badge state has
+    no source metadata (defuse removes the timer), so it is intentionally not a
+    distinct badge state — left for whenever such metadata exists.
 
 - [ ] **P1-6 Cracked rubble**
   - Allowed: `src/components/GridCell/GridCell.tsx` (rubble case), theme tokens

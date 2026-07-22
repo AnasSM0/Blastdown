@@ -1,1 +1,1 @@
-export { GridCell, type CellPreviewState } from "./GridCell";
+export { GridCell, type CellEdges, type CellPreviewState } from "./GridCell";

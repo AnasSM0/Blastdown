@@ -10,7 +10,7 @@ import { getTimerVisualState } from "../../ui/timerStates";
 import { radius, spacing } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import { EffectsLayer } from "../effects/EffectsLayer";
-import { GridCell, type CellPreviewState } from "../GridCell";
+import { GridCell, type CellEdges, type CellPreviewState } from "../GridCell";
 import { TimerBadge } from "../TimerBadge";
 
 type GameBoardProps = {
@@ -38,7 +38,36 @@ type GameBoardProps = {
   /** Effective reduced-motion (OS combined with the persisted override). When
    *  omitted, falls back to the OS setting alone. */
   reducedMotion?: boolean;
+  /** True while the run's rewarded freeze is active — pauses the countdown and
+   *  puts every timer badge into its frozen (icy, static) cue. */
+  frozen?: boolean;
 };
+
+/** Boundary sides of a timed cell within its piece: a side is a boundary when
+ *  its neighbor is not the same timed piece. Reads only the cells' existing
+ *  `pieceInstanceId` — no grouping is reconstructed, just adjacency-checked.
+ *  Returns undefined for non-timed cells (no contour). */
+function contourEdgesFor(
+  grid: readonly (readonly DomainGridCell[])[],
+  row: number,
+  column: number,
+): CellEdges | undefined {
+  const cell = grid[row][column];
+  if (cell.kind !== "timed") {
+    return undefined;
+  }
+  const id = cell.pieceInstanceId;
+  const samePiece = (r: number, c: number): boolean => {
+    const neighbor = grid[r]?.[c];
+    return neighbor?.kind === "timed" && neighbor.pieceInstanceId === id;
+  };
+  return {
+    top: !samePiece(row - 1, column),
+    right: !samePiece(row, column + 1),
+    bottom: !samePiece(row + 1, column),
+    left: !samePiece(row, column - 1),
+  };
+}
 
 const FRAME_WIDTH = 2;
 
@@ -67,6 +96,7 @@ function GameBoardImpl(
     effectKey,
     highlightPieceId,
     reducedMotion: reducedMotionProp,
+    frozen = false,
   }: GameBoardProps,
   ref: React.ForwardedRef<View>,
 ) {
@@ -185,6 +215,7 @@ function GameBoardImpl(
                       cell.pieceInstanceId === highlightPieceId
                     }
                     critical={cell.kind === "timed" && criticalPieceIds.has(cell.pieceInstanceId)}
+                    contourEdges={contourEdgesFor(grid, row, column)}
                     onPress={onCellPress ? () => onCellPress({ row, column }) : undefined}
                     flashNonce={placedSet.has(`${row},${column}`) ? placementNonce : undefined}
                     reducedMotion={reducedMotion}
@@ -287,6 +318,7 @@ function GameBoardImpl(
                 pieceId={badge.pieceId}
                 remainingTurns={badge.remainingTurns}
                 colorId={badge.colorId}
+                frozen={frozen}
               />
             </View>
           ))

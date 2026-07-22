@@ -1,7 +1,15 @@
 import { render } from "@testing-library/react-native";
+import { StyleSheet, type ViewStyle } from "react-native";
 
 import { TimerBadge } from "../../src/components/TimerBadge";
 import { getTimerVisualState } from "../../src/ui/timerStates";
+import { resolveTheme } from "../../src/ui/themes";
+
+const reactor = resolveTheme(undefined);
+
+function ringStyle(node: { props: Record<string, unknown> }): ViewStyle {
+  return (StyleSheet.flatten(node.props.style as ViewStyle) ?? {}) as ViewStyle;
+}
 
 const mockReducedMotion = { value: false };
 jest.mock("../../src/hooks/useReducedMotion", () => ({
@@ -41,5 +49,26 @@ describe("TimerBadge", () => {
     expect(result.getByText("1")).toBeTruthy();
     expect(result.getByTestId("timer-badge-p1").props.accessibilityHint).toMatch(/urgent/i);
     mockReducedMotion.value = false;
+  });
+
+  it("shows a frozen cue that keeps the numeral and reads as paused (P1-5)", async () => {
+    const result = await render(
+      <TimerBadge remainingTurns={1} colorId="cyan" pieceId="p1" frozen />,
+    );
+    // Numeral preserved…
+    expect(result.getByText("1")).toBeTruthy();
+    const badge = result.getByTestId("timer-badge-p1");
+    // …state announced as frozen, not the underlying countdown state…
+    expect(badge.props.accessibilityLabel).toMatch(/frozen/i);
+    expect(badge.props.accessibilityHint).toMatch(/frozen/i);
+    // …with a dashed icy ring as the non-color cue.
+    const style = ringStyle(badge);
+    expect(style.borderStyle).toBe("dashed");
+    expect(style.borderColor).toBe(reactor.timerFrozen);
+  });
+
+  it("uses a solid ring when not frozen", async () => {
+    const result = await render(<TimerBadge remainingTurns={3} colorId="cyan" pieceId="p2" />);
+    expect(ringStyle(result.getByTestId("timer-badge-p2")).borderStyle).toBe("solid");
   });
 });

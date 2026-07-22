@@ -10,6 +10,15 @@ import { BlockSurface } from "../BlockSurface";
 
 export type CellPreviewState = "valid" | "invalid" | "conflict";
 
+/** Which sides of a timed cell sit on the outer boundary of its piece — a side
+ *  is a boundary when its neighbor is not part of the same timed piece. Drives
+ *  the piece contour. Computed by the board from existing piece metadata. */
+export type CellEdges = { top: boolean; right: boolean; bottom: boolean; left: boolean };
+
+/** Contour stroke weight — heavier than the block's own edge so a timed piece's
+ *  silhouette reads as one bounded group, distinct from a plain block. */
+const CONTOUR_WIDTH = 2;
+
 type GridCellProps = {
   cell: DomainGridCell;
   row: number;
@@ -22,6 +31,9 @@ type GridCellProps = {
    *  drives the "critical" block material (color preserved, intensified edge +
    *  glow). Derived from existing badge metadata by the board, not here. */
   critical?: boolean;
+  /** Boundary sides of this cell within its timed piece. Present only for timed
+   *  cells; drives the shared piece contour. */
+  contourEdges?: CellEdges;
   onPress?: () => void;
   /** Changes each turn a piece lands on this cell, triggering a brief settle
    *  "snap" (docs/ANIMATION_SPEC.md "Placement feedback"). Undefined = no
@@ -64,6 +76,7 @@ export function GridCell({
   previewState,
   highlighted,
   critical,
+  contourEdges,
   onPress,
   flashNonce,
   reducedMotion,
@@ -144,6 +157,27 @@ export function GridCell({
           testID={`block-${row}-${column}`}
         />
       ) : null}
+      {contourEdges && blockAccent ? (
+        // A bright boundary stroke in the piece's own accent, drawn only on the
+        // sides that face outside the timed piece. Internal (shared) sides get
+        // nothing, so a multi-cell piece reads as one bounded group. Inset,
+        // non-interactive, and interior-transparent — it never covers the block
+        // highlight; previews, the highlight ring, and the badge draw over it.
+        <View
+          pointerEvents="none"
+          style={[
+            styles.contour,
+            {
+              borderTopWidth: contourEdges.top ? CONTOUR_WIDTH : 0,
+              borderRightWidth: contourEdges.right ? CONTOUR_WIDTH : 0,
+              borderBottomWidth: contourEdges.bottom ? CONTOUR_WIDTH : 0,
+              borderLeftWidth: contourEdges.left ? CONTOUR_WIDTH : 0,
+              borderColor: blockAccent,
+            },
+          ]}
+          testID={`contour-${row}-${column}`}
+        />
+      ) : null}
       {cell.kind === "rubble" ? (
         <>
           <View style={[styles.crackA, { backgroundColor: theme.rubbleCrack }]} />
@@ -205,6 +239,14 @@ const styles = StyleSheet.create({
     height: 1.5,
     transform: [{ rotate: "-50deg" }],
     opacity: 0.5,
+  },
+  contour: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: radius.cell,
   },
   preview: {
     position: "absolute",

@@ -93,6 +93,43 @@ describe("GameBoard", () => {
     );
   });
 
+  it("draws a piece contour only on timed cells, following existing piece metadata (P1-5)", async () => {
+    const grid = makeEmptyGrid(8);
+    // A 2-cell horizontal timed piece and an unrelated normal block.
+    grid[0][0] = { kind: "timed", pieceInstanceId: "a", colorId: "cyan" };
+    grid[0][1] = { kind: "timed", pieceInstanceId: "a", colorId: "cyan" };
+    grid[3][3] = { kind: "normal", colorId: "amber" };
+
+    const result = await render(<GameBoard grid={grid} badges={[]} boardSize={328} />);
+
+    // Both timed cells get a contour; the normal block and empty cells do not.
+    expect(result.getByTestId("contour-0-0")).toBeTruthy();
+    expect(result.getByTestId("contour-0-1")).toBeTruthy();
+    expect(result.queryByTestId("contour-3-3")).toBeNull();
+    expect(result.queryByTestId("contour-5-5")).toBeNull();
+
+    // The shared side between the two cells is internal, so it is not stroked:
+    // cell (0,0)'s right edge and cell (0,1)'s left edge carry no border width.
+    const left = StyleSheet.flatten(result.getByTestId("contour-0-0").props.style) as ViewStyle;
+    const right = StyleSheet.flatten(result.getByTestId("contour-0-1").props.style) as ViewStyle;
+    expect(left.borderRightWidth).toBe(0);
+    expect(left.borderLeftWidth).toBeGreaterThan(0);
+    expect(right.borderLeftWidth).toBe(0);
+    expect(right.borderRightWidth).toBeGreaterThan(0);
+  });
+
+  it("puts every timer badge into the frozen cue while freeze is active (P1-5)", async () => {
+    const grid = makeEmptyGrid(8);
+    grid[0][0] = { kind: "timed", pieceInstanceId: "a", colorId: "cyan" };
+    const badges: TimerBadgePlacement[] = [
+      { pieceId: "a", position: { row: 0, column: 0 }, remainingTurns: 1, colorId: "cyan" },
+    ];
+
+    const result = await render(<GameBoard grid={grid} badges={badges} boardSize={328} frozen />);
+
+    expect(result.getByTestId("timer-badge-a").props.accessibilityHint).toMatch(/frozen/i);
+  });
+
   it("labels the board for screen readers", async () => {
     const result = await render(<GameBoard grid={makeEmptyGrid(8)} badges={[]} boardSize={328} />);
     expect(result.getByLabelText(/game board/i)).toBeTruthy();

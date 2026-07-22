@@ -91,6 +91,38 @@ describe("GridCell premium block surfaces (P1-4)", () => {
     expect(String(criticalFill).startsWith(accent)).toBe(true);
   });
 
+  it("strokes the piece contour in the block accent on boundary sides only (P1-5)", async () => {
+    const accent = blockColor(reactor, "cyan");
+    const result = await render(
+      <GridCell
+        cell={{ kind: "timed", colorId: "cyan", pieceInstanceId: "p1" }}
+        row={0}
+        column={0}
+        size={40}
+        contourEdges={{ top: true, right: false, bottom: true, left: true }}
+      />,
+    );
+    const contour = StyleSheet.flatten(
+      result.getByTestId("contour-0-0").props.style as ViewStyle,
+    ) as ViewStyle;
+    // Contour carries the piece's own accent, preserving color identity.
+    expect(contour.borderColor).toBe(accent);
+    // Boundary sides are stroked; the internal (right) side is not.
+    expect(contour.borderTopWidth).toBeGreaterThan(0);
+    expect(contour.borderLeftWidth).toBeGreaterThan(0);
+    expect(contour.borderBottomWidth).toBeGreaterThan(0);
+    expect(contour.borderRightWidth).toBe(0);
+    // The contour never intercepts touches.
+    expect(result.getByTestId("contour-0-0").props.pointerEvents).toBe("none");
+  });
+
+  it("renders no contour when none is supplied", async () => {
+    const result = await render(
+      <GridCell cell={{ kind: "normal", colorId: "cyan" }} row={0} column={0} size={40} />,
+    );
+    expect(result.queryByTestId("contour-0-0")).toBeNull();
+  });
+
   it("does not render a block tile for empty or rubble cells", async () => {
     const empty = await render(<GridCell cell={{ kind: "empty" }} row={0} column={0} size={40} />);
     expect(empty.queryByTestId("block-0-0")).toBeNull();

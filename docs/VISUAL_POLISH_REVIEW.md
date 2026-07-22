@@ -403,3 +403,84 @@ existing urgent visual state (≤1 move); if design later wants warning (2 moves
 to also intensify, extend `criticalPieceIds`. (3) Non-Reactor block materials
 are alpha-tinted from each theme's accents, not tuned on-device — validate
 contrast against empty cells and rubble when a device is available.
+
+## Phase 1 · P1-5 — Timer badges and piece contours
+
+**Scope:** refine the timer badge and make each timed piece's ownership visually
+unambiguous, without touching timer rules or values.
+
+**Badge decisions:**
+
+- All badge styling moved into a pure `getBadgeVisual(visualState, frozen,
+theme)` (`src/ui/timerBadgeStyle.ts`), matching the `blockSurface` pattern;
+  `TimerBadge` is now a thin consumer that keeps the numeral and pulse handling.
+- **Exactly one badge per timed piece** is unchanged — it still comes from the
+  domain selector `getTimerBadgePlacements` (topmost, then leftmost surviving
+  cell), so it stays anchored after partial clears. No domain change.
+- Dark center + tabular-nums numeral + theme-aware ring preserved and legible
+  over every block color and theme.
+
+**State handling (never color-only):**
+
+- **normal** — thin `timerNormal` ring, static.
+- **caution (3–4)** — calm thin amber ring, static (pre-warning).
+- **warning (2)** — restrained amber, medium-weight ring, gentle pulse.
+- **critical (1)** — `timerCritical` danger ring, **heavier and larger** badge,
+  high glow, stronger pulse.
+- **frozen** — icy `timerFrozen` ring, the only **dashed** ring, **static**
+  (timers paused), labelled "frozen". Overrides the countdown emphasis.
+- Distinctness is carried by ring width, badge size, and the dashed cue — not
+  hue — so the states remain distinguishable for colorblind players. The block
+  color beneath the badge is never changed.
+- **Defused-transition** state is intentionally not a distinct badge look: a
+  defuse removes the timer entirely, so no such metadata exists to drive it.
+
+**Piece contour:**
+
+- `GameBoard` computes each timed cell's boundary sides from the existing
+  `pieceInstanceId` (adjacency only — no grouping reconstructed) and passes
+  `contourEdges` to `GridCell`.
+- `GridCell` strokes the piece's own `blockColor` accent on **outer sides only**
+  (interior transparent), non-interactive. Internal shared sides are left
+  unstroked so a multi-cell piece reads as one bounded group, distinct from a
+  plain same-color block. It never covers block highlights, previews, rubble, or
+  the badge numeral (those draw over it or sit on a higher layer).
+
+**Motion / reduced motion:** pulse still routes through `getPulseConfig` (event/
+state-driven, reduced-motion gated); the badge keys its loop on the resolved
+`pulseState` primitive, so ordinary rerenders never retrigger it. Reduced motion
+disables the repeated pulse while the static ring/size/dashed cues remain.
+
+**Themes / accessibility:** one new `timerFrozen` token added to all five themes
+(Reactor/Arctic/Magma/Void/Solar), verified distinct from each theme's other
+timer hues. Accessibility labels describe remaining moves and announce "frozen"
+when paused. Board geometry and tap/drag hit testing untouched (contour and
+badge are `pointerEvents="none"`).
+
+**Tests:** `timerBadgeStyle.test.ts` (new) — semantic ring colors, non-color
+distinctness of the named states, frozen static + dashed + override, and a valid
+distinct `timerFrozen` in every theme; `TimerBadge.test.tsx` — frozen shows a
+dashed icy ring and announces "frozen" while keeping the numeral, solid ring
+otherwise; `GameBoard.test.tsx` — contour only on timed cells with the internal
+shared side unstroked, and freeze puts every badge into the frozen cue;
+`GridCell.test.tsx` — contour strokes the accent on boundary sides only and is
+non-interactive, none when unsupplied. Full suite: **82 suites / 468 tests**
+green; coverage **89.71%** (`timerBadgeStyle` + `TimerBadge` 100%, `GridCell`
+97.5%, `GameBoard` 96.55%).
+
+**Verification:** typecheck ✅, lint ✅, test ✅, coverage ✅ 89.71%,
+format:check ✅, expo-doctor ✅ 20/20, `expo export --platform android` ✅.
+
+**Screenshot / device finding:** no Android device/emulator available, so
+`docs/current game images/phase1-p5-timers-contours-after.jpg` was **not**
+produced — recorded here, not fabricated. Android export succeeds. On-device
+visual confirmation deferred.
+
+**Risks:** (1) The contour adds one static per-timed-cell overlay View; timed
+cells are few, so cost is negligible, but it stacks with P1-4's sheen sub-View
+on the same cells — still no blur/animation. (2) The contour accent equals the
+block edge color; on-device it should read as a heavier outline via width — if
+it looks too subtle, lightening the contour tone or a dedicated `timerContour`
+token is the follow-up. (3) Frozen is driven by the global freeze flag, so all
+badges show frozen together (correct — freeze pauses all timers); if per-piece
+freeze is ever added, thread a per-badge flag instead.
