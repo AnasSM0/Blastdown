@@ -13,8 +13,23 @@ describe("accessibility", () => {
   it("labels the rewarded actions and gives them >=44x44 targets", async () => {
     const result = await render(
       <RewardedActionBar
-        freeze={{ onPress: jest.fn(), disabled: false, active: false, placementsRemaining: 0 }}
-        defuse={{ onPress: jest.fn(), disabled: false, selected: false }}
+        freeze={{
+          label: "FREEZE",
+          glyph: "❄",
+          testID: "freeze-button",
+          onPress: jest.fn(),
+          disabled: false,
+          active: false,
+          placementsRemaining: 0,
+        }}
+        defuse={{
+          label: "DEFUSE",
+          glyph: "⚡",
+          testID: "defuse-button",
+          onPress: jest.fn(),
+          disabled: false,
+          selected: false,
+        }}
       />,
     );
 
@@ -24,10 +39,12 @@ describe("accessibility", () => {
     expect(freeze.props.accessibilityLabel).toMatch(/freeze/i);
     expect(defuse.props.accessibilityLabel).toMatch(/defuse/i);
 
+    // The dock cells are equal-width (flex) with minimum target dimensions, so
+    // assert the reserved minimums clear the 44px accessibility floor.
     for (const button of [freeze, defuse]) {
       const style = flatStyle(button);
-      expect(Number(style.width)).toBeGreaterThanOrEqual(44);
-      expect(Number(style.height)).toBeGreaterThanOrEqual(44);
+      expect(Number(style.minWidth)).toBeGreaterThanOrEqual(44);
+      expect(Number(style.minHeight)).toBeGreaterThanOrEqual(44);
     }
   });
 

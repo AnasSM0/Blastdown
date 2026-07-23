@@ -1,108 +1,221 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import type { ReactNode } from "react";
+import { Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 
-import { colors, neonGlow, spacing, typography } from "../../ui/theme";
+import { radius, spacing, typography } from "../../ui/theme";
+import { useTheme } from "../../ui/ThemeProvider";
+import type { ThemePalette } from "../../ui/themes";
 
-type RewardedActionButtonProps = {
-  glyph: string;
+export type RewardActionPhase = "idle" | "pending" | "success" | "failure" | "cancelled";
+
+type RewardedDockActionBase = {
   label: string;
-  testID: string;
+  glyph: string;
   onPress: () => void;
-  /** Charged/active treatment (cyan fill) — used by Freeze while frozen. */
-  active?: boolean;
-  /** Cyan outline highlight — used by Defuse while its confirm card is open. */
-  selected?: boolean;
-  disabled?: boolean;
+  disabled: boolean;
+  unavailable?: boolean;
+  phase?: RewardActionPhase;
+  rewarded?: boolean;
+  testID: string;
 };
 
-/** A rewarded power-up control (Stitch 07/09). Idle: neutral outline. Active:
- *  cyan fill (Freeze while frozen). Selected: cyan outline (Defuse pending
- *  confirm). Disabled: dimmed and non-interactive when the domain says the
- *  power-up is unavailable or a reward is in flight. */
-function RewardedActionButton({
-  glyph,
-  label,
-  testID,
-  onPress,
-  active = false,
-  selected = false,
-  disabled = false,
-}: RewardedActionButtonProps) {
-  return (
-    <Pressable
-      onPress={disabled ? undefined : onPress}
-      disabled={disabled}
-      style={[
-        styles.button,
-        active && styles.buttonActive,
-        selected && !active && styles.buttonSelected,
-        disabled && !active && styles.buttonDisabled,
-        active ? neonGlow(colors.cyanBlock, "low") : undefined,
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled }}
-      testID={testID}
-    >
-      <Text style={[styles.glyph, active && styles.glyphActive, disabled && styles.glyphDisabled]}>
-        {glyph}
-      </Text>
-    </Pressable>
-  );
-}
-
 export type RewardedActionBarProps = {
-  freeze: {
-    onPress: () => void;
-    disabled: boolean;
-    /** True while a freeze is holding timers. */
+  freeze: RewardedDockActionBase & {
     active: boolean;
-    /** Successful placements the active freeze still covers (0 when idle). */
     placementsRemaining: number;
   };
-  defuse: {
-    onPress: () => void;
-    disabled: boolean;
-    /** True while the defuse confirm card is open. */
+  defuse: RewardedDockActionBase & {
     selected: boolean;
   };
 };
 
-/** The two in-run rewarded controls beneath the tray. Freeze surfaces its
- *  remaining-placements count while active (Stitch 09's "N MOVES"); Defuse
- *  opens a confirm card before spending the reward (Stitch 07). Both are
- *  disabled by the caller from the domain's own capability checks. */
-export function RewardedActionBar({ freeze, defuse }: RewardedActionBarProps) {
+type PresentationState =
+  | "pending"
+  | "active"
+  | "selected"
+  | "success"
+  | "failure"
+  | "cancelled"
+  | "unavailable"
+  | "disabled"
+  | "available";
+
+type DockActionProps = RewardedDockActionBase & {
+  engaged: "active" | "selected" | null;
+  accessibilityLabel: string;
+  activeCaption?: ReactNode;
+};
+
+function presentationState({
+  phase = "idle",
+  engaged,
+  disabled,
+  unavailable = false,
+}: Pick<DockActionProps, "phase" | "engaged" | "disabled" | "unavailable">): PresentationState {
+  if (phase === "pending") {
+    return "pending";
+  }
+  if (engaged) {
+    return engaged;
+  }
+  if (phase !== "idle") {
+    return phase;
+  }
+  if (disabled && unavailable) {
+    return "unavailable";
+  }
+  if (disabled) {
+    return "disabled";
+  }
+  return "available";
+}
+
+function stateStyle(theme: ThemePalette, state: PresentationState): ViewStyle {
+  switch (state) {
+    case "active":
+      return {
+        backgroundColor: theme.timerFrozen,
+        borderColor: theme.timerFrozen,
+        borderWidth: 2,
+      };
+    case "selected":
+      return {
+        backgroundColor: theme.boardBg,
+        borderColor: theme.block.cyan,
+        borderWidth: 2,
+      };
+    case "success":
+      return { borderColor: theme.accent, borderWidth: 2 };
+    case "failure":
+      return { borderColor: theme.timerCritical, borderWidth: 2 };
+    case "cancelled":
+      return { borderColor: theme.outline, borderWidth: 1 };
+    case "pending":
+      return { borderColor: theme.timerWarning, borderWidth: 1, opacity: 0.72 };
+    case "unavailable":
+      return { borderColor: theme.outlineVariant, borderStyle: "dashed", opacity: 0.58 };
+    case "disabled":
+      return { borderColor: theme.outlineVariant, borderStyle: "solid", opacity: 0.4 };
+    case "available":
+      return { borderColor: theme.outline, borderStyle: "solid", opacity: 1 };
+  }
+}
+
+function captionFor(state: PresentationState): string {
+  switch (state) {
+    case "pending":
+      return "…";
+    case "selected":
+      return "SELECTED";
+    case "success":
+      return "✓ DONE";
+    case "failure":
+      return "AD FAILED";
+    case "cancelled":
+      return "CANCELLED";
+    case "unavailable":
+      return "—";
+    case "active":
+    case "disabled":
+    case "available":
+      return "";
+  }
+}
+
+function DockAction({
+  label,
+  glyph,
+  onPress,
+  disabled,
+  unavailable = false,
+  phase = "idle",
+  rewarded = false,
+  testID,
+  engaged,
+  accessibilityLabel,
+  activeCaption,
+}: DockActionProps) {
+  const theme = useTheme();
+  const state = presentationState({ phase, engaged, disabled, unavailable });
+  const pending = state === "pending";
+  const pressDisabled = disabled || pending;
+  const rewardedVisible = state === "available" && rewarded;
+  const active = state === "active";
+
   return (
-    <View style={styles.bar} testID="rewarded-action-bar">
-      <View style={styles.slot}>
-        {freeze.active ? (
-          <Text style={styles.movesLabel} testID="freeze-moves-label">
+    <Pressable
+      onPress={pressDisabled ? undefined : onPress}
+      disabled={pressDisabled}
+      style={[styles.action, { backgroundColor: theme.boardBg }, stateStyle(theme, state)]}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
+      testID={testID}
+    >
+      <View style={styles.glyphRow}>
+        <Text style={[styles.glyph, { color: active ? theme.boardBg : theme.onSurface }]}>
+          {glyph}
+        </Text>
+        {rewardedVisible ? (
+          <View
+            style={[
+              styles.rewardChip,
+              { borderColor: theme.accent, backgroundColor: theme.surfaceBg },
+            ]}
+            testID={`${testID}-reward`}
+          >
+            <Text style={[styles.rewardText, { color: theme.accent }]}>▷ AD</Text>
+          </View>
+        ) : null}
+      </View>
+      <Text style={[styles.label, { color: active ? theme.boardBg : theme.onSurface }]}>
+        {label}
+      </Text>
+      <View style={styles.captionRow}>
+        {state === "active" && activeCaption ? (
+          activeCaption
+        ) : (
+          <Text
+            style={[
+              styles.caption,
+              { color: state === "failure" ? theme.timerCritical : theme.onSurfaceVariant },
+            ]}
+            testID={`${testID}-caption`}
+          >
+            {captionFor(state)}
+          </Text>
+        )}
+      </View>
+    </Pressable>
+  );
+}
+
+export function RewardedActionBar({ freeze, defuse }: RewardedActionBarProps) {
+  const theme = useTheme();
+
+  return (
+    <View
+      style={[styles.bar, { backgroundColor: theme.surfaceBg, borderColor: theme.outlineVariant }]}
+      testID="rewarded-action-bar"
+    >
+      <DockAction
+        {...freeze}
+        engaged={freeze.active ? "active" : null}
+        accessibilityLabel={
+          freeze.active
+            ? `Freeze active, ${freeze.placementsRemaining} placements left`
+            : "Freeze timers"
+        }
+        activeCaption={
+          <Text style={[styles.caption, { color: theme.boardBg }]} testID="freeze-moves-label">
             {freeze.placementsRemaining} {freeze.placementsRemaining === 1 ? "MOVE" : "MOVES"}
           </Text>
-        ) : null}
-        <RewardedActionButton
-          glyph="❄"
-          label={
-            freeze.active
-              ? `Freeze active, ${freeze.placementsRemaining} placements left`
-              : "Freeze timers"
-          }
-          testID="freeze-button"
-          onPress={freeze.onPress}
-          active={freeze.active}
-          disabled={freeze.disabled}
-        />
-      </View>
-      <View style={styles.slot}>
-        <RewardedActionButton
-          glyph="⚡"
-          label="Defuse the lowest-timer piece"
-          testID="defuse-button"
-          onPress={defuse.onPress}
-          selected={defuse.selected}
-          disabled={defuse.disabled}
-        />
-      </View>
+        }
+      />
+      <DockAction
+        {...defuse}
+        engaged={defuse.selected ? "selected" : null}
+        accessibilityLabel="Defuse the lowest-timer piece"
+      />
     </View>
   );
 }
@@ -110,48 +223,69 @@ export function RewardedActionBar({ freeze, defuse }: RewardedActionBarProps) {
 const styles = StyleSheet.create({
   bar: {
     flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "flex-end",
-    gap: spacing.xl,
-    paddingVertical: spacing.sm,
-  },
-  slot: {
-    alignItems: "center",
     gap: spacing.xs,
-  },
-  movesLabel: {
-    ...typography.labelCaps,
-    color: colors.cyanBlock,
-    fontSize: 11,
-  },
-  button: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    padding: spacing.xs,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
+    borderRadius: radius.panel,
+    shadowColor: "#000000",
+    shadowOpacity: 0.16,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+  action: {
+    flex: 1,
+    minWidth: 48,
+    minHeight: 76,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderWidth: 1,
+    borderRadius: radius.cell,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "transparent",
   },
-  buttonActive: {
-    backgroundColor: colors.cyanBlock,
-    borderColor: colors.cyanBlock,
-  },
-  buttonSelected: {
-    borderColor: colors.cyanBlock,
-  },
-  buttonDisabled: {
-    opacity: 0.4,
+  glyphRow: {
+    minHeight: 22,
+    alignItems: "center",
+    justifyContent: "center",
   },
   glyph: {
     fontSize: 20,
-    color: colors.onSurfaceVariant,
+    lineHeight: 22,
   },
-  glyphActive: {
-    color: colors.appBackground,
+  rewardChip: {
+    position: "absolute",
+    left: 18,
+    top: -2,
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.xs,
+    minWidth: 31,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  glyphDisabled: {
-    color: colors.onSurfaceVariant,
+  rewardText: {
+    fontSize: 8,
+    lineHeight: 10,
+    fontWeight: "600",
+  },
+  label: {
+    ...typography.labelCaps,
+    fontSize: 11,
+    lineHeight: 14,
+    marginTop: 1,
+  },
+  captionRow: {
+    height: 16,
+    marginTop: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  caption: {
+    ...typography.labelCaps,
+    fontSize: 9,
+    lineHeight: 12,
+    letterSpacing: 0.7,
   },
 });

@@ -1,1 +1,5 @@
-export { RewardedActionBar, type RewardedActionBarProps } from "./RewardedActionButton";
+export {
+  RewardedActionBar,
+  type RewardActionPhase,
+  type RewardedActionBarProps,
+} from "./RewardedActionButton";
