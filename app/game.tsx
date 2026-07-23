@@ -11,7 +11,7 @@ import { GameOverOverlay } from "../src/components/modals/GameOverOverlay";
 import { DefuseConfirmCard } from "../src/components/modals/DefuseConfirmCard";
 import { SecondChanceBanner } from "../src/components/modals/SecondChanceBanner";
 import { PauseOverlay } from "../src/components/modals/PauseOverlay";
-import { RewardedActionBar } from "../src/components/RewardedActionButton";
+import { RewardedActionBar, type RewardActionPhase } from "../src/components/RewardedActionButton";
 import { DragGhost, DRAG_LIFT, type DragGhostHandle } from "../src/components/DragGhost";
 import { BOARD_SIZE } from "../src/domain/board";
 import type { CellPosition } from "../src/domain/placement";
@@ -42,7 +42,7 @@ import type { AudioService } from "../src/services/audio";
 import { StorageServiceProvider, createMemoryStorageService } from "../src/services/storage";
 import { SettingsProvider } from "../src/state/SettingsProvider";
 import { AdServiceProvider, REWARD_PLACEMENTS } from "../src/services/ads";
-import type { AdService } from "../src/services/ads";
+import type { AdService, RewardedResult } from "../src/services/ads";
 import { AnalyticsServiceProvider, rewardOutcome, useAnalytics } from "../src/services/analytics";
 import type { AnalyticsService } from "../src/services/analytics";
 import { useGameSession } from "../src/state/GameSessionProvider";
@@ -85,6 +85,24 @@ type GameViewProps = {
 
 const SECOND_CHANCE_MS = 1500;
 const SECOND_CHANCE_REDUCED_MS = 800;
+
+/** How long a transient reward outcome (success/failure/cancelled) shows on a
+ *  dock button before it settles back to its resting state. Presentation only. */
+const ACTION_FLASH_MS = 1400;
+const ACTION_FLASH_REDUCED_MS = 700;
+
+/** Map a rewarded-ad outcome to the dock's transient presentation phase. This
+ *  only drives the button's visible feedback — the reward mutation stays
+ *  earn-only in `useRewardedAction`, unchanged. */
+function phaseForResult(result: RewardedResult): RewardActionPhase {
+  if (result === "earned") {
+    return "success";
+  }
+  if (result === "closed") {
+    return "cancelled";
+  }
+  return "failure";
+}
 
 /** Upper bound on the board's edge so it never balloons on tablets/wide screens
  *  (mirrors GameBoard's own maxWidth). */
@@ -150,6 +168,14 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
   const [defuseConfirmOpen, setDefuseConfirmOpen] = useState(false);
   const [secondChance, setSecondChance] = useState(false);
   const secondChanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Transient per-action dock feedback (pending while the ad is in flight, then
+  // a brief success/failure/cancelled flash). Presentation only.
+  const [freezePhase, setFreezePhase] = useState<RewardActionPhase>("idle");
+  const [defusePhase, setDefusePhase] = useState<RewardActionPhase>("idle");
+  const actionPhaseTimers = useRef<{
+    freeze: ReturnType<typeof setTimeout> | null;
+    defuse: ReturnType<typeof setTimeout> | null;
+  }>({ freeze: null, defuse: null });
   const [previewOrigin, setPreviewOrigin] = useState<CellPosition | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dragOrigin, setDragOrigin] = useState<CellPosition | null>(null);
@@ -321,6 +347,31 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
     [audio, clearDrag, controller, haptics, originForPoint, state.hand, track],
   );
 
+  // Sets a dock action's transient phase and auto-clears the outcome flash.
+  // "pending" holds until the ad resolves; success/failure/cancelled fade back
+  // to idle. Never gates or repeats the reward — that stays in useRewardedAction.
+  const setActionPhase = useCallback(
+    (action: "freeze" | "defuse", phase: RewardActionPhase) => {
+      const setter = action === "freeze" ? setFreezePhase : setDefusePhase;
+      const timers = actionPhaseTimers.current;
+      if (timers[action] !== null) {
+        clearTimeout(timers[action] as ReturnType<typeof setTimeout>);
+        timers[action] = null;
+      }
+      setter(phase);
+      if (phase !== "idle" && phase !== "pending") {
+        timers[action] = setTimeout(
+          () => {
+            timers[action] = null;
+            setter("idle");
+          },
+          reducedMotion ? ACTION_FLASH_REDUCED_MS : ACTION_FLASH_MS,
+        );
+      }
+    },
+    [reducedMotion],
+  );
+
   const handleFreeze = useCallback(() => {
     // Guard against re-activation while active/exhausted or mid-reward — the
     // domain would reject anyway, but this avoids a needless ad request.
@@ -331,6 +382,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
     // Offer logged when the ad is actually requested; result logged from the
     // resolution (never inside onEarned, so a reward can't double-log).
     track({ name: "freeze_offer" });
+    setActionPhase("freeze", "pending");
     void reward
       .run(REWARD_PLACEMENTS.freeze, () => {
         if (controller.activateFreeze()) {
@@ -338,8 +390,11 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
           audio.playSfx("freeze");
         }
       })
-      .then((result) => track({ name: "freeze_result", result: rewardOutcome(result) }));
-  }, [audio, controller, haptics, inputLocked, reward, state, track]);
+      .then((result) => {
+        track({ name: "freeze_result", result: rewardOutcome(result) });
+        setActionPhase("freeze", phaseForResult(result));
+      });
+  }, [audio, controller, haptics, inputLocked, reward, setActionPhase, state, track]);
 
   const handleDefuseOpen = useCallback(() => {
     if (inputLocked || !canApplyRewardedDefuse(state)) {
@@ -363,6 +418,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
     }
     audio.playSfx("button");
     track({ name: "defuse_offer" });
+    setActionPhase("defuse", "pending");
     void reward
       .run(REWARD_PLACEMENTS.defuse, () => {
         if (controller.defuse()) {
@@ -370,11 +426,14 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
           audio.playSfx("defuse");
         }
       })
-      .then((result) => track({ name: "defuse_result", result: rewardOutcome(result) }))
+      .then((result) => {
+        track({ name: "defuse_result", result: rewardOutcome(result) });
+        setActionPhase("defuse", phaseForResult(result));
+      })
       .finally(() => {
         setDefuseConfirmOpen(false);
       });
-  }, [audio, controller, haptics, reward, track]);
+  }, [audio, controller, haptics, reward, setActionPhase, track]);
 
   const clearSecondChance = useCallback(() => {
     if (secondChanceTimer.current !== null) {
@@ -444,8 +503,10 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
     setPreviewOrigin(null);
     clearSecondChance();
     clearDrag();
+    setActionPhase("freeze", "idle");
+    setActionPhase("defuse", "idle");
     animator.reset();
-  }, [animator, clearDrag, clearSecondChance]);
+  }, [animator, clearDrag, clearSecondChance, setActionPhase]);
 
   const handleRestart = useCallback(() => {
     audio.playSfx("button");
@@ -461,6 +522,20 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
 
   // Cancel a pending second-chance timer on unmount.
   useEffect(() => () => clearSecondChance(), [clearSecondChance]);
+
+  // Cancel any outstanding dock outcome-flash timers on unmount.
+  useEffect(
+    () => () => {
+      const timers = actionPhaseTimers.current;
+      if (timers.freeze !== null) {
+        clearTimeout(timers.freeze);
+      }
+      if (timers.defuse !== null) {
+        clearTimeout(timers.defuse);
+      }
+    },
+    [],
+  );
 
   const freezeActive = state.freezeTurnsRemaining > 0;
   const defuseTarget = defuseConfirmOpen ? getRewardedDefuseTarget(state) : null;
@@ -513,14 +588,28 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
           <View style={styles.actionZone}>
             <RewardedActionBar
               freeze={{
+                label: "FREEZE",
+                glyph: "❄",
+                testID: "freeze-button",
                 onPress: handleFreeze,
                 disabled: inputLocked || !canActivateFreeze(state),
+                // Rule-unavailable (no timers to freeze / uses spent) when idle,
+                // distinct from a temporary input lock.
+                unavailable: !freezeActive && !canActivateFreeze(state),
+                rewarded: true,
+                phase: freezePhase,
                 active: freezeActive,
                 placementsRemaining: state.freezeTurnsRemaining,
               }}
               defuse={{
+                label: "DEFUSE",
+                glyph: "⚡",
+                testID: "defuse-button",
                 onPress: handleDefuseOpen,
                 disabled: inputLocked || (!defuseConfirmOpen && !canApplyRewardedDefuse(state)),
+                unavailable: !defuseConfirmOpen && !canApplyRewardedDefuse(state),
+                rewarded: true,
+                phase: defusePhase,
                 selected: defuseConfirmOpen,
               }}
             />
