@@ -72,6 +72,26 @@ commit the accepted result. Codex must not add dependencies, change domain
 rules, change board size, change timer/explosion rules, add ad placements, or
 touch `src/domain/**` without explicit authorization in the task.
 
+## Codex delegation
+
+Claude may delegate bounded tasks with:
+
+    codex exec --sandbox workspace-write "<task>"
+
+Rules:
+
+- Claude remains lead engineer.
+- Give Codex exact allowed and forbidden files.
+- Claude and Codex must never edit the same files concurrently.
+- Codex must not commit or push.
+- Claude must inspect git status and git diff after every Codex task.
+- Claude must run relevant tests before accepting the diff.
+- Use Codex for isolated UI, tests, documentation, and mechanical refactors.
+- Never delegate domain logic, gameplay balance, persistence, economy, rewards,
+  ads, or release configuration.
+- If apply_patch fails on Windows, Codex may use direct PowerShell file writes,
+  but only inside the assigned repository files.
+
 ## Working rules
 
 - Keep gameplay logic pure (see `docs/ARCHITECTURE.md` section on the domain
