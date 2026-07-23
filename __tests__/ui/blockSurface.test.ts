@@ -88,6 +88,40 @@ describe("blockSurface material (P1-4)", () => {
     expect(invalid.fill).not.toBe(conflict.fill);
   });
 
+  it("keeps placed blocks opaque and lighter than the empty cell in ALL five themes (P1-9)", () => {
+    const luminance = (hex: string): number => {
+      const h = hex.slice(1);
+      return (
+        0.299 * parseInt(h.slice(0, 2), 16) +
+        0.587 * parseInt(h.slice(2, 4), 16) +
+        0.114 * parseInt(h.slice(4, 6), 16)
+      );
+    };
+    for (const theme of THEMES) {
+      for (const colorId of COLOR_IDS) {
+        const accent = blockColor(theme, colorId);
+        for (const variant of ["normal", "tray", "selected", "critical"] as const) {
+          const surface = blockSurface(theme, accent, variant);
+          // Opaque body that reads over the empty cell — a placed block never
+          // sinks into the board in any theme (the visibility invariant).
+          expect(surface.fill).toMatch(OPAQUE_HEX);
+          expect(surface.opacity).toBe(1);
+          expect(luminance(surface.fill)).toBeGreaterThan(luminance(theme.emptyCell));
+        }
+      }
+    }
+  });
+
+  it("uses the dashed non-color invalid cue in every theme (P1-9)", () => {
+    for (const theme of THEMES) {
+      // Invalid/conflict previews carry a shape cue (dashed), not color alone —
+      // in every theme, so the warning survives a colorblind-unfriendly palette.
+      expect(blockSurface(theme, theme.accent, "previewValid").dashed).toBe(false);
+      expect(blockSurface(theme, theme.timerCritical, "previewInvalid").dashed).toBe(true);
+      expect(blockSurface(theme, theme.timerCritical, "previewConflict").dashed).toBe(true);
+    }
+  });
+
   it("produces valid color strings for every state under all five themes", () => {
     const variants: BlockVariant[] = [
       "normal",

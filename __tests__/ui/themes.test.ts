@@ -22,6 +22,7 @@ const REQUIRED_COLOR_FIELDS: (keyof ThemePalette)[] = [
   "timerNormal",
   "timerWarning",
   "timerCritical",
+  "timerFrozen",
   "rubbleFill",
   "rubbleEdge",
   "rubbleFacet",
@@ -84,6 +85,22 @@ describe("theme palettes", () => {
       expect(theme.emptyCell).not.toBe(theme.boardBg);
       expect(theme.emptyCell).not.toBe(theme.rubbleFill);
       expect(theme.emptyCellBorder).not.toBe(theme.emptyCell);
+    }
+  });
+
+  it("keeps the four timer states mutually distinct in every theme (P1-9)", () => {
+    for (const theme of THEMES) {
+      // Normal / warning / critical / frozen must each read differently — the
+      // frozen cue in particular must never collide with a live-timer color, so
+      // "paused" is unambiguous in every theme. (Non-color cues also back these
+      // up in the badge itself; this guards the color layer.)
+      const timers = [
+        theme.timerNormal,
+        theme.timerWarning,
+        theme.timerCritical,
+        theme.timerFrozen,
+      ];
+      expect(new Set(timers).size).toBe(4);
     }
   });
 
