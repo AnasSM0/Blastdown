@@ -709,3 +709,90 @@ but slot stability would regress — a targeted test guards the format. (2)
 Five-theme readability is asserted at the token level, not a rendered per-theme
 snapshot. (3) The pre-existing expo-doctor version drift should be addressed in a
 separate dependency-maintenance pass (out of P1-7 scope).
+
+## Phase 1 · P1-8 — Compact Freeze/Defuse action dock
+
+**Scope:** replace the two floating icon-only circles (baseline
+`gameplay screen.jpg`, and the Stitch 07/09 references — the "floating unrelated
+controls" the master plan says to avoid) with one grounded, theme-aware bottom
+dock holding both rewarded actions. Presentation only — the reward-earn flow
+(`useRewardedAction`, ad service, analytics) is untouched.
+
+**Delegation:** the component half (P1-8-A) was implemented by Codex
+(`codex exec --sandbox workspace-write`), scoped to
+`src/components/RewardedActionButton/**` + its test only, to a prop contract and
+testID/accessibility compatibility spec fixed by Claude Code beforehand. Claude
+Code reviewed the full diff (in-boundary; normalized a stray UTF-8 BOM + CRLF),
+ran the focused suite, then wrote the Claude-owned `app/game.tsx` integration and
+the reward-state mapping. Single-writer throughout: Codex never touched
+`app/game.tsx`, `useRewardedAction`, services, or domain.
+
+**Structure:** `RewardedActionBar` is now one horizontal reactor panel
+(`surfaceBg` fill + `outlineVariant` border, `radius.panel`, one small shadow)
+containing two **equal-width** (`flex: 1`) action cells side by side — grounded,
+not floating circles. Each cell stacks: glyph icon, visible `FREEZE` / `DEFUSE`
+label, and a **fixed-height caption row** so state changes never reflow the dock.
+Whole cell is the ≥48px press target.
+
+**State model (Claude-owned mapping, presentation-only):** a single
+`RewardActionPhase` (`idle`/`pending`/`success`/`failure`/`cancelled`) plus the
+existing `active`/`selected`/`disabled`/`unavailable` props drive one derived
+presentation state per button, precedence: pending → active/selected →
+transient(success/failure/cancelled) → unavailable → disabled → available. Every
+state is distinguished by a **non-color** cue (caption text, border style,
+opacity, or the reward chip), never color alone:
+
+- available: reward-video chip (`▷ AD`, testID `${id}-reward`), empty caption
+- unavailable (rule can't-use): dashed border + `—` caption
+- disabled (input-locked): solid border, 0.4 opacity, no `—` (distinct from above)
+- pending: `…` caption, non-interactive (no double-trigger)
+- success `✓ DONE` / failure `AD FAILED` / cancelled `CANCELLED`: transient flash
+- freeze active: cyan-charged fill + the preserved `N MOVES`/`MOVE` label
+- defuse selected: cyan outline + `SELECTED` caption
+
+`game.tsx` maps: `unavailable` = rule-unusable while idle (vs a temporary input
+lock); `phase` set to `pending` when the ad is requested and to the mapped
+outcome when it resolves (`earned→success`, `closed→cancelled`, else `failure`),
+auto-clearing after a reduced-motion-aware flash and on restart/home/unmount. The
+reward mutation stays earn-only — the phase never gates or repeats it.
+
+**Compatibility:** testIDs `rewarded-action-bar` / `freeze-button` /
+`defuse-button` and the exact `freeze-moves-label` children (`[n, " ", word]`,
+only when active) preserved; `accessibilityRole="button"`,
+`accessibilityState.disabled`, and the `Freeze…`/`Defuse…piece` labels preserved;
+existing reward-flow / pause / analytics / layout integration tests pass
+unchanged. No `overflow: hidden` on any rounded/transformed view (Android
+black-box trap avoided).
+
+**Themes:** theme-token-only (`useTheme()`); no `colors`/`neonGlow` from the flat
+theme, no new tokens. Reactor/Arctic/Magma/Void/Solar all read via existing
+semantic tokens (`surfaceBg`, `boardBg`, `onSurface`, `outline`, `outlineVariant`,
+`accent`, `block.cyan`, `timerFrozen`, `timerWarning`, `timerCritical`).
+
+**Responsive:** two `flex:1` cells inside the P1-1 `actionZone` (within the
+bottom safe area) fit 320px; the fixed caption row keeps dock height constant so
+neither action nor the tray above it is clipped, at normal or large text.
+
+**Tests:** RewardedActionButton — dock renders both equal-width cells; callbacks
+fire when available; press is a no-op when disabled/unavailable/pending; the
+`N MOVES`/`MOVE` label appears only when active with exact children; all eight
+states render a distinct non-color cue; reward chip only when available+rewarded;
+a11y disabled tied to prop; no `overflow:hidden`/transform on a slot.
+accessibility.test updated to the new contract + min-target assertion. Full
+suite: **84 suites / 499 tests** green; coverage **90.14%**
+(RewardedActionButton.tsx 100% lines).
+
+**Verification:** typecheck ✅, lint ✅, tests ✅, coverage ✅, format ✅,
+expo-doctor 19/20 (one pre-existing upstream Expo patch-version drift, unrelated
+— no dependencies changed), Android export ✅.
+
+**Device finding:** no Android device on the build machine, so
+`docs/current game images/phase1-p8-action-dock-after.jpg` was **not** captured —
+recorded here, not fabricated. On-device confirmation deferred.
+
+**Risks:** (1) the transient success/failure/cancelled flash is new presentation
+of existing reward outcomes; it is timer-driven and cleared on restart/home/
+unmount, but is not asserted by an integration test that advances fake timers
+(the phase→state mapping is covered at the component level). (2) Five-theme
+readability is asserted at the token level, not a rendered per-theme snapshot.
+(3) Pre-existing expo-doctor drift still pending a separate dependency pass.

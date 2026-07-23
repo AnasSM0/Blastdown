@@ -994,7 +994,10 @@ column)` — deterministic, never randomized at render — so a full rubble boar
       drift, unrelated — no deps changed), Android export ✅. No device →
       after-screenshot not captured (recorded, not fabricated).
 
-- [ ] **P1-8 Freeze/Defuse action dock**
+- [x] **P1-8 Freeze/Defuse action dock** — done 2026-07-23
+      (branch `phase-professional-polish-1-action-dock`). See
+      `docs/VISUAL_POLISH_REVIEW.md` §"Phase 1 · P1-8" and the 2026-07-23
+      Decisions entry.
   - Allowed: `src/components/RewardedActionButton/**`, `app/game.tsx` (dock
     placement only).
   - Forbidden: reward trigger logic (`useRewardedAction`, ad service), domain.
@@ -1005,6 +1008,20 @@ column)` — deterministic, never randomized at render — so a full rubble boar
   - Tests: existing reward-flow integration tests pass unchanged; button states
     render per prop.
   - Verify: full battery.
+  - Result: `RewardedActionBar` is now one grounded reactor panel with two
+    equal-width (`flex:1`) Freeze/Defuse cells (glyph + `FREEZE`/`DEFUSE` label +
+    fixed-height caption row; whole cell ≥48px), replacing the two floating
+    circles. A `RewardActionPhase` (`idle/pending/success/failure/cancelled`) plus
+    `active`/`selected`/`disabled`/`unavailable` drive eight distinct states, each
+    with a non-color cue (caption/border/opacity/reward-chip), never color alone;
+    the `N MOVES` freeze label and all reward-flow testIDs/a11y are preserved.
+    Component delegated to Codex (`workspace-write`) to a Claude-fixed contract;
+    Claude reviewed the diff, wrote the `app/game.tsx` integration + presentation-
+    only reward-state mapping (earn flow untouched). Theme-token-only, no new
+    tokens, no `overflow:hidden` (Android-safe). 84 suites / 499 tests, coverage
+    90.14% (RewardedActionButton 100% lines), doctor 19/20 (pre-existing upstream
+    Expo drift, unrelated), Android export ✅. No device → after-screenshot not
+    captured (recorded, not fabricated).
 
 - [ ] **P1-9 Theme compatibility**
   - Allowed: gameplay-visible components (`GridCell`, `PieceTray`, `ScoreHeader`,

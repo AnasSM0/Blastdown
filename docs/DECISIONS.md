@@ -1114,3 +1114,42 @@ tokens, no expensive shadow or animated slot background.
 
 **Ownership:** the Codex sandbox remains broken on this machine (2026-07-18
 entry), so the one allowed Codex UI task was done by Claude single-writer.
+
+## 2026-07-23 — P1-8 action dock: prop contract, transient phases, Codex split
+
+Replaced the floating Freeze/Defuse circles with one grounded `RewardedActionBar`
+dock (equal-width cells, labels, reward chip, fixed-height caption row).
+
+- **Prop contract extended, not replaced.** Kept `active`/`selected`/`disabled`/
+  `placementsRemaining` (so the pinned integration behavior — `freeze-moves-label`
+  children, `accessibilityState.disabled`, the `freeze-button`/`defuse-button`/
+  `rewarded-action-bar` testIDs — is preserved) and added `label`/`glyph`/
+  `testID`/`rewarded`/`unavailable`/`phase`. Why: the reward-flow integration
+  tests are a contract we must not break, and P1-9 will still migrate remaining
+  chrome; a compatible extension keeps both green.
+- **`unavailable` vs `disabled` are distinct states.** `unavailable` = the rule
+  makes the power-up unusable right now (no timers / uses spent); `disabled` = a
+  temporary input lock (animating / paused / another reward pending). They render
+  differently (dashed + `—` vs solid dimmed) so the reason is legible, not just
+  "greyed out". Affects only presentation; the domain capability checks
+  (`canActivateFreeze`, `canApplyRewardedDefuse`) are unchanged.
+- **Transient phase is presentation-only.** `game.tsx` sets a per-action
+  `RewardActionPhase` to `pending` when the ad is requested and to the mapped
+  outcome on resolve (`earned→success`, `closed→cancelled`,
+  `unavailable`/`error→failure`), auto-clearing after a reduced-motion-aware
+  flash and on restart/home/unmount. It never gates or repeats the reward — the
+  earn-only mutation in `useRewardedAction` is untouched, so the once-only
+  guarantee holds. Freeze's persistent `active` state wins over a `success` flash
+  by precedence.
+- **Component delegated to Codex; integration kept by Claude.** Codex
+  (`--sandbox workspace-write`) implemented `RewardedActionButton/**` + its test
+  to a Claude-fixed contract; Claude reviewed the diff in-boundary (normalized a
+  stray UTF-8 BOM + CRLF the tool introduced), then wrote `app/game.tsx` and the
+  reward-state mapping. This is the first delegated P1 task since the Codex
+  sandbox was repaired; it supersedes the master-plan note that P1 tasks are not
+  delegated (that note predates the fix — see the CLAUDE.md "Codex delegation"
+  rules and the config-repair entry).
+
+Affects: `src/components/RewardedActionButton/**`, `app/game.tsx`,
+`__tests__/components/{RewardedActionButton,accessibility}.test.tsx`. No gameplay,
+domain, economy, analytics, reward, or dependency change.
