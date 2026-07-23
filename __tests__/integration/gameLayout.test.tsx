@@ -6,13 +6,22 @@ const NOW = 1_752_800_000_000;
 const options = { seed: "layout-seed", now: () => NOW };
 
 describe("computeBoardSide (responsive board geometry)", () => {
-  it("returns the largest square fitting width and the height budget, capped", () => {
-    // Width-bound (tall screen): board = full width.
+  it("returns the largest square fitting width and the height left after the tray/dock reserve, capped", () => {
+    // Width-bound (tall screen): board = full inner width.
     expect(computeBoardSide({ width: 320, height: 900 })).toBe(320);
-    // Height-bound (short screen): board = height * 0.62.
-    expect(computeBoardSide({ width: 800, height: 500 })).toBeCloseTo(310, 5);
+    // Height-bound (short screen): board = height minus the fixed tray+dock
+    // reserve (200), so those controls always fit beneath it.
+    expect(computeBoardSide({ width: 800, height: 500 })).toBe(300);
     // Capped at the max on very large screens.
     expect(computeBoardSide({ width: 1200, height: 2000 })).toBe(420);
+  });
+
+  it("reserves fixed room for the tray and dock on short screens (P1-10)", () => {
+    // The board never claims height the tray/dock need: at 460px inner height the
+    // board is 260 (460 - 200), leaving the reserve free.
+    expect(computeBoardSide({ width: 800, height: 460 })).toBe(260);
+    // Extremely short: nothing left for the board after the reserve → 0.
+    expect(computeBoardSide({ width: 800, height: 180 })).toBe(0);
   });
 
   it("returns 0 until the content box is measured (nothing renders that frame)", () => {
