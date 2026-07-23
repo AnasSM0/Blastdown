@@ -790,9 +790,15 @@ expo-doctor 19/20 (one pre-existing upstream Expo patch-version drift, unrelated
 `docs/current game images/phase1-p8-action-dock-after.jpg` was **not** captured —
 recorded here, not fabricated. On-device confirmation deferred.
 
-**Risks:** (1) the transient success/failure/cancelled flash is new presentation
-of existing reward outcomes; it is timer-driven and cleared on restart/home/
-unmount, but is not asserted by an integration test that advances fake timers
-(the phase→state mapping is covered at the component level). (2) Five-theme
-readability is asserted at the token level, not a rendered per-theme snapshot.
-(3) Pre-existing expo-doctor drift still pending a separate dependency pass.
+**Reward-phase tests (added after a stop-time review flagged the timer behavior
+as untested):** `rewardFlows.test.tsx` now covers the game.tsx transient mapping
+and auto-clear end-to-end — freeze `closed`→`CANCELLED` and `error`→`AD FAILED`
+captions that then auto-clear (awaited with `waitFor`); an `earned` reward shows
+the active moves label with no success caption leaking over it; and cancelling
+the defuse confirm card runs no ad and shows no flash. (Real timers throughout —
+faking them deadlocks RNTL's async `act`, which flushes via a faked
+`setImmediate`.)
+
+**Risks:** (1) Five-theme readability is asserted at the token level, not a
+rendered per-theme snapshot. (2) Pre-existing expo-doctor drift still pending a
+separate dependency pass.
