@@ -1023,7 +1023,10 @@ column)` — deterministic, never randomized at render — so a full rubble boar
     Expo drift, unrelated), Android export ✅. No device → after-screenshot not
     captured (recorded, not fabricated).
 
-- [ ] **P1-9 Theme compatibility**
+- [x] **P1-9 Theme compatibility** — done 2026-07-23
+      (branch `phase-professional-polish-1-theme-compatibility`). See
+      `docs/VISUAL_POLISH_REVIEW.md` §"Phase 1 · P1-9" and the 2026-07-23
+      Decisions entry.
   - Allowed: gameplay-visible components (`GridCell`, `PieceTray`, `ScoreHeader`,
     `RewardedActionButton`, `GameBoard`) + theme tokens; remove hardcoded
     `colors.*` from these.
@@ -1035,6 +1038,18 @@ column)` — deterministic, never randomized at render — so a full rubble boar
   - Tests: `it.each` over `THEMES` asserting key chrome (block, empty, rubble,
     badge, preview-conflict, dock-active) matches the theme token.
   - Verify: full battery.
+  - Result: a Codex read-only audit + grep confirmed the gameplay UI was already
+    ~fully theme-migrated across P1-1..P1-8; the only remaining bypass was
+    `ComboIndicator` (`colors.amberBlock`), now drawing its pill border + numeral
+    from `theme.score` via `useTheme()`. Also removed a dead `colors.appBackground`
+    fallback (+ unused import) from `app/game.tsx` `styles.screen`. Zero `colors.*`
+    / `neonGlow` remain in any gameplay component. No new tokens (combo reuses the
+    `score` accent). Five-theme readability now guarded per-theme (were Reactor-
+    only): placed-block opacity + luminance over empty cell, four timer states
+    mutually distinct, dashed invalid cue; `timerFrozen` added to the required
+    per-theme color contract. 85 suites / 510 tests, coverage 90.15%
+    (ComboIndicator 100%), doctor 19/20 (pre-existing Expo drift), Android export
+    ✅. No device → after-screenshots not captured (recorded, not fabricated).
 
 - [ ] **P1-10 Responsive & accessibility review**
   - Allowed: `docs/**`, `__tests__/**` (UI code changes only to fix regressions

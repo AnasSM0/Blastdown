@@ -802,3 +802,86 @@ faking them deadlocks RNTL's async `act`, which flushes via a faked
 **Risks:** (1) Five-theme readability is asserted at the token level, not a
 rendered per-theme snapshot. (2) Pre-existing expo-doctor drift still pending a
 separate dependency pass.
+
+## Phase 1 · P1-9 — Five-theme compatibility & semantic-token cleanup
+
+**Scope:** verify the polished gameplay UI reads consistently across all five
+themes (Reactor/Arctic/Magma/Void/Solar) and remove the remaining
+gameplay-critical hardcoded colors. No gameplay, reward, or domain change.
+
+**Audit (Codex, read-only):** a `codex exec --sandbox workspace-write` read-only
+pass over every gameplay component (GameBoard, GridCell, BlockSurface,
+TimerBadge, RubbleSurface, PieceTray, ScoreHeader, ComboIndicator,
+RewardedActionButton, ReactorBackground, DragGhost, effects, app/game.tsx) found
+the UI **already ~fully theme-migrated** from P1-1..P1-8. Only real bypass:
+`ComboIndicator` used the flat `colors.amberBlock` for its pill border + text.
+Claude independently confirmed with `grep` (only ComboIndicator matched); the
+`shadowColor: "#000000"` in the dock is an elevation tint (not a gameplay color)
+and `app/game.tsx`'s `styles.screen` had a dead `colors.appBackground` fallback
+already overridden inline by `theme.appBackground`.
+
+**Changes (2 production files):**
+
+- `ComboIndicator` now consumes `useTheme()` and draws its pill border + numeral
+  from `theme.score` (the per-theme score accent) instead of `colors.amberBlock`
+  — the combo multiplier is a scoring flourish, so it tracks the score color in
+  every theme (Reactor orange, Arctic cyan, etc.).
+- `app/game.tsx` `styles.screen` dropped the dead `colors.appBackground`
+  fallback (the root View already sets `theme.appBackground` inline), and the now
+  unused `colors` import was removed. No visual change — it removes a masked
+  bypass.
+
+Net: **zero** `colors.*` / `neonGlow` references remain in any gameplay component
+or the gameplay screen.
+
+**Token decisions:** no new tokens added — every gameplay-critical surface maps
+to an existing `ThemePalette` token, avoiding duplicates. The combo pill reuses
+`score` rather than introducing a combo-specific token (same semantic: the run's
+scoring accent). Token names stay purpose-based.
+
+**Five-theme findings:** all required gameplay tokens exist and are valid in every
+theme (asserted over `THEMES`): background/HUD, board frame + empty cells, the
+three block hues, the four timer states (normal/warning/critical/frozen), piece
+contours (piece accent via `blockColor`), rubble layers + fissure, tray slots,
+the Freeze/Defuse dock, valid/invalid previews, and score/labels/disabled. Key
+readability invariants now hold per-theme, not just Reactor: placed blocks stay
+opaque and lighter than the empty cell in all five themes; the four timer colors
+are mutually distinct in all five; rubble stays distinct from empty and block
+cells; the invalid preview keeps its dashed non-color cue in all five.
+
+**Tests (focused, added):**
+
+- `themes.test.ts`: `timerFrozen` added to the required per-theme color contract;
+  new "four timer states mutually distinct in every theme".
+- `blockSurface.test.ts`: placed-block opacity + luminance-over-emptyCell now
+  swept over **all five themes × three hues × solid variants** (was Reactor
+  only); dashed invalid/conflict cue asserted in every theme.
+- `ComboIndicator.test.tsx` (new): renders nothing at combo 0; shows the
+  multiplier + a11y label; pill border and numeral both come from `theme.score`
+  (not the old hardcoded hue).
+
+Existing guards continue to cover the rest of the P1-9 checklist unchanged:
+placed-block opacity (blockSurface/GridCell), Android overflow/transform guards
+(GridCell/BlockSurface/PieceTray/RewardedActionButton), 64-cell board
+(GameBoard), and gameplay/reward behavior (domain + rewardFlows/pause/analytics).
+
+Full suite: **85 suites / 510 tests** green; coverage **90.15%**
+(ComboIndicator 100%).
+
+**Verification:** typecheck ✅, lint ✅, tests ✅, coverage ✅, format ✅,
+expo-doctor 19/20 (pre-existing upstream Expo patch-version drift, unrelated — no
+dependencies changed), Android export ✅.
+
+**Device finding:** no Android device on the build machine, so
+`docs/current game images/phase1-p9-reactor-after.jpg` and
+`…/phase1-p9-alt-theme-after.jpg` were **not** captured — recorded here, not
+fabricated. Per-theme on-device confirmation (esp. Solar/Magma warm palettes for
+critical-red readability, and Void violet-on-dark) deferred.
+
+**Risks:** (1) Five-theme readability is asserted at the token/material level
+(distinctness + luminance invariants), not a rendered per-theme pixel snapshot —
+a device pass is still the final visual check. (2) `theme.score` in warm themes
+(Solar/Magma) is close in hue to the amber block; the combo pill is text+border
+on a transparent fill and sits in the HUD (not over the board), so it stays
+legible, but a device glance should confirm. (3) Pre-existing expo-doctor drift
+still pending a separate dependency pass.

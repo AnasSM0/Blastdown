@@ -1153,3 +1153,33 @@ dock (equal-width cells, labels, reward chip, fixed-height caption row).
 Affects: `src/components/RewardedActionButton/**`, `app/game.tsx`,
 `__tests__/components/{RewardedActionButton,accessibility}.test.tsx`. No gameplay,
 domain, economy, analytics, reward, or dependency change.
+
+## 2026-07-23 — P1-9 five-theme compatibility: combo token, no new tokens
+
+Completed the gameplay theme-contract migration. The gameplay UI was already
+~fully theme-migrated across P1-1..P1-8; a Codex read-only audit + a grep
+confirmed the only remaining gameplay-critical bypass was `ComboIndicator`
+(`colors.amberBlock` for its pill border + text).
+
+- **Combo pill → `theme.score`, not a new token.** The combo multiplier is a
+  scoring flourish, so it reuses the existing per-theme `score` accent rather
+  than adding a combo-specific token — no duplicate token with the same meaning.
+- **No new tokens added in P1-9.** Every gameplay-critical surface mapped cleanly
+  to an existing `ThemePalette` token, so the five-theme contract needed no
+  additions — only the `ComboIndicator` consumer was fixed.
+- **Removed a dead theme bypass in `app/game.tsx`.** `styles.screen` carried a
+  static `colors.appBackground` that was always overridden inline by
+  `theme.appBackground` on the root View; dropped it (and the now-unused `colors`
+  import). No visual change; removes the masked bypass so no gameplay file
+  references the flat `colors` object.
+- **`shadowColor: "#000000"`** in the dock is kept — it is an elevation/shadow
+  tint, not a gameplay color, and is theme-agnostic by design.
+
+Five-theme readability invariants are now guarded per-theme (were Reactor-only):
+placed-block opacity + luminance over the empty cell, the four timer states
+mutually distinct, rubble distinct from empty/blocks, and the dashed invalid cue.
+`timerFrozen` added to the required per-theme color contract test.
+
+Affects: `src/components/ComboIndicator/ComboIndicator.tsx`, `app/game.tsx`,
+`__tests__/{ui/themes,ui/blockSurface,components/ComboIndicator}.test.*`. No
+gameplay, domain, economy, analytics, reward, or dependency change.
