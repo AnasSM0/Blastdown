@@ -1055,7 +1055,10 @@ column)` — deterministic, never randomized at render — so a full rubble boar
     (ComboIndicator 100%), doctor 19/20 (pre-existing Expo drift), Android export
     ✅. No device → after-screenshots not captured (recorded, not fabricated).
 
-- [ ] **P1-10 Responsive & accessibility review**
+- [x] **P1-10 Responsive & accessibility review** — done 2026-07-23
+      (branch `phase-professional-polish-1-responsive-a11y`). See
+      `docs/VISUAL_POLISH_REVIEW.md` §"Phase 1 · P1-10", `docs/ACCESSIBILITY.md`
+      §"P1-10", and the 2026-07-23 Decisions entry.
   - Allowed: `docs/**`, `__tests__/**` (UI code changes only to fix regressions
     this review surfaces).
   - Forbidden: feature work, domain.
@@ -1065,6 +1068,20 @@ column)` — deterministic, never randomized at render — so a full rubble boar
     recorded in `VISUAL_POLISH_REVIEW.md` + `ACCESSIBILITY.md`.
   - Tests: gameplay renders at min board width; a11y labels present on new chrome.
   - Verify: full battery + Android export.
+  - Result: Codex read-only audit (18 findings) reviewed; proven regressions
+    fixed. Board sizing reworked (inner-box + fixed tray/dock reserve so nothing
+    clips on short screens); TimerBadge/PieceTray now honor the EFFECTIVE
+    reduced-motion override; TimerBadge/board-shake/DragGhost omit identity
+    transforms under reduced motion (Android black-render guard extended);
+    text-scaling caps (combo/dock/timer numeral); a11y labels/hints (rubble
+    "blocked", cell placement hint, pause hint, dock per-state + rewarded-ad
+    hints, pending disabled). Board-cell <44px recorded as an accepted 8×8-grid
+    constraint (all discrete controls meet 44px). New `responsiveA11y.test.tsx` +
+    `gameLayout.test` reserve cases. 86 suites / 523 tests, coverage 91.72%,
+    doctor 19/20 (pre-existing Expo drift), Android export ✅. No device →
+    on-device matrix recorded, not fabricated. UI code touched only to fix
+    audit-proven regressions (the `docs/**`+`__tests__/**` allowance explicitly
+    permits regression fixes).
 
 - [ ] **P1-11 Before/after screenshot comparison**
   - Allowed: `docs/**`, add an AFTER capture under `docs/current game images/`

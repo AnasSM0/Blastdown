@@ -108,3 +108,59 @@ too — the board-sizing rule in `docs/STYLE_GUIDE.md` (compute board width
 from available space, don't hardcode 350px) is what makes this work on
 narrower devices; verify at implementation time on a ~360px-wide reference
 device, not just the 390px one the designs were built against.
+
+## P1-10 responsive & accessibility review (2026-07-23)
+
+Verification pass over the polished gameplay screen. A read-only Codex audit
+(18 findings) was reviewed against the code; only proven regressions were fixed.
+
+**Tested geometry.** `computeBoardSide` is now driven off the INNER content box
+(the content view's 20px horizontal padding + 8px vertical padding are subtracted
+before sizing, fixing a board that previously overran both gutters), and it
+reserves a fixed 200px beneath the board for the tray + dock so they can never be
+pushed off a short screen (was a height fraction that under-reserved on the
+shortest phones). Composition verified at 320/360/390/420px board widths (64-cell
+board + HUD + tray + dock all present) and the reserve verified at short heights
+(460px → 260px board; ≤200px → board suppressed rather than overflowing).
+
+**Board-cell touch targets — accepted constraint.** An 8×8 board on a phone
+yields cells ~35–42px at 320–360px width; 44px×8 = 352px+gutters exceeds those
+widths, so per-cell 44px is geometrically impossible without a redesign (out of
+P1-10 scope). This is a dense spatial grid, not a set of discrete controls — the
+44×44 floor is upheld for every discrete control (tray slots 64×64, dock cells
+≥48×76, pause 48×48 + hit-slop). Placement also has a tap-to-select-then-tap path
+and drag. Documented as an accepted trade-off; revisit only if a redesign adds an
+accessible non-grid placement affordance.
+
+**Text scaling.** Score/best already capped (P1-2). Added caps so large OS font
+scales can't push controls off-screen or clip: combo pill (`numberOfLines`,
+`maxFontSizeMultiplier`), dock FREEZE/DEFUSE labels + state captions + reward chip
+(`numberOfLines` + `maxFontSizeMultiplier`), and the timer numeral
+(`allowFontScaling={false}` — a spatial indicator sized to its badge; the count is
+also in the badge's accessibility label).
+
+**Labels & hints.** Rubble now announces "Blocked rubble cell…"; actionable board
+cells carry a "Places the selected piece here" hint; the pause control gained a
+hint; the dock exposes a per-state hint (pending→"Loading the rewarded ad",
+unavailable/disabled/failure/cancelled variants) and announces the rewarded-ad
+cost ("Watch a rewarded ad to use this") when the "▷ AD" chip shows; a pending
+dock button reports `accessibilityState.disabled` so it can't be triggered again.
+
+**Reduced motion.** `TimerBadge` and `PieceTray` now consume the EFFECTIVE
+reduced-motion value (OS combined with the persisted in-app override) threaded
+from the screen, instead of the OS-only hook — so the Settings toggle actually
+suppresses the badge pulse and the tray lift. Every rounded, animatable gameplay
+view (TimerBadge, the board's shake wrapper, DragGhost — joining GridCell/tray
+slot/dock already done) now OMITS its transform entirely under reduced motion
+rather than binding an identity one, upholding the Android hardware-layer
+"black-render" guard. Static block/rubble/empty visibility is unchanged; warnings
+stay readable (numeral + ring, never color alone).
+
+**Deferred device checks.** No Android device on the build machine, so the
+on-device matrix (very short phone, large font scale, gesture vs three-button nav,
+reduced-motion on a real device) is recorded here, not captured/fabricated. The
+board-cell size and safe-area behavior should be eyeballed on a ~360px device.
+
+**Colorblind-safe palette** (from the Phase-0 gap list) remains a separate,
+larger task — not in P1-10 scope; state is never signaled by color alone across
+the polished surfaces (verified in P1-9 + here).

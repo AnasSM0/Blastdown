@@ -1211,3 +1211,43 @@ components; all five themes render correctly"):
 
 The `Allowed` list in `docs/TASKS.md` P1-9 was updated to name both explicitly.
 Mirrors the P1-5 reconciliation pattern above.
+
+## 2026-07-23 — P1-10 responsive/a11y: board-sizing model, effective reduced motion, accepted board-cell size
+
+Responsive + accessibility review of the gameplay screen (Codex read-only audit,
+Claude-reviewed; only proven regressions fixed).
+
+- **Board sizing reworked to reserve tray/dock, off the inner box.**
+  `computeBoardSide` previously used the padded content width (board overran both
+  20px gutters) and a 0.62 height fraction that under-reserved on the shortest
+  screens. Now the layout handler subtracts the content padding before storing the
+  box, and `computeBoardSide` = `min(innerWidth, innerHeight - RESERVED_BELOW_BOARD
+(200), MAX (420))`. Width-bound cases are unchanged; height-bound cases reserve a
+  fixed 200 for the tray + dock so they never clip. `RESERVED_BELOW_BOARD` is an
+  estimate (tray ≈88 + dock ≈84 + gaps ≈28) and must track the chrome if it grows.
+- **TimerBadge/PieceTray now honor the EFFECTIVE reduced-motion value.** Both read
+  the OS-only `useReducedMotion` hook, ignoring the persisted in-app override that
+  the rest of the screen respects via `useEffectiveReducedMotion`. Made both accept
+  an optional `reducedMotion` prop (fallback to the OS hook for isolated renders),
+  threaded from the screen (PieceTray) / board (TimerBadge). The Settings toggle now
+  actually suppresses the badge pulse and tray lift.
+- **Android identity-transform guard extended.** `TimerBadge`, the board's shake
+  wrapper (`GameBoard`), and `DragGhost` now omit their transform entirely under
+  reduced motion (joining GridCell / tray slot / dock). An identity transform on a
+  rounded, elevated view still promotes it to an Android hardware layer — the
+  black-render trap — so binding none is the correct guard.
+- **Board-cell <44px is an ACCEPTED constraint, not a fix.** An 8×8 board on a
+  320–360px phone yields ~35–42px cells; 44px×8 exceeds those widths, so per-cell
+  44px is impossible without a redesign (out of scope). The 44px floor is upheld for
+  every discrete control (tray 64, dock ≥48×76, pause 48). The board is a dense
+  spatial grid with tap-select + drag alternatives. Recorded in `ACCESSIBILITY.md`.
+- **Text-scaling caps** added (combo, dock label/caption/chip, timer numeral) to
+  bound large-OS-font growth; the timer numeral is `allowFontScaling={false}` (a
+  spatial indicator; the count is also in its a11y label).
+- **A11y labels/hints** enriched (rubble "blocked", cell placement hint, pause hint,
+  dock per-state hints + rewarded-ad cost, pending → `accessibilityState.disabled`).
+
+Affects: `app/game.tsx`, `src/components/{TimerBadge,GameBoard,PieceTray,DragGhost,
+GridCell,ScoreHeader,ComboIndicator,RewardedActionButton}`, and
+`__tests__/{components/responsiveA11y,integration/gameLayout}`. No gameplay,
+domain, economy, analytics, reward, ad, or dependency change.

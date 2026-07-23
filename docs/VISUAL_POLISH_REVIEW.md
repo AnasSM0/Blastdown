@@ -885,3 +885,67 @@ a device pass is still the final visual check. (2) `theme.score` in warm themes
 on a transparent fill and sits in the HUD (not over the board), so it stays
 legible, but a device glance should confirm. (3) Pre-existing expo-doctor drift
 still pending a separate dependency pass.
+
+## Phase 1 · P1-10 — Responsive, accessibility & reduced-motion review
+
+**Scope:** review the polished gameplay screen for responsive layout, text
+scaling, touch/accessibility, non-color cues, and reduced-motion correctness;
+fix only verified regressions. No gameplay, reward, analytics, theme, or domain
+change.
+
+**Audit (Codex, read-only):** an 18-finding pass (16 confirmed, 2 possible) over
+the gameplay path. Claude reviewed each against the code and fixed the proven
+ones; documented the one non-fixable constraint; deferred device-only checks.
+
+**Fixes:**
+
+- **Board sizing (responsive):** `computeBoardSide` now works off the INNER
+  content box (the content view's own padding is subtracted in the layout
+  handler) — the board no longer overruns the 20px gutters — and reserves a fixed
+  `RESERVED_BELOW_BOARD` (200) for the tray + dock instead of a height fraction,
+  so on short screens the controls can't be pushed off. Board stays square, 64
+  cells, capped at 420.
+- **Reduced-motion correctness + Android guard:** `TimerBadge` and `PieceTray`
+  now take the effective reduced-motion value (OS + persisted override) from the
+  screen (were OS-only, ignoring the Settings toggle). `TimerBadge`, the board's
+  shake wrapper, and `DragGhost` now omit their transforms entirely under reduced
+  motion (joining GridCell / tray slot / dock) — no identity transform on a
+  rounded, elevated view, upholding the black-render guard.
+- **Text scaling:** caps added to the combo pill, the dock labels/captions/reward
+  chip, and the timer numeral (locked font — spatial indicator, count also in the
+  a11y label), so large OS font scales can't clip or push controls off-screen.
+- **Labels/hints:** rubble announces "Blocked rubble cell…"; actionable cells get
+  a placement hint; the pause control gets a hint; the dock exposes per-state
+  hints (pending "Loading the rewarded ad", unavailable/failure/cancelled…) and
+  the rewarded-ad cost when the "▷ AD" chip shows; pending dock buttons report
+  `accessibilityState.disabled`.
+
+**Accepted constraint (not a fix):** board cells are ~35–42px at 320–360px width;
+44px per cell is geometrically impossible for an 8×8 grid on a phone. The 44×44
+floor holds for every discrete control (tray 64, dock ≥48×76, pause 48); the board
+is a dense spatial grid with tap-select and drag alternatives. Recorded in
+`ACCESSIBILITY.md`.
+
+**Non-color cues (re-verified):** invalid preview dashed; critical timer
+numeral+ring; frozen icy dashed static ring; dock states via caption/border/
+opacity; rubble via cracks/facets — none color-only. No COLOR-ONLY finding.
+
+**Tests (added):** `responsiveA11y.test.tsx` (new) — reduced-motion transform
+omission for TimerBadge/board/DragGhost/PieceTray; locked timer numeral; rubble
+"blocked" label; actionable-cell hint; pause hint; combo + dock scaling caps; dock
+per-state a11y hints. `gameLayout.test.tsx` — `computeBoardSide` reserve/inner-box
+behavior (300 at 800×500, 260 at 800×460, 0 at 800×180). Full suite: **86 suites /
+523 tests** green; coverage **91.72%**.
+
+**Verification:** typecheck ✅, lint ✅, tests ✅, coverage ✅, format ✅,
+expo-doctor 19/20 (pre-existing upstream Expo patch drift, unrelated — no deps
+changed), Android export ✅.
+
+**Device finding:** no Android device on the build machine — the on-device matrix
+(short phone, large font, gesture vs three-button nav, real reduced-motion) is
+recorded, not captured/fabricated.
+
+**Risks:** (1) The board-cell 44px shortfall is an accepted grid constraint, not
+resolved. (2) `RESERVED_BELOW_BOARD` is an estimate (200); if the tray/dock chrome
+grows it should track. (3) Text-scaling caps bound growth but a device pass at the
+largest accessibility sizes is still advisable. (4) Pre-existing expo-doctor drift.
