@@ -1244,7 +1244,9 @@ Claude-reviewed; only proven regressions fixed).
 - **Text-scaling caps** added (combo, dock label/caption/chip, timer numeral) to
   bound large-OS-font growth; the timer numeral is `allowFontScaling={false}` (a
   spatial indicator; the count is also in its a11y label).
-- **A11y labels/hints** enriched (rubble "blocked", cell placement hint, pause hint,
+- **A11y labels/hints** enriched (rubble "blocked", a conditional placement hint on
+  empty cells only — "If a piece is selected, double tap to place it here", so it
+  never claims a placement that a no-selection/occupied tap won't make — pause hint,
   dock per-state hints + rewarded-ad cost, pending → `accessibilityState.disabled`).
 
 Affects: `app/game.tsx`, `src/components/{TimerBadge,GameBoard,PieceTray,DragGhost,

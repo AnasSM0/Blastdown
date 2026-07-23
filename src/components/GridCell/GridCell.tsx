@@ -141,6 +141,15 @@ export function GridCell({
   // is only briefly non-identity during the placement snap.
   const cellTransform = reducedMotion ? undefined : { transform: [{ scale: snap }] };
 
+  // A placement hint only on empty cells — the only cells a placement can land
+  // on — and phrased conditionally: tapping does nothing unless a piece is
+  // selected, so an unconditional "places the piece here" would mislead when
+  // nothing is selected or the cell is occupied.
+  const placementHint =
+    onPress && cell.kind === "empty"
+      ? "If a piece is selected, double tap to place it here"
+      : undefined;
+
   return (
     <AnimatedPressable
       style={[styles.cell, base, visual, cellTransform]}
@@ -149,7 +158,7 @@ export function GridCell({
       testID={`cell-${row}-${column}`}
       accessibilityLabel={cellLabel(cell, row, column)}
       accessibilityRole={onPress ? "button" : undefined}
-      accessibilityHint={onPress ? "Places the selected piece here" : undefined}
+      accessibilityHint={placementHint}
       accessible
     >
       {isBlock && blockAccent ? (

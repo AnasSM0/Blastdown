@@ -89,16 +89,31 @@ describe("accessibility labels and hints (P1-10)", () => {
     expect(result.getByTestId("cell-0-0").props.accessibilityLabel).toMatch(/blocked rubble/i);
   });
 
-  it("gives an actionable cell a placement hint and a non-actionable cell none", async () => {
+  it("gives an empty actionable cell a conditional placement hint", async () => {
     const actionable = await render(
       <GridCell cell={{ kind: "empty" }} row={1} column={1} size={40} onPress={jest.fn()} />,
     );
+    // Conditional phrasing: tapping only places WHEN a piece is selected, so the
+    // hint must not claim an unconditional placement.
     expect(actionable.getByTestId("cell-1-1").props.accessibilityHint).toMatch(
-      /places the selected piece/i,
+      /if a piece is selected/i,
     );
 
     const inert = await render(<GridCell cell={{ kind: "empty" }} row={2} column={2} size={40} />);
     expect(inert.getByTestId("cell-2-2").props.accessibilityHint).toBeUndefined();
+  });
+
+  it("does not give an occupied cell a placement hint (it is not a target)", async () => {
+    const occupied = await render(
+      <GridCell
+        cell={{ kind: "normal", colorId: "cyan" }}
+        row={3}
+        column={3}
+        size={40}
+        onPress={jest.fn()}
+      />,
+    );
+    expect(occupied.getByTestId("cell-3-3").props.accessibilityHint).toBeUndefined();
   });
 
   it("gives the pause control a hint describing what it does", async () => {
