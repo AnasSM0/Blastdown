@@ -47,7 +47,7 @@ import { AnalyticsServiceProvider, rewardOutcome, useAnalytics } from "../src/se
 import type { AnalyticsService } from "../src/services/analytics";
 import { useGameSession } from "../src/state/GameSessionProvider";
 import { useProfile } from "../src/state/ProfileProvider";
-import { colors, spacing } from "../src/ui/theme";
+import { spacing } from "../src/ui/theme";
 import { useTheme } from "../src/ui/ThemeProvider";
 
 type DragState = {
@@ -745,8 +745,10 @@ export default function GameScreen() {
 
 const styles = StyleSheet.create({
   screen: {
+    // Background color is applied inline from the active theme
+    // (`theme.appBackground`) on the root View, so no static fallback here —
+    // that fallback was a theme bypass masked by the inline override.
     flex: 1,
-    backgroundColor: colors.appBackground,
   },
   safe: {
     flex: 1,
