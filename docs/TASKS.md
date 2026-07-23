@@ -1028,8 +1028,12 @@ column)` — deterministic, never randomized at render — so a full rubble boar
       `docs/VISUAL_POLISH_REVIEW.md` §"Phase 1 · P1-9" and the 2026-07-23
       Decisions entry.
   - Allowed: gameplay-visible components (`GridCell`, `PieceTray`, `ScoreHeader`,
-    `RewardedActionButton`, `GameBoard`) + theme tokens; remove hardcoded
-    `colors.*` from these.
+    `ComboIndicator`, `RewardedActionButton`, `GameBoard`) + `app/game.tsx`
+    (gameplay screen) + theme tokens; remove hardcoded `colors.*` from these.
+    (`ComboIndicator` and `app/game.tsx` were added to this list during execution
+    — the original enumeration was a representative sample of "gameplay-visible
+    components", and the audit found the only remaining bypasses lived in those
+    two; see the 2026-07-23 "P1-9 file-boundary reconciliation" Decisions entry.)
   - Forbidden: domain; non-gameplay screens optional (out of Phase 1 scope).
   - Depends on: P1-2..P1-8.
   - Acceptance: every gameplay-visible chrome color reads from the active theme;

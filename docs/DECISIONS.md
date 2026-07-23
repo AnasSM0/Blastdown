@@ -1183,3 +1183,31 @@ mutually distinct, rubble distinct from empty/blocks, and the dashed invalid cue
 Affects: `src/components/ComboIndicator/ComboIndicator.tsx`, `app/game.tsx`,
 `__tests__/{ui/themes,ui/blockSurface,components/ComboIndicator}.test.*`. No
 gameplay, domain, economy, analytics, reward, or dependency change.
+
+### P1-9 file-boundary reconciliation (2026-07-23)
+
+A stop-time review flagged that the P1-9 implementation edited files outside the
+task's original `Allowed` list (which enumerated `GridCell`, `PieceTray`,
+`ScoreHeader`, `RewardedActionButton`, `GameBoard` + theme tokens). Reviewed
+against the governing constraints — neither edited file touches a PROTECTED path
+(`src/domain/**`, balance, persistence, economy, analytics/diagnostics, reward
+logic, ad config, `BUILD_SPEC.md`) or any DO-NOT item — and reconciled by
+**keeping** both edits and widening the boundary, because both were squarely
+within P1-9's stated intent ("remove hardcoded `colors.*` from gameplay-visible
+components; all five themes render correctly"):
+
+- `src/components/ComboIndicator/ComboIndicator.tsx` — the combo multiplier
+  renders in the HUD via `ScoreHeader` on the gameplay screen, so it IS a
+  gameplay-visible component; the original list was a representative sample, not
+  an exhaustive one, and `ComboIndicator` was named explicitly in the P1-9 goal's
+  audit focus and chrome list. It held the only remaining gameplay-critical
+  bypass (`colors.amberBlock`), so fixing it is the core P1-9 deliverable, not
+  scope creep.
+- `app/game.tsx` — the gameplay screen itself, and already the allowed file in
+  P1-1/P1-2/P1-8. The P1-9 edit only removed a dead `colors.appBackground`
+  fallback (always overridden inline by `theme.appBackground`) and the now-unused
+  `colors` import — i.e. removing a hardcoded-color theme bypass, exactly the
+  task's purpose. No behavior or visual change.
+
+The `Allowed` list in `docs/TASKS.md` P1-9 was updated to name both explicitly.
+Mirrors the P1-5 reconciliation pattern above.
