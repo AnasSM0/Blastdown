@@ -158,22 +158,25 @@ describe("dock transient reward feedback", () => {
     );
   });
 
-  it("does not leak a transient caption over active freeze on an earned reward", async () => {
+  it("keeps active freeze intact after the earned-reward flash timer fires", async () => {
     const service = createMockAdService({ rewarded: { rewarded_freeze: "earned" } });
     const result = await renderRun(service);
 
     await act(async () => {
       fireEvent.press(result.getByTestId("freeze-button"));
     });
-    // Active wins: the moves label shows, not a success caption.
+    // Active wins immediately: the moves label shows, not a success caption.
     expect(result.getByTestId("freeze-moves-label").props.children).toEqual([2, " ", "MOVES"]);
     expect(result.queryByTestId("freeze-button-caption")).toBeNull();
 
-    // The success flash timer runs and clears without ever displacing the active
-    // freeze — the moves label is still present after it would have fired.
-    await waitFor(() =>
-      expect(result.getByTestId("freeze-moves-label").props.children).toEqual([2, " ", "MOVES"]),
-    );
+    // Actually elapse past the 1400ms flash window (inside act, so the success
+    // timer's state update flushes) — the active freeze must survive it; the
+    // transient phase never displaces the active state.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1600));
+    });
+    expect(result.getByTestId("freeze-moves-label").props.children).toEqual([2, " ", "MOVES"]);
+    expect(result.queryByTestId("freeze-button-caption")).toBeNull();
   });
 
   it("flashes the defuse caption on a failed confirm reward, then clears it", async () => {
