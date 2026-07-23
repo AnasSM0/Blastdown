@@ -175,7 +175,11 @@ function GameBoardImpl(
       style={[
         styles.board,
         { backgroundColor: theme.boardBg, borderColor: theme.boardFrame },
-        { transform: [{ translateX: shake }] },
+        // Only bind the shake transform when motion is allowed. Under reduced
+        // motion the shake never animates, so an identity transform would only
+        // promote this rounded board (and its rounded cell/rubble children) to
+        // an Android hardware layer for no benefit — the black-render trap.
+        reducedMotion ? undefined : { transform: [{ translateX: shake }] },
       ]}
       onLayout={handleLayout}
       collapsable={false}
@@ -319,6 +323,7 @@ function GameBoardImpl(
                 remainingTurns={badge.remainingTurns}
                 colorId={badge.colorId}
                 frozen={frozen}
+                reducedMotion={reducedMotion}
               />
             </View>
           ))

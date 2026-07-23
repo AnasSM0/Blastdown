@@ -22,7 +22,11 @@ export function ComboIndicator({ combo }: ComboIndicatorProps) {
       accessibilityLabel={`Combo x${combo}`}
       accessible
     >
-      <Text style={[styles.text, { color: theme.score }]}>{`x${combo}`}</Text>
+      <Text
+        style={[styles.text, { color: theme.score }]}
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.4}
+      >{`x${combo}`}</Text>
     </View>
   );
 }

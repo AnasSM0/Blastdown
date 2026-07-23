@@ -106,10 +106,14 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
   const left = point.x - width / 2;
   const top = point.y - LIFT - height;
 
+  // Under reduced motion the return-scale never runs, so drop the transform
+  // rather than bind an identity one over the rounded child cells (consistent
+  // with the board/cell Android hardware-layer guard).
+  const ghostTransform = reducedMotion ? {} : { transform: [{ scale }] };
   return (
     <Animated.View
       pointerEvents="none"
-      style={[styles.ghost, { left, top, width, height, opacity, transform: [{ scale }] }]}
+      style={[styles.ghost, { left, top, width, height, opacity }, ghostTransform]}
       testID="drag-ghost"
     >
       {shape.cells.map((cell) => (

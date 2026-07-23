@@ -14,13 +14,24 @@ type TimerBadgeProps = {
   /** True while the run's rewarded freeze is active — pauses the countdown and
    *  switches the badge to its icy, static frozen cue. */
   frozen?: boolean;
+  /** Effective reduced-motion (OS combined with the persisted override),
+   *  supplied by the board. Falls back to the OS setting alone when omitted
+   *  (isolated renders), so the persisted override is honored on the real
+   *  screen — the OS-only hook would ignore it. */
+  reducedMotion?: boolean;
 };
 
-export function TimerBadge({ pieceId, remainingTurns, frozen = false }: TimerBadgeProps) {
+export function TimerBadge({
+  pieceId,
+  remainingTurns,
+  frozen = false,
+  reducedMotion: reducedMotionProp,
+}: TimerBadgeProps) {
   const theme = useTheme();
   const visualState = getTimerVisualState(remainingTurns);
   const badge = getBadgeVisual(visualState, frozen, theme);
-  const reducedMotion = useReducedMotion();
+  const osReducedMotion = useReducedMotion();
+  const reducedMotion = reducedMotionProp ?? osReducedMotion;
   const [scale] = useState(() => new Animated.Value(1));
 
   // Pulse keys on the resolved pulse state (a primitive), so ordinary rerenders
@@ -53,6 +64,11 @@ export function TimerBadge({ pieceId, remainingTurns, frozen = false }: TimerBad
     };
   }, [badge.pulseState, reducedMotion, scale]);
 
+  // Under reduced motion the pulse never runs, so scale stays 1 — omit the
+  // transform entirely rather than binding an identity one. A rounded, glowing
+  // (elevated) view carrying a transform promotes to an Android hardware layer,
+  // the black-render trap; no transform, no promotion.
+  const badgeTransform = reducedMotion ? undefined : { transform: [{ scale }] };
   return (
     <Animated.View
       style={[
@@ -65,8 +81,8 @@ export function TimerBadge({ pieceId, remainingTurns, frozen = false }: TimerBad
           borderColor: badge.ringColor,
           borderWidth: badge.ringWidth,
           borderStyle: badge.dashed ? "dashed" : "solid",
-          transform: [{ scale }],
         },
+        badgeTransform,
         badge.glow,
       ]}
       testID={`timer-badge-${pieceId}`}
@@ -74,7 +90,16 @@ export function TimerBadge({ pieceId, remainingTurns, frozen = false }: TimerBad
       accessibilityHint={`Timer state: ${frozen ? "frozen" : visualState}`}
       accessible
     >
-      <Text style={[styles.digit, { color: badge.numeralColor }]}>{remainingTurns}</Text>
+      {/* The numeral is a spatial indicator sized to the badge; it must not grow
+          past the ring at large OS text sizes (the count is also in the
+          accessibility label). */}
+      <Text
+        style={[styles.digit, { color: badge.numeralColor }]}
+        allowFontScaling={false}
+        numberOfLines={1}
+      >
+        {remainingTurns}
+      </Text>
     </Animated.View>
   );
 }

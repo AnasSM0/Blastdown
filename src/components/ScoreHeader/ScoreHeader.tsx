@@ -71,6 +71,7 @@ export function ScoreHeader({ score, best, combo, onPause }: ScoreHeaderProps) {
           style={[styles.pauseButton, { borderColor: theme.outlineVariant }]}
           accessibilityRole="button"
           accessibilityLabel="Pause"
+          accessibilityHint="Pauses the current run and opens the pause menu"
           testID="pause-button"
           hitSlop={4}
         >

@@ -121,6 +121,30 @@ function captionFor(state: PresentationState): string {
   }
 }
 
+/** A screen-reader hint conveying the button's current state — the equivalent of
+ *  the visible caption/indicator for assistive tech. */
+function stateHint(state: PresentationState, rewardedVisible: boolean): string | undefined {
+  switch (state) {
+    case "pending":
+      return "Loading the rewarded ad";
+    case "unavailable":
+      return "Not available right now";
+    case "disabled":
+      return "Temporarily unavailable";
+    case "success":
+      return "Reward earned";
+    case "failure":
+      return "Ad failed, tap to try again";
+    case "cancelled":
+      return "Ad cancelled";
+    case "available":
+      return rewardedVisible ? "Watch a rewarded ad to use this" : undefined;
+    case "active":
+    case "selected":
+      return undefined;
+  }
+}
+
 function DockAction({
   label,
   glyph,
@@ -141,6 +165,11 @@ function DockAction({
   const rewardedVisible = state === "available" && rewarded;
   const active = state === "active";
 
+  // A hint that conveys the CURRENT state to assistive tech (the visible captions
+  // do this for sighted users). "available + rewarded" announces the rewarded-ad
+  // cost, which is otherwise only shown as the visual "▷ AD" chip.
+  const accessibilityHint = stateHint(state, rewardedVisible);
+
   return (
     <Pressable
       onPress={pressDisabled ? undefined : onPress}
@@ -148,11 +177,15 @@ function DockAction({
       style={[styles.action, { backgroundColor: theme.boardBg }, stateStyle(theme, state)]}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled }}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled: pressDisabled }}
       testID={testID}
     >
       <View style={styles.glyphRow}>
-        <Text style={[styles.glyph, { color: active ? theme.boardBg : theme.onSurface }]}>
+        <Text
+          style={[styles.glyph, { color: active ? theme.boardBg : theme.onSurface }]}
+          allowFontScaling={false}
+        >
           {glyph}
         </Text>
         {rewardedVisible ? (
@@ -163,11 +196,21 @@ function DockAction({
             ]}
             testID={`${testID}-reward`}
           >
-            <Text style={[styles.rewardText, { color: theme.accent }]}>▷ AD</Text>
+            <Text
+              style={[styles.rewardText, { color: theme.accent }]}
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.3}
+            >
+              ▷ AD
+            </Text>
           </View>
         ) : null}
       </View>
-      <Text style={[styles.label, { color: active ? theme.boardBg : theme.onSurface }]}>
+      <Text
+        style={[styles.label, { color: active ? theme.boardBg : theme.onSurface }]}
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.3}
+      >
         {label}
       </Text>
       <View style={styles.captionRow}>
@@ -179,6 +222,8 @@ function DockAction({
               styles.caption,
               { color: state === "failure" ? theme.timerCritical : theme.onSurfaceVariant },
             ]}
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.3}
             testID={`${testID}-caption`}
           >
             {captionFor(state)}
@@ -206,7 +251,12 @@ export function RewardedActionBar({ freeze, defuse }: RewardedActionBarProps) {
             : "Freeze timers"
         }
         activeCaption={
-          <Text style={[styles.caption, { color: theme.boardBg }]} testID="freeze-moves-label">
+          <Text
+            style={[styles.caption, { color: theme.boardBg }]}
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.3}
+            testID="freeze-moves-label"
+          >
             {freeze.placementsRemaining} {freeze.placementsRemaining === 1 ? "MOVE" : "MOVES"}
           </Text>
         }

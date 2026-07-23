@@ -107,20 +107,26 @@ function phaseForResult(result: RewardedResult): RewardActionPhase {
 /** Upper bound on the board's edge so it never balloons on tablets/wide screens
  *  (mirrors GameBoard's own maxWidth). */
 const MAX_BOARD_SIZE = 420;
-/** The board may claim at most this fraction of the gameplay content height, so
- *  the tray and action dock always have room beneath it on short screens — the
- *  board shrinks to fit rather than clipping the controls. */
-const BOARD_HEIGHT_FRACTION = 0.62;
+/** Fixed height the tray + action dock (plus a little breathing room) need
+ *  beneath the board. The board's height budget is the content height MINUS this
+ *  reserve, so the tray and dock always fit and never clip below the safe area —
+ *  even on very short screens or at large text. Tray ≈ 88, dock ≈ 84, gaps ≈ 28. */
+const RESERVED_BELOW_BOARD = 200;
 
-/** Board edge length from the measured content box: the largest square that
- *  fits the available width and the height budget, capped. Returns 0 until the
- *  content area has been measured (nothing renders that frame). Pure — no fixed
- *  device coordinates, just measured geometry. */
+/** Board edge length from the measured INNER content box (the content view's own
+ *  padding already removed by the caller): the largest square that fits the
+ *  available width and the height left after reserving the tray + dock, capped.
+ *  Returns 0 until measured (nothing renders that frame). Pure — no fixed device
+ *  coordinates, just measured geometry. */
 export function computeBoardSide(content: { width: number; height: number }): number {
   if (content.width <= 0 || content.height <= 0) {
     return 0;
   }
-  return Math.min(content.width, content.height * BOARD_HEIGHT_FRACTION, MAX_BOARD_SIZE);
+  const heightBudget = content.height - RESERVED_BELOW_BOARD;
+  if (heightBudget <= 0) {
+    return 0;
+  }
+  return Math.min(content.width, heightBudget, MAX_BOARD_SIZE);
 }
 
 /** Presentational gameplay screen over a supplied controller. Holds no
@@ -156,12 +162,19 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
   // Measured gameplay content box; drives a responsive square board that fits
   // both the available width and a height budget. A caller-supplied `boardSize`
   // (test seam) overrides measurement, since onLayout doesn't fire under jest.
+  // The measured box is the INNER content area (the board's actual room), so the
+  // content view's own padding is subtracted here — otherwise the board would be
+  // sized to the full padded width and overrun both gutters.
   const [contentBox, setContentBox] = useState({ width: 0, height: 0 });
   const boardSide = boardSize ?? computeBoardSide(contentBox);
   const handleContentLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
+    const innerWidth = Math.max(0, width - 2 * spacing.screenPadding);
+    const innerHeight = Math.max(0, height - 2 * spacing.sm);
     setContentBox((current) =>
-      current.width === width && current.height === height ? current : { width, height },
+      current.width === innerWidth && current.height === innerHeight
+        ? current
+        : { width: innerWidth, height: innerHeight },
     );
   }, []);
 
@@ -583,6 +596,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
               onDragMove={handleDragMove}
               onDragEnd={handleDragEnd}
               draggingHandId={drag?.handId ?? null}
+              reducedMotion={reducedMotion}
             />
           </View>
           <View style={styles.actionZone}>

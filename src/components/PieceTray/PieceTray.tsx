@@ -24,6 +24,11 @@ type PieceTrayProps = {
   onDragEnd?: (handId: string, point: Point) => void;
   /** True while a piece is being dragged (drives the picked-up slot style). */
   draggingHandId?: string | null;
+  /** Effective reduced-motion (OS combined with the persisted override), from
+   *  the screen. Falls back to the OS setting alone when omitted, so the
+   *  persisted override is honored on the real screen (the OS-only hook would
+   *  ignore it). */
+  reducedMotion?: boolean;
 };
 
 const SLOT_SIZE = 64;
@@ -232,8 +237,10 @@ export function PieceTray({
   onDragMove,
   onDragEnd,
   draggingHandId,
+  reducedMotion: reducedMotionProp,
 }: PieceTrayProps) {
-  const reducedMotion = useReducedMotion();
+  const osReducedMotion = useReducedMotion();
+  const reducedMotion = reducedMotionProp ?? osReducedMotion;
   const slots = layoutSlots(hand);
 
   return (

@@ -62,7 +62,7 @@ function cellLabel(cell: DomainGridCell, row: number, column: number): string {
     case "normal":
       return `${cell.colorId} block, ${place}`;
     case "rubble":
-      return `Rubble, ${place}`;
+      return `Blocked rubble cell, ${place}`;
   }
 }
 
@@ -149,6 +149,7 @@ export function GridCell({
       testID={`cell-${row}-${column}`}
       accessibilityLabel={cellLabel(cell, row, column)}
       accessibilityRole={onPress ? "button" : undefined}
+      accessibilityHint={onPress ? "Places the selected piece here" : undefined}
       accessible
     >
       {isBlock && blockAccent ? (
