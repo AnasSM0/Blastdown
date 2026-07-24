@@ -50,7 +50,7 @@ describe("reduced-motion Android transform guards (P1-10)", () => {
     expect(flat(off.getByTestId("game-board")).transform).toBeDefined();
   });
 
-  it("DragGhost omits the scale transform when reduced motion is on", async () => {
+  it("DragGhost omits the lift scale under reduced motion (position translate only)", async () => {
     const ghost = await render(
       <DragGhost
         shapeId="single"
@@ -62,7 +62,30 @@ describe("reduced-motion Android transform guards (P1-10)", () => {
         reducedMotion
       />,
     );
-    expect(flat(ghost.getByTestId("drag-ghost")).transform).toBeUndefined();
+    // Position must ride the native driver, so a translate transform is always
+    // present — but under reduced motion the lift/return SCALE must not be, so no
+    // identity scale promotes the rounded ghost cells to an Android layer.
+    const transform = flat(ghost.getByTestId("drag-ghost")).transform as
+      | Record<string, unknown>[]
+      | undefined;
+    expect(transform).toBeDefined();
+    expect(transform?.some((entry) => "scale" in entry)).toBe(false);
+
+    const moving = await render(
+      <DragGhost
+        shapeId="single"
+        colorId="cyan"
+        cellSize={30}
+        initialX={100}
+        initialY={100}
+        valid
+        reducedMotion={false}
+      />,
+    );
+    const movingTransform = flat(moving.getByTestId("drag-ghost")).transform as
+      | Record<string, unknown>[]
+      | undefined;
+    expect(movingTransform?.some((entry) => "scale" in entry)).toBe(true);
   });
 
   it("PieceTray honors the effective reduced-motion prop (no lift transform)", async () => {

@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { Animated, StyleSheet } from "react-native";
 
 import { getShapeById } from "../../domain/shapes";
@@ -14,6 +14,9 @@ export const DRAG_LIFT = 28;
 const LIFT = DRAG_LIFT;
 const GUTTER = spacing.gridGutter;
 const RETURN_MS = 160;
+/** Subtle pick-up scale so the dragged piece reads as lifted off the tray.
+ *  Kept small per the Phase 2 motion rules (no large scale, no overshoot). */
+const DRAG_SCALE = 1.06;
 
 export type DragGhostHandle = {
   /** Move the ghost so it floats above the given window-space finger point. */
@@ -35,9 +38,10 @@ type DragGhostProps = {
 };
 
 /** A translucent copy of the dragged piece that follows the finger. Its
- *  position is driven imperatively via the ref so only this small overlay
- *  re-renders on every pointer move — the board is left untouched until the
- *  mapped origin cell actually changes. */
+ *  position is a native-backed `Animated.ValueXY` driven imperatively through
+ *  the ref, so a pointer move updates the value directly and NEVER triggers a
+ *  React render — no per-frame setState, no board rerender. The board is only
+ *  touched when the mapped origin cell actually changes (the screen's job). */
 export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function DragGhost(
   {
     shapeId,
@@ -53,16 +57,20 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
   ref,
 ) {
   const theme = useTheme();
-  const [point, setPoint] = useState({ x: initialX, y: initialY });
-  const [opacity] = useState(() => new Animated.Value(0.9));
-  const [scale] = useState(() => new Animated.Value(1));
+  const pos = useRef(new Animated.ValueXY({ x: initialX, y: initialY })).current;
+  const opacity = useRef(new Animated.Value(0.9)).current;
+  // Rest at the small lift scale while motion is allowed so the piece reads as
+  // picked up the instant the drag begins; reduced motion rests at 1 (no lift).
+  const scale = useRef(new Animated.Value(reducedMotion ? 1 : DRAG_SCALE)).current;
 
   useImperativeHandle(
     ref,
     () => ({
-      moveTo: (x: number, y: number) => setPoint({ x, y }),
+      // Position is pushed straight into the native-backed value — no setState,
+      // so following the finger costs zero React renders.
+      moveTo: (x: number, y: number) => pos.setValue({ x, y }),
     }),
-    [],
+    [pos],
   );
 
   useEffect(() => {
@@ -73,7 +81,14 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
       onReturnComplete?.();
       return;
     }
+    // Invalid/cancelled drop: glide back to the pick-up point (its original tray
+    // slot) while fading and shrinking, then clear. Short and deterministic.
     const animation = Animated.parallel([
+      Animated.timing(pos, {
+        toValue: { x: initialX, y: initialY },
+        duration: RETURN_MS,
+        useNativeDriver: true,
+      }),
       Animated.timing(opacity, { toValue: 0, duration: RETURN_MS, useNativeDriver: true }),
       Animated.timing(scale, { toValue: 0.85, duration: RETURN_MS, useNativeDriver: true }),
     ]);
@@ -83,7 +98,7 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
       }
     });
     return () => animation.stop();
-  }, [returning, reducedMotion, opacity, scale, onReturnComplete]);
+  }, [returning, reducedMotion, pos, opacity, scale, initialX, initialY, onReturnComplete]);
 
   const shape = getShapeById(shapeId);
   if (!shape) {
@@ -102,44 +117,53 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
   const width = (maxColumn + 1) * pitch - GUTTER;
   const height = (maxRow + 1) * pitch - GUTTER;
 
-  // Center on the finger horizontally, floated above it vertically.
-  const left = point.x - width / 2;
-  const top = point.y - LIFT - height;
+  // The anchor is a zero-size point translated to the finger; the piece is drawn
+  // offset up-and-left from it (centered horizontally, floated above). Position
+  // MUST be a transform so it can ride the native driver (top/left cannot), so a
+  // translate is always present — but it is a real position, not an identity
+  // transform. The scale (lift/return) is the only motion transform, and it is
+  // omitted entirely under reduced motion. The ghost has no overflow:hidden and
+  // no elevation, so it is clear of the Android rounded-layer black-render trap.
+  const transform = reducedMotion
+    ? pos.getTranslateTransform()
+    : [...pos.getTranslateTransform(), { scale }];
 
-  // Under reduced motion the return-scale never runs, so drop the transform
-  // rather than bind an identity one over the rounded child cells (consistent
-  // with the board/cell Android hardware-layer guard).
-  const ghostTransform = reducedMotion ? {} : { transform: [{ scale }] };
   return (
     <Animated.View
       pointerEvents="none"
-      style={[styles.ghost, { left, top, width, height, opacity }, ghostTransform]}
+      style={[styles.anchor, { opacity, transform }]}
       testID="drag-ghost"
     >
-      {shape.cells.map((cell) => (
-        <Animated.View
-          key={`${cell.row}-${cell.column}`}
-          style={[
-            styles.cell,
-            {
-              width: cellSize,
-              height: cellSize,
-              top: cell.row * pitch,
-              left: cell.column * pitch,
-              backgroundColor: `${accent}55`,
-              borderColor: cellBorderColor,
-              borderStyle: surface.dashed ? "dashed" : "solid",
-            },
-          ]}
-        />
-      ))}
+      <Animated.View
+        style={{ position: "absolute", left: -width / 2, top: -(LIFT + height), width, height }}
+      >
+        {shape.cells.map((cell) => (
+          <Animated.View
+            key={`${cell.row}-${cell.column}`}
+            style={[
+              styles.cell,
+              {
+                width: cellSize,
+                height: cellSize,
+                top: cell.row * pitch,
+                left: cell.column * pitch,
+                backgroundColor: `${accent}55`,
+                borderColor: cellBorderColor,
+                borderStyle: surface.dashed ? "dashed" : "solid",
+              },
+            ]}
+          />
+        ))}
+      </Animated.View>
     </Animated.View>
   );
 });
 
 const styles = StyleSheet.create({
-  ghost: {
+  anchor: {
     position: "absolute",
+    top: 0,
+    left: 0,
     zIndex: 20,
   },
   cell: {
