@@ -1,26 +1,37 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, StyleSheet, Text, View } from "react-native";
 
 import { colors, neonGlow, radius, spacing, typography } from "../../ui/theme";
+import { useAppearAnimation } from "../../hooks/useAppearAnimation";
+import { PressableFeedback } from "../PressableFeedback";
 
 type DefuseConfirmCardProps = {
   onConfirm: () => void;
   onCancel: () => void;
   /** Disables both actions while the reward is in flight (no double-spend). */
   busy?: boolean;
+  /** Effective reduced-motion for the appear transition + press feedback. */
+  reducedMotion?: boolean;
 };
 
 /** Bottom confirm card for the rewarded defuse (Stitch 07). The targeted piece
  *  is highlighted on the board beneath; this only asks the player to spend the
  *  reward. "WATCH & DEFUSE" earns the ad, then the domain defuses the
  *  lowest-timer piece — the UI never picks the target itself. */
-export function DefuseConfirmCard({ onConfirm, onCancel, busy = false }: DefuseConfirmCardProps) {
+export function DefuseConfirmCard({
+  onConfirm,
+  onCancel,
+  busy = false,
+  reducedMotion = false,
+}: DefuseConfirmCardProps) {
+  const appear = useAppearAnimation(reducedMotion);
   return (
     <View style={styles.wrap} testID="defuse-confirm" accessible>
-      <View style={styles.card}>
+      <Animated.View style={[styles.card, appear]}>
         <Text style={styles.prompt}>Defuse this piece?</Text>
-        <Pressable
+        <PressableFeedback
           onPress={busy ? undefined : onConfirm}
           disabled={busy}
+          reducedMotion={reducedMotion}
           style={[styles.confirm, busy && styles.busy, neonGlow(colors.cyanBlock, "low")]}
           accessibilityRole="button"
           accessibilityLabel="Watch an ad and defuse the piece"
@@ -28,10 +39,11 @@ export function DefuseConfirmCard({ onConfirm, onCancel, busy = false }: DefuseC
           testID="defuse-confirm-button"
         >
           <Text style={styles.confirmText}>WATCH &amp; DEFUSE</Text>
-        </Pressable>
-        <Pressable
+        </PressableFeedback>
+        <PressableFeedback
           onPress={busy ? undefined : onCancel}
           disabled={busy}
+          reducedMotion={reducedMotion}
           style={styles.cancel}
           accessibilityRole="button"
           accessibilityLabel="Cancel defuse"
@@ -39,8 +51,8 @@ export function DefuseConfirmCard({ onConfirm, onCancel, busy = false }: DefuseC
           testID="defuse-cancel-button"
         >
           <Text style={styles.cancelText}>CANCEL</Text>
-        </Pressable>
-      </View>
+        </PressableFeedback>
+      </Animated.View>
     </View>
   );
 }

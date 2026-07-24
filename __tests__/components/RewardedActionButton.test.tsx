@@ -227,10 +227,13 @@ describe("RewardedActionBar", () => {
       <RewardedActionBar freeze={freezeAction()} defuse={defuseAction()} />,
     );
 
+    // The dock action carries a scale press transform (Phase 2), so the Android
+    // guard is not "no transform" but "no overflow:hidden on a transformed,
+    // rounded surface" — the combination that black-renders. The action has no
+    // elevation, so a transient scale is safe as long as it is never clipped.
     for (const testID of ["freeze-button", "defuse-button"]) {
       const style = StyleSheet.flatten(result.getByTestId(testID).props.style);
       expect(style.overflow).not.toBe("hidden");
-      expect(style.transform).toBeUndefined();
     }
   });
 });

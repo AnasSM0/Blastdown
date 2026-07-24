@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { colors, neonGlow, radius, spacing, typography } from "../../ui/theme";
+import { PressableFeedback } from "../PressableFeedback";
 
 type HomeScreenViewProps = {
   bestScore: number;
@@ -39,7 +40,7 @@ export function HomeScreenView({
   return (
     <SafeAreaView style={styles.screen} testID="home-screen">
       <View style={styles.topRow}>
-        <Pressable
+        <PressableFeedback
           style={styles.iconButton}
           onPress={onSettings}
           accessibilityRole="button"
@@ -47,7 +48,7 @@ export function HomeScreenView({
           testID="settings-button"
         >
           <Text style={styles.iconGlyph}>⚙</Text>
-        </Pressable>
+        </PressableFeedback>
         <View style={styles.boltsPill} testID="bolts-balance">
           <Text style={styles.boltsText}>{formatNumber(bolts)}</Text>
           <Text style={styles.boltsGlyph}> ⚡</Text>
@@ -61,7 +62,7 @@ export function HomeScreenView({
           <Text style={styles.bestValue}>{formatNumber(bestScore)}</Text>
         </View>
 
-        <Pressable
+        <PressableFeedback
           style={[styles.playButton, neonGlow(colors.scoreOrange, "high")]}
           onPress={onPlay}
           accessibilityRole="button"
@@ -70,10 +71,10 @@ export function HomeScreenView({
         >
           <Text style={styles.playGlyph}>▶</Text>
           <Text style={styles.playText}>PLAY</Text>
-        </Pressable>
+        </PressableFeedback>
 
         {canContinue ? (
-          <Pressable
+          <PressableFeedback
             style={styles.continueButton}
             onPress={onContinue}
             accessibilityRole="button"
@@ -81,13 +82,13 @@ export function HomeScreenView({
             testID="continue-button"
           >
             <Text style={styles.continueText}>CONTINUE</Text>
-          </Pressable>
+          </PressableFeedback>
         ) : null}
       </View>
 
       <View style={styles.footer}>
         <View style={styles.menuRow}>
-          <Pressable
+          <PressableFeedback
             style={styles.menuButton}
             onPress={onThemes}
             accessibilityRole="button"
@@ -96,8 +97,8 @@ export function HomeScreenView({
           >
             <Text style={styles.menuGlyph}>◑</Text>
             <Text style={styles.menuLabel}>THEMES</Text>
-          </Pressable>
-          <Pressable
+          </PressableFeedback>
+          <PressableFeedback
             style={styles.menuButton}
             onPress={onHowToPlay}
             accessibilityRole="button"
@@ -106,16 +107,16 @@ export function HomeScreenView({
           >
             <Text style={styles.menuGlyph}>?</Text>
             <Text style={styles.menuLabel}>HOW TO PLAY</Text>
-          </Pressable>
+          </PressableFeedback>
         </View>
-        <Pressable
+        <PressableFeedback
           onPress={onPrivacy}
           accessibilityRole="link"
           accessibilityLabel="Privacy policy"
           testID="privacy-link"
         >
           <Text style={styles.privacy}>Privacy Policy</Text>
-        </Pressable>
+        </PressableFeedback>
       </View>
     </SafeAreaView>
   );

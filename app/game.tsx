@@ -583,7 +583,13 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
       <ReactorBackground />
       <SafeAreaView style={styles.safe} edges={["top", "bottom", "left", "right"]}>
         {/* Zone 1 — compact HUD, showing the persisted best score (P1-2). */}
-        <ScoreHeader score={state.score} best={best} combo={state.combo} onPause={handlePause} />
+        <ScoreHeader
+          score={state.score}
+          best={best}
+          combo={state.combo}
+          onPause={handlePause}
+          reducedMotion={reducedMotion}
+        />
         {/* Zones 2–4 — board / tray / action dock, evenly distributed so the
             board stays large while the tray and dock never drift far below it
             and the lower screen is not left empty. */}
@@ -625,6 +631,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
           </View>
           <View style={styles.actionZone}>
             <RewardedActionBar
+              reducedMotion={reducedMotion}
               freeze={{
                 label: "FREEZE",
                 glyph: "❄",
@@ -658,6 +665,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
             onConfirm={handleDefuseConfirm}
             onCancel={handleDefuseCancel}
             busy={reward.pending}
+            reducedMotion={reducedMotion}
           />
         ) : null}
         {secondChance ? <SecondChanceBanner reducedMotion={reducedMotion} /> : null}
@@ -676,6 +684,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
             onRevive={handleRevive}
             onEndRun={handleEndRun}
             busy={reward.pending}
+            reducedMotion={reducedMotion}
           />
         ) : null}
       </SafeAreaView>

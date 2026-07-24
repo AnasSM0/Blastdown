@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import { StyleSheet, Text, View, type ViewStyle } from "react-native";
 
 import { radius, spacing, typography } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import type { ThemePalette } from "../../ui/themes";
+import { PressableFeedback } from "../PressableFeedback";
 
 export type RewardActionPhase = "idle" | "pending" | "success" | "failure" | "cancelled";
 
@@ -26,6 +27,8 @@ export type RewardedActionBarProps = {
   defuse: RewardedDockActionBase & {
     selected: boolean;
   };
+  /** Effective reduced-motion, for the dock buttons' press feedback. */
+  reducedMotion?: boolean;
 };
 
 type PresentationState =
@@ -43,6 +46,7 @@ type DockActionProps = RewardedDockActionBase & {
   engaged: "active" | "selected" | null;
   accessibilityLabel: string;
   activeCaption?: ReactNode;
+  reducedMotion?: boolean;
 };
 
 function presentationState({
@@ -157,6 +161,7 @@ function DockAction({
   engaged,
   accessibilityLabel,
   activeCaption,
+  reducedMotion,
 }: DockActionProps) {
   const theme = useTheme();
   const state = presentationState({ phase, engaged, disabled, unavailable });
@@ -171,9 +176,11 @@ function DockAction({
   const accessibilityHint = stateHint(state, rewardedVisible);
 
   return (
-    <Pressable
+    <PressableFeedback
       onPress={pressDisabled ? undefined : onPress}
       disabled={pressDisabled}
+      reducedMotion={reducedMotion}
+      pressStyle="scale"
       style={[styles.action, { backgroundColor: theme.boardBg }, stateStyle(theme, state)]}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
@@ -230,11 +237,11 @@ function DockAction({
           </Text>
         )}
       </View>
-    </Pressable>
+    </PressableFeedback>
   );
 }
 
-export function RewardedActionBar({ freeze, defuse }: RewardedActionBarProps) {
+export function RewardedActionBar({ freeze, defuse, reducedMotion }: RewardedActionBarProps) {
   const theme = useTheme();
 
   return (
@@ -244,6 +251,7 @@ export function RewardedActionBar({ freeze, defuse }: RewardedActionBarProps) {
     >
       <DockAction
         {...freeze}
+        reducedMotion={reducedMotion}
         engaged={freeze.active ? "active" : null}
         accessibilityLabel={
           freeze.active
@@ -263,6 +271,7 @@ export function RewardedActionBar({ freeze, defuse }: RewardedActionBarProps) {
       />
       <DockAction
         {...defuse}
+        reducedMotion={reducedMotion}
         engaged={defuse.selected ? "selected" : null}
         accessibilityLabel="Defuse the lowest-timer piece"
       />

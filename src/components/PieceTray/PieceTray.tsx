@@ -35,6 +35,8 @@ const SLOT_SIZE = 64;
 const MINI_CELL = 14;
 const MINI_GAP = 2;
 const SELECTED_SCALE = 1.08;
+/** Selection lift duration — short and within the Phase 2 100–220 ms band. */
+const SELECT_LIFT_MS = 150;
 /** Finger travel before a press becomes a drag; below this a tap selects. */
 const DRAG_ACTIVATION_DISTANCE = 8;
 
@@ -163,15 +165,17 @@ function TraySlot({
     const target = selected ? SELECTED_SCALE : 1;
     if (reducedMotion) {
       // Reduced motion keeps the selected-state distinction (border/glow) but
-      // skips the springy lift transform (BUILD_SPEC.md §19).
+      // skips the lift transform (BUILD_SPEC.md §19).
       lift.setValue(target);
       return;
     }
-    const animation = Animated.spring(lift, {
+    // A quick, restrained lift/settle — no spring overshoot (Phase 2 motion
+    // rules). Selecting emphasizes the new piece and the previous one settles
+    // back cleanly in the same short window.
+    const animation = Animated.timing(lift, {
       toValue: target,
+      duration: SELECT_LIFT_MS,
       useNativeDriver: true,
-      speed: 20,
-      bounciness: 8,
     });
     animation.start();
     return () => animation.stop();

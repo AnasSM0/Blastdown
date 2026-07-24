@@ -66,8 +66,7 @@ describe("reduced-motion Android transform guards (P1-10)", () => {
     // present — but under reduced motion the lift/return SCALE must not be, so no
     // identity scale promotes the rounded ghost cells to an Android layer.
     const transform = flat(ghost.getByTestId("drag-ghost")).transform as
-      | Record<string, unknown>[]
-      | undefined;
+      Record<string, unknown>[] | undefined;
     expect(transform).toBeDefined();
     expect(transform?.some((entry) => "scale" in entry)).toBe(false);
 
@@ -83,8 +82,7 @@ describe("reduced-motion Android transform guards (P1-10)", () => {
       />,
     );
     const movingTransform = flat(moving.getByTestId("drag-ghost")).transform as
-      | Record<string, unknown>[]
-      | undefined;
+      Record<string, unknown>[] | undefined;
     expect(movingTransform?.some((entry) => "scale" in entry)).toBe(true);
   });
 

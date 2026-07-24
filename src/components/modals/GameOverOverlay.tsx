@@ -1,6 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, StyleSheet, Text, View } from "react-native";
 
 import { colors, neonGlow, radius, spacing, typography } from "../../ui/theme";
+import { useAppearAnimation } from "../../hooks/useAppearAnimation";
+import { PressableFeedback } from "../PressableFeedback";
 
 type GameOverOverlayProps = {
   score: number;
@@ -13,6 +15,8 @@ type GameOverOverlayProps = {
   onEndRun: () => void;
   /** Disables both actions while a revive reward is in flight. */
   busy?: boolean;
+  /** Effective reduced-motion for the appear transition + press feedback. */
+  reducedMotion?: boolean;
 };
 
 /** Game-over panel (Stitch 08). Shown over the failed board (visible beneath
@@ -26,7 +30,9 @@ export function GameOverOverlay({
   onRevive,
   onEndRun,
   busy = false,
+  reducedMotion = false,
 }: GameOverOverlayProps) {
+  const appear = useAppearAnimation(reducedMotion);
   return (
     <View
       style={styles.scrim}
@@ -34,7 +40,7 @@ export function GameOverOverlay({
       accessibilityLabel={`Run over. Final score ${score.toLocaleString("en-US")}`}
       accessible
     >
-      <View style={styles.panel}>
+      <Animated.View style={[styles.panel, appear]}>
         <Text style={typography.labelCaps}>RUN OVER</Text>
         <Text style={[styles.score, neonGlow(colors.scoreOrange, "low")]}>
           {score.toLocaleString("en-US")}
@@ -47,9 +53,10 @@ export function GameOverOverlay({
 
         {reviveAvailable ? (
           <>
-            <Pressable
+            <PressableFeedback
               onPress={busy ? undefined : onRevive}
               disabled={busy}
+              reducedMotion={reducedMotion}
               style={[styles.revive, busy && styles.busy, neonGlow(colors.cyanBlock, "low")]}
               accessibilityRole="button"
               accessibilityLabel="Repair and continue by watching an ad"
@@ -57,14 +64,15 @@ export function GameOverOverlay({
               testID="revive-button"
             >
               <Text style={styles.reviveText}>▶ REPAIR &amp; CONTINUE</Text>
-            </Pressable>
+            </PressableFeedback>
             <Text style={styles.reviveNote}>CLEAR RUBBLE · ADD +2 MOVES · NEW PIECES</Text>
           </>
         ) : null}
 
-        <Pressable
+        <PressableFeedback
           onPress={busy ? undefined : onEndRun}
           disabled={busy}
+          reducedMotion={reducedMotion}
           style={styles.endRun}
           accessibilityRole="button"
           accessibilityLabel="End run and see results"
@@ -72,8 +80,8 @@ export function GameOverOverlay({
           testID="end-run-button"
         >
           <Text style={styles.endRunText}>END RUN</Text>
-        </Pressable>
-      </View>
+        </PressableFeedback>
+      </Animated.View>
     </View>
   );
 }

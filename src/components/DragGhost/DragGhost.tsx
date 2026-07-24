@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { Animated, StyleSheet } from "react-native";
 
 import { getShapeById } from "../../domain/shapes";
@@ -57,11 +57,11 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
   ref,
 ) {
   const theme = useTheme();
-  const pos = useRef(new Animated.ValueXY({ x: initialX, y: initialY })).current;
-  const opacity = useRef(new Animated.Value(0.9)).current;
+  const [pos] = useState(() => new Animated.ValueXY({ x: initialX, y: initialY }));
+  const [opacity] = useState(() => new Animated.Value(0.9));
   // Rest at the small lift scale while motion is allowed so the piece reads as
   // picked up the instant the drag begins; reduced motion rests at 1 (no lift).
-  const scale = useRef(new Animated.Value(reducedMotion ? 1 : DRAG_SCALE)).current;
+  const [scale] = useState(() => new Animated.Value(reducedMotion ? 1 : DRAG_SCALE));
 
   useImperativeHandle(
     ref,

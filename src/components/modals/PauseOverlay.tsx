@@ -1,6 +1,8 @@
-import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Animated, StyleSheet, Switch, Text, View } from "react-native";
 
 import { colors, neonGlow, radius, spacing, typography } from "../../ui/theme";
+import { useAppearAnimation } from "../../hooks/useAppearAnimation";
+import { PressableFeedback } from "../PressableFeedback";
 
 type PauseOverlayProps = {
   onResume: () => void;
@@ -30,20 +32,22 @@ export function PauseOverlay({
   onHome,
   reducedMotion = false,
 }: PauseOverlayProps) {
+  const appear = useAppearAnimation(reducedMotion);
   return (
     <View style={styles.scrim} testID="pause-overlay" accessibilityLabel="Paused" accessible>
-      <View style={styles.panel}>
+      <Animated.View style={[styles.panel, appear]}>
         <Text style={styles.title}>PAUSED</Text>
 
-        <Pressable
+        <PressableFeedback
           onPress={onResume}
+          reducedMotion={reducedMotion}
           style={[styles.resume, neonGlow(colors.cyanBlock, "low")]}
           accessibilityRole="button"
           accessibilityLabel="Resume game"
           testID="resume-button"
         >
           <Text style={styles.resumeText}>▶ RESUME</Text>
-        </Pressable>
+        </PressableFeedback>
 
         <View style={styles.toggles}>
           {PLACEHOLDER_ROWS.map((row) => (
@@ -59,26 +63,28 @@ export function PauseOverlay({
         </View>
 
         <View style={styles.actions}>
-          <Pressable
+          <PressableFeedback
             onPress={onRestart}
+            reducedMotion={reducedMotion}
             style={styles.action}
             accessibilityRole="button"
             accessibilityLabel="Restart run"
             testID="pause-restart-button"
           >
             <Text style={styles.actionText}>Restart</Text>
-          </Pressable>
-          <Pressable
+          </PressableFeedback>
+          <PressableFeedback
             onPress={onHome}
+            reducedMotion={reducedMotion}
             style={styles.action}
             accessibilityRole="button"
             accessibilityLabel="Go home"
             testID="pause-home-button"
           >
             <Text style={styles.actionText}>Home</Text>
-          </Pressable>
+          </PressableFeedback>
         </View>
-      </View>
+      </Animated.View>
     </View>
   );
 }

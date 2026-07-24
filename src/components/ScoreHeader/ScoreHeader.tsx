@@ -1,15 +1,18 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { spacing, typography } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import { glowFor } from "../../ui/themes";
 import { ComboIndicator } from "../ComboIndicator";
+import { PressableFeedback } from "../PressableFeedback";
 
 type ScoreHeaderProps = {
   score: number;
   best: number;
   combo: number;
   onPause: () => void;
+  /** Effective reduced-motion, for the pause control's press feedback. */
+  reducedMotion?: boolean;
 };
 
 function formatNumber(value: number): string {
@@ -23,7 +26,7 @@ function formatNumber(value: number): string {
 const SCORE_MAX_SCALE = 1.4;
 const LABEL_MAX_SCALE = 1.6;
 
-export function ScoreHeader({ score, best, combo, onPause }: ScoreHeaderProps) {
+export function ScoreHeader({ score, best, combo, onPause, reducedMotion }: ScoreHeaderProps) {
   const theme = useTheme();
   return (
     <View style={styles.row} testID="score-header">
@@ -66,8 +69,9 @@ export function ScoreHeader({ score, best, combo, onPause }: ScoreHeaderProps) {
       </View>
 
       <View style={[styles.side, styles.sideRight]}>
-        <Pressable
+        <PressableFeedback
           onPress={onPause}
+          reducedMotion={reducedMotion}
           style={[styles.pauseButton, { borderColor: theme.outlineVariant }]}
           accessibilityRole="button"
           accessibilityLabel="Pause"
@@ -77,7 +81,7 @@ export function ScoreHeader({ score, best, combo, onPause }: ScoreHeaderProps) {
         >
           <View style={[styles.pauseBar, { backgroundColor: theme.onSurfaceVariant }]} />
           <View style={[styles.pauseBar, { backgroundColor: theme.onSurfaceVariant }]} />
-        </Pressable>
+        </PressableFeedback>
       </View>
     </View>
   );
