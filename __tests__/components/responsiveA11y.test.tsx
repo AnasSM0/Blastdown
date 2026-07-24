@@ -89,17 +89,45 @@ describe("accessibility labels and hints (P1-10)", () => {
     expect(result.getByTestId("cell-0-0").props.accessibilityLabel).toMatch(/blocked rubble/i);
   });
 
-  it("gives an empty actionable cell a conditional placement hint", async () => {
-    const actionable = await render(
+  it("announces placement only where the selected piece is a valid anchor", async () => {
+    // A piece is selected and this empty cell is a valid anchor → the hint
+    // announces the placement the tap will perform.
+    const valid = await render(
+      <GridCell
+        cell={{ kind: "empty" }}
+        row={1}
+        column={1}
+        size={40}
+        onPress={jest.fn()}
+        placementState="valid"
+      />,
+    );
+    expect(valid.getByTestId("cell-1-1").props.accessibilityHint).toMatch(/place the selected/i);
+
+    // Selected, but this empty cell is not a valid anchor → the hint states the
+    // placement is unavailable and never promises success.
+    const invalid = await render(
+      <GridCell
+        cell={{ kind: "empty" }}
+        row={4}
+        column={4}
+        size={40}
+        onPress={jest.fn()}
+        placementState="invalid"
+      />,
+    );
+    const invalidHint = invalid.getByTestId("cell-4-4").props.accessibilityHint;
+    expect(invalidHint).toMatch(/can't be placed|cannot be placed/i);
+    expect(invalidHint).not.toMatch(/double tap to place/i);
+  });
+
+  it("stays silent on an empty cell while no piece is selected", async () => {
+    // Actionable, but no selection (no placementState) → no placement hint, so
+    // it never implies an action a bare tap won't perform.
+    const noSelection = await render(
       <GridCell cell={{ kind: "empty" }} row={1} column={1} size={40} onPress={jest.fn()} />,
     );
-    // Conditional phrasing: tapping only places WHEN a piece is selected, so the
-    // hint must not claim an unconditional placement. It is also phrased as an
-    // ATTEMPT ("try to place") — even an empty cell can be an invalid anchor, so
-    // the hint must not promise the placement will succeed.
-    const hint = actionable.getByTestId("cell-1-1").props.accessibilityHint;
-    expect(hint).toMatch(/if a piece is selected/i);
-    expect(hint).toMatch(/try to place/i);
+    expect(noSelection.getByTestId("cell-1-1").props.accessibilityHint).toBeUndefined();
 
     const inert = await render(<GridCell cell={{ kind: "empty" }} row={2} column={2} size={40} />);
     expect(inert.getByTestId("cell-2-2").props.accessibilityHint).toBeUndefined();
@@ -113,9 +141,45 @@ describe("accessibility labels and hints (P1-10)", () => {
         column={3}
         size={40}
         onPress={jest.fn()}
+        placementState="valid"
       />,
     );
+    // Even if a validity flag leaked in, a non-empty cell is never a placement
+    // target, so it must not announce one.
     expect(occupied.getByTestId("cell-3-3").props.accessibilityHint).toBeUndefined();
+  });
+
+  it("announces a timed cell's remaining moves and urgent/frozen state without color", async () => {
+    const urgent = await render(
+      <GridCell
+        cell={{ kind: "timed", pieceInstanceId: "p1", colorId: "cyan" }}
+        row={0}
+        column={0}
+        size={40}
+        remainingTurns={1}
+        critical
+      />,
+    );
+    const urgentLabel = urgent.getByTestId("cell-0-0").props.accessibilityLabel;
+    expect(urgentLabel).toMatch(/1 move left/i);
+    expect(urgentLabel).toMatch(/urgent/i);
+
+    const frozen = await render(
+      <GridCell
+        cell={{ kind: "timed", pieceInstanceId: "p2", colorId: "cyan" }}
+        row={0}
+        column={1}
+        size={40}
+        remainingTurns={3}
+        critical
+        frozen
+      />,
+    );
+    const frozenLabel = frozen.getByTestId("cell-0-1").props.accessibilityLabel;
+    expect(frozenLabel).toMatch(/3 moves left/i);
+    expect(frozenLabel).toMatch(/frozen/i);
+    // Frozen pieces aren't counting down, so they never also say "urgent".
+    expect(frozenLabel).not.toMatch(/urgent/i);
   });
 
   it("gives the pause control a hint describing what it does", async () => {

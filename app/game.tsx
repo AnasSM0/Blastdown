@@ -215,6 +215,29 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
   const tapPreview = previewOrigin ? controller.previewAt(previewOrigin) : null;
   const preview = dragPreview ?? tapPreview;
 
+  // Per-empty-cell anchor validity for the selected piece, for the board's
+  // accessibility placement hints. Reuses the domain's own read-only preview
+  // (no gameplay mutation, no duplicated rules) and is null while nothing is
+  // selected, so empty cells stay silent until a piece is held. Recomputes when
+  // the selection or the board changes, so the hints never go stale.
+  const { previewAt, selectedHandId } = controller;
+  const placementHints = useMemo(() => {
+    if (selectedHandId === null) {
+      return null;
+    }
+    const hints = new Map<string, "valid" | "invalid">();
+    for (let row = 0; row < BOARD_SIZE; row++) {
+      for (let column = 0; column < BOARD_SIZE; column++) {
+        if (state.grid[row][column].kind !== "empty") {
+          continue;
+        }
+        const cellPreview = previewAt({ row, column });
+        hints.set(`${row},${column}`, cellPreview?.valid ? "valid" : "invalid");
+      }
+    }
+    return hints;
+  }, [previewAt, selectedHandId, state.grid]);
+
   const handleCellSizeChange = useCallback((size: number) => {
     cellSizeRef.current = size;
     setCellSize(size);
@@ -583,6 +606,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
                   highlightPieceId={defuseTarget?.id ?? null}
                   reducedMotion={reducedMotion}
                   frozen={freezeActive}
+                  placementHints={placementHints}
                 />
               </View>
             ) : null}

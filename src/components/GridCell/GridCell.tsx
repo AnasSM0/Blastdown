@@ -41,6 +41,17 @@ type GridCellProps = {
    *  recent placement here. */
   flashNonce?: number;
   reducedMotion?: boolean;
+  /** Anchor validity of the currently selected piece at this empty cell, from
+   *  the domain's own placement preview. Present only on empty cells while a
+   *  piece is selected; undefined otherwise (no selection, or a non-empty cell).
+   *  Drives the placement hint so it mirrors the engine, never over-promises. */
+  placementState?: "valid" | "invalid";
+  /** Remaining move count of this cell's timed piece, announced in the label so
+   *  the countdown never relies on color/glow alone. Timed cells only. */
+  remainingTurns?: number;
+  /** True while the run's freeze is active — announced on timed cells so the
+   *  paused state is conveyed without color. */
+  frozen?: boolean;
 };
 
 /** Maps a cell preview state to its shared block-surface variant. */
@@ -52,13 +63,34 @@ const PREVIEW_VARIANT: Record<CellPreviewState, BlockVariant> = {
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-function cellLabel(cell: DomainGridCell, row: number, column: number): string {
+type TimerAnnounce = { remainingTurns?: number; critical?: boolean; frozen?: boolean };
+
+function cellLabel(
+  cell: DomainGridCell,
+  row: number,
+  column: number,
+  timer: TimerAnnounce,
+): string {
   const place = `row ${row + 1}, column ${column + 1}`;
   switch (cell.kind) {
     case "empty":
       return `Empty cell, ${place}`;
-    case "timed":
-      return `${cell.colorId} block with timer, ${place}`;
+    case "timed": {
+      // The timer state is spoken, never left to color/glow alone: the move
+      // count plus a "frozen"/"urgent" cue mirror the badge's own signals. A
+      // frozen piece isn't counting down, so it never also announces "urgent".
+      const parts = [`${cell.colorId} block with timer`];
+      if (timer.remainingTurns !== undefined) {
+        const noun = timer.remainingTurns === 1 ? "move" : "moves";
+        parts.push(`${timer.remainingTurns} ${noun} left`);
+      }
+      if (timer.frozen) {
+        parts.push("frozen");
+      } else if (timer.critical) {
+        parts.push("urgent");
+      }
+      return `${parts.join(", ")}, ${place}`;
+    }
     case "normal":
       return `${cell.colorId} block, ${place}`;
     case "rubble":
@@ -81,6 +113,9 @@ export function GridCell({
   onPress,
   flashNonce,
   reducedMotion,
+  placementState,
+  remainingTurns,
+  frozen,
 }: GridCellProps) {
   const theme = useTheme();
   const base = { width: size, height: size };
@@ -141,15 +176,19 @@ export function GridCell({
   // is only briefly non-identity during the placement snap.
   const cellTransform = reducedMotion ? undefined : { transform: [{ scale: snap }] };
 
-  // A placement hint only on empty cells — the only cells a placement can land
-  // on. Phrased as an ATTEMPT, not a promise: tapping does nothing unless a piece
-  // is selected, and even an empty cell can be an invalid anchor (the piece may
-  // extend into occupied or off-board cells), so the tap tries and may be
-  // rejected. The cell has no per-piece validity to make a stronger claim.
-  const placementHint =
-    onPress && cell.kind === "empty"
-      ? "If a piece is selected, double tap to try to place it here"
-      : undefined;
+  // The placement hint appears only on empty cells (the only legal anchors) and
+  // only while a piece is selected — `placementState` carries the domain's own
+  // preview verdict for the selected piece anchored here, so the hint mirrors the
+  // engine exactly: it promises a placement only where the engine would accept
+  // one, states plainly where it would not, and stays silent (no hint) when
+  // nothing is held so it never implies an action that a tap won't perform.
+  let placementHint: string | undefined;
+  if (onPress && cell.kind === "empty" && placementState) {
+    placementHint =
+      placementState === "valid"
+        ? "Double tap to place the selected piece here"
+        : "The selected piece can't be placed here";
+  }
 
   return (
     <AnimatedPressable
@@ -157,7 +196,7 @@ export function GridCell({
       onPress={onPress}
       disabled={onPress === undefined}
       testID={`cell-${row}-${column}`}
-      accessibilityLabel={cellLabel(cell, row, column)}
+      accessibilityLabel={cellLabel(cell, row, column, { remainingTurns, critical, frozen })}
       accessibilityRole={onPress ? "button" : undefined}
       accessibilityHint={placementHint}
       accessible

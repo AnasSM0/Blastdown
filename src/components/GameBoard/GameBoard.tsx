@@ -42,6 +42,11 @@ type GameBoardProps = {
   /** True while the run's rewarded freeze is active — pauses the countdown and
    *  puts every timer badge into its frozen (icy, static) cue. */
   frozen?: boolean;
+  /** Per-empty-cell anchor validity for the currently selected piece, keyed
+   *  "row,column", from the domain's placement preview. Null/absent when no
+   *  piece is selected. Drives each empty cell's placement hint for assistive
+   *  tech — read-only presentation data, never a gameplay input. */
+  placementHints?: ReadonlyMap<string, "valid" | "invalid"> | null;
 };
 
 /** Boundary sides of a timed cell within its piece: a side is a boundary when
@@ -97,6 +102,7 @@ function GameBoardImpl(
     highlightPieceId,
     reducedMotion: reducedMotionProp,
     frozen = false,
+    placementHints,
   }: GameBoardProps,
   ref: React.ForwardedRef<View>,
 ) {
@@ -139,6 +145,10 @@ function GameBoardImpl(
       .filter((badge) => getTimerVisualState(badge.remainingTurns) === "urgent")
       .map((badge) => badge.pieceId),
   );
+
+  // Remaining move count per timed piece, from the same badge data — announced
+  // in each timed cell's accessibility label (never signaled by color alone).
+  const remainingByPiece = new Map(badges.map((badge) => [badge.pieceId, badge.remainingTurns]));
 
   const previewMap = new Map<string, CellPreviewState>();
   if (preview) {
@@ -223,6 +233,15 @@ function GameBoardImpl(
                     onPress={onCellPress ? () => onCellPress({ row, column }) : undefined}
                     flashNonce={placedSet.has(`${row},${column}`) ? placementNonce : undefined}
                     reducedMotion={reducedMotion}
+                    placementState={
+                      cell.kind === "empty"
+                        ? (placementHints?.get(`${row},${column}`) ?? undefined)
+                        : undefined
+                    }
+                    remainingTurns={
+                      cell.kind === "timed" ? remainingByPiece.get(cell.pieceInstanceId) : undefined
+                    }
+                    frozen={frozen}
                   />
                 </View>
               ))}
