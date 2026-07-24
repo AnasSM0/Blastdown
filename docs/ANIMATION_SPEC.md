@@ -133,3 +133,39 @@ plays once) immediately after a revive is granted, coinciding with rubble
 being cleared and timers being boosted. Good candidate for the revive
 resolution moment; pair with the existing `rowSweepAnim`-style visual
 language rather than inventing a third sweep treatment.
+
+## Phase 2 — interaction motion (implemented, 2026-07-25)
+
+The consolidated interaction-motion pass. Scope is **interaction feedback**
+(cause → result), NOT event effects — no explosions, particles, line-clear, or
+reward-celebration motion was added (those remain Phase 3). Every beat below is
+RN `Animated`, native-driven, within the 100–220 ms band, and removed under the
+effective reduced-motion value; no new animation dependency was added.
+
+| Beat            | Where                  | Motion                                                                                                                     | Reduced motion                                        |
+| --------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Piece selection | `PieceTray` `TraySlot` | lift scale 1 → 1.08, 150 ms timing (no spring overshoot); previous selection settles back in the same window               | instant `setValue`, no transform                      |
+| Drag follow     | `DragGhost`            | position on a native `Animated.ValueXY` driven imperatively — zero React renders per pointer move                          | native translate (no scale)                           |
+| Drag pick-up    | `DragGhost`            | subtle lift scale ×1.06 while dragging                                                                                     | no scale                                              |
+| Board preview   | `GridCell`             | valid/invalid appear **instantly** (fastest, and avoids animating 64 cells / board geometry)                               | unchanged                                             |
+| Placement snap  | `GridCell`             | placed cells settle scale 1.12 → 1, 150 ms                                                                                 | skipped, transform omitted                            |
+| Invalid return  | `DragGhost`            | ghost glides back to the pick-up point + fades + shrinks, 160 ms, deterministic                                            | returns immediately                                   |
+| Timer tick      | `TimerBadge`           | on a countdown value change, one-shot scale 1 → 1.16 → 1 (~210 ms), composed over the pulse; never on mount or when frozen | no tick                                               |
+| Timer urgency   | `TimerBadge`           | existing warning/urgent pulse (unchanged)                                                                                  | static higher-contrast badge                          |
+| Button press    | `PressableFeedback`    | dim: opacity → 0.6 (transform-free, for rounded/elevated controls); scale: → 0.96 (elevation-free dock only)               | no animation; disabled/pending controls never animate |
+| Modal appear    | `useAppearAnimation`   | pause / defuse / game-over panels fade + rise 12 px, 180 ms                                                                | instant, opacity 1, no transform                      |
+
+**Android safety.** Press feedback defaults to **opacity** (no transform) so it
+is safe on rounded, glowing (elevated) controls — a transient scale on those is
+exactly the rounded-view hardware-layer black-render hazard this project has hit
+on-device, and the build machine has no Android device to verify a scale against.
+Scale press is used only on the reward dock, which has no elevation and no
+`overflow:hidden`. No animation binds an identity transform under reduced motion;
+the drag ghost's position translate is a real position (not identity) on a view
+with no `overflow:hidden`/elevation.
+
+**Performance.** The only per-frame work on the drag path was the ghost's
+`setPoint`; it is gone. The board still updates React preview state only when the
+mapped anchor changes, so a gesture never triggers a 64-cell rerender. Physical
+device release/profile confirmation of drag smoothness is required and is the
+user's step (no device on the build machine).

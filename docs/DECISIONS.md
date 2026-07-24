@@ -1268,3 +1268,57 @@ GridCell,ScoreHeader,ComboIndicator,RewardedActionButton}`, and
 `__tests__/{components/responsiveA11y,components/boardCellHints,integration/gameLayout}`.
 No gameplay, domain, economy, analytics, reward, ad, or dependency change (the
 placement hint reads the existing pure `getPlacementPreview` selector only).
+
+## 2026-07-25 — Professional UI Polish Phase 2: Interaction Motion
+
+Consolidated interaction-motion pass on branch
+`phase-professional-polish-2-interaction-motion` (4 commits: `perf` drag,
+`feat` motion, `test`, `docs`). Scope is interaction feedback only — NOT Phase 3
+event effects (explosions/particles/line-clear/reward celebration were not
+touched). No new animation dependency; RN `Animated` only, per the
+2026-07-20 single-animation-system decision.
+
+- **Drag path is render-free.** The drag ghost followed the finger via a React
+  `setPoint` (a component render on every pointer event). Rebuilt on a
+  native-backed `Animated.ValueXY` set imperatively in `moveTo`, so following the
+  finger costs zero React renders. Position must be a transform (top/left can't
+  ride the native driver), so the ghost always carries a translate — a real
+  position, not an identity transform — on a view with no `overflow:hidden`/
+  elevation, clear of the black-render trap. The board still updates preview
+  state only when the mapped anchor changes (`app/game.tsx` `setDragOrigin`), so a
+  gesture never rerenders the 64 cells.
+- **Press feedback defaults to opacity, not scale.** A transient press _scale_ on
+  a rounded, glowing (elevated) control is exactly the Android hardware-layer
+  black-render hazard this project hit on-device (see the placed-block saga), and
+  the build machine has no Android device to verify a scale is safe. So the shared
+  `PressableFeedback` uses an opacity dip by default (transform-free, universally
+  safe) and offers a `scale` mode only for the reward dock, which has no elevation
+  and no `overflow:hidden`. Disabled/pending controls never animate, so a press
+  can't replay motion on a control that won't act.
+- **No overshoot, no loops.** The tray selection lift was a bouncy spring;
+  retuned to a 150 ms timing (motion rules forbid overshoot). No decorative
+  looping motion was added — the only loop remains the pre-existing timer urgency
+  pulse. The timer badge gains a discrete value-change tick (a placement consumed
+  a move), composed over the pulse via `Animated.multiply`, never firing on mount
+  or when frozen.
+- **Modal appear via a shared hook.** `useAppearAnimation` gives the pause,
+  defuse, and game-over panels a short fade + 12 px rise; under reduced motion it
+  resolves instantly with no transform. Modals still use the pre-Premium `colors`
+  palette — a theme migration is out of a motion pass's scope and was left alone.
+- **Reduced motion removes every added beat**, and no beat binds an identity
+  transform under reduced motion. The dock overflow-guard test was updated: the
+  action now legitimately carries a scale transform, so the invariant is
+  "no `overflow:hidden` on the transformed surface," not "no transform."
+
+New: `src/components/PressableFeedback/**`, `src/hooks/useAppearAnimation.ts`,
+`__tests__/components/interactionMotion.test.tsx`. Touched: `DragGhost`,
+`PieceTray`, `TimerBadge`, `ScoreHeader`, `RewardedActionButton`, the three
+modals, `HomeScreenView`, `app/game.tsx`. 88 suites / 551 tests, coverage 91.81%,
+full battery + Android export clean, doctor 19/20 (pre-existing Expo drift).
+
+**Device gate (open):** the required physical release/profile drag pass (all
+three pieces, slow/fast drags, valid/invalid drops, corners, timers+rubble,
+reduced-motion on/off, Reactor + one alt theme, dev + release build, no visible
+lag) is the user's step — no Android device on the build machine, so it is
+recorded, not fabricated. Phase 3 (event/celebration effects) must not begin
+until this Phase 2 device pass is signed off.

@@ -182,3 +182,26 @@ board-cell size and safe-area behavior should be eyeballed on a ~360px device.
 **Colorblind-safe palette** (from the Phase-0 gap list) remains a separate,
 larger task — not in P1-10 scope; state is never signaled by color alone across
 the polished surfaces (verified in P1-9 + here).
+
+## Phase 2 interaction motion — reduced motion (2026-07-25)
+
+The interaction-motion pass adds only cause-and-result feedback, and every beat
+is removed under the effective reduced-motion value (OS + persisted override):
+
+- Press feedback (`PressableFeedback`) does not animate under reduced motion (or
+  while a control is disabled/pending); the control and its state styling are
+  unchanged, so nothing is lost.
+- The tray selection lift, drag pick-up/return scale, placement snap, timer tick,
+  and modal appear (`useAppearAnimation`) all resolve to their end state instantly
+  with **no transform** under reduced motion — upholding the Android
+  identity-transform / rounded-layer black-render guard.
+- No looping decorative motion was added; the only loop remains the existing
+  timer urgency pulse, which already degrades to a static higher-contrast badge.
+- State is still never signaled by motion alone: selection has border/glow, the
+  timer has its numeral + ring, invalid placement keeps its dashed non-color cue,
+  and every button keeps its label/role. Focus order, accessibility labels/hints,
+  safe areas, and once-only callbacks are unchanged by the motion layer.
+
+Physical-device confirmation with reduced motion ON and OFF (and a smooth drag on
+a real phone) is required and recorded as the user's step — there is no Android
+device on the build machine.

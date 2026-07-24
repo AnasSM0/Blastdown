@@ -1109,3 +1109,36 @@ column)` — deterministic, never randomized at render — so a full rubble boar
 clean; all 5 themes correct; no gameplay/domain/economy/analytics/reward change;
 before/after comparison approved. Then Phase 2 (motion polish), Phase 3
 (whole-app polish), and only afterward resume Phase 6B.
+
+## Professional UI Polish — Phase 2 (Interaction Motion)
+
+- [x] **P2 Interaction motion pass** — done 2026-07-25 (branch
+      `phase-professional-polish-2-interaction-motion`). One consolidated pass
+      over selection, dragging, placement, invalid return, controls, timers, and
+      modal microinteractions. See `docs/ANIMATION_SPEC.md` §"Phase 2 —
+      interaction motion (implemented)", `docs/VISUAL_POLISH_REVIEW.md` §"Phase 2",
+      and the 2026-07-25 Decisions entry.
+  - Allowed: gameplay/interaction UI components, `app/game.tsx`, motion helpers,
+    `__tests__/**`, `docs/**`.
+  - Forbidden: `src/domain/**`, gameplay/balance, persistence, economy,
+    analytics/diagnostics contracts, reward logic, ads, `BUILD_SPEC.md`, package
+    versions. No new animation dependency (RN `Animated` only).
+  - Result: (1) **Drag perf** — the ghost followed the finger via `setPoint`
+    (per-frame React render); rebuilt on a native-backed `Animated.ValueXY`
+    driven imperatively, so following the finger costs zero renders and the board
+    still updates preview state only on anchor change. (2) **Motion** — shared
+    `PressableFeedback` (opacity-dim by default, scale for the elevation-free
+    dock) on the pause control, dock, all modal buttons, and Home controls; shared
+    `useAppearAnimation` fade+rise for the pause/defuse/game-over panels; tray
+    selection lift retuned to a no-overshoot 150 ms timing; a discrete
+    value-change tick on the timer badge; ghost pick-up/return scale. (3) All
+    beats native-driven, 100–220 ms, removed under reduced motion; no transform
+    hazard on rounded/elevated/overflow surfaces. New `PressableFeedback.test.tsx`
+    equivalents + `interactionMotion.test.tsx` (10 tests) + updated dock/ghost
+    guards. 88 suites / 551 tests, coverage 91.81%, full battery + Android export
+    clean, doctor 19/20 (pre-existing Expo drift). **No Android device on the
+    build machine** → the required physical-device release/profile drag pass
+    (all three pieces, slow/fast drags, valid/invalid drops, corners, timers,
+    reduced-motion on/off, Reactor + one alt theme, dev + release build) is the
+    user's step, recorded here, not fabricated. Do NOT begin Phase 3
+    (explosions/particles/line-clear/reward-celebration effects).

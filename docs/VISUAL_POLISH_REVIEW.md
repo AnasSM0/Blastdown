@@ -983,3 +983,65 @@ selection change (rerender), the 64-cell board, and read-only `getPlacementPrevi
 resolved. (2) `RESERVED_BELOW_BOARD` is an estimate (200); if the tray/dock chrome
 grows it should track. (3) Text-scaling caps bound growth but a device pass at the
 largest accessibility sizes is still advisable. (4) Pre-existing expo-doctor drift.
+
+---
+
+## Phase 2 · Interaction Motion (2026-07-25)
+
+**Scope:** one consolidated interaction-motion pass — selection, dragging,
+placement, invalid return, controls, timers, and modal microinteractions. NOT
+Phase 3 (no explosions, particles, line-clear, or reward-celebration effects). No
+gameplay, reward, analytics, persistence, or domain change; no new dependency (RN
+`Animated` only). Full contract in `docs/ANIMATION_SPEC.md` §"Phase 2".
+
+**Audit (Codex, read-only):** a bounded read-only pass plus a full manual read of
+the gesture/motion stack. Confirmed the single per-frame hazard: `DragGhost`
+followed the finger via `setPoint` (a React render per pointer move); the board
+itself already updated only on anchor change.
+
+**Drag performance:** `DragGhost` position moved off React state onto a
+native-backed `Animated.ValueXY` driven imperatively through the ref, so following
+the finger costs zero renders. Position rides the native driver (a translate,
+which top/left cannot); the pick-up lift + invalid-return use a native scale
+omitted under reduced motion. Board preview state still updates only when the
+mapped anchor changes — no 64-cell rerender on a gesture event.
+
+**Motion added:** shared `PressableFeedback` press feedback (opacity-dim default;
+scale for the elevation-free dock) on the pause control, both dock actions, all
+pause/defuse/game-over modal buttons, and the Home Play/Continue/menu controls;
+shared `useAppearAnimation` fade+rise for the pause/defuse/game-over panels; tray
+selection lift retuned from a bouncy spring to a 150 ms no-overshoot timing; a
+discrete timer-badge value-change tick (composed over the existing pulse); the
+ghost pick-up/return scale. All native-driven, 100–220 ms, removed under reduced
+motion.
+
+**Android safety:** press feedback defaults to opacity (transform-free) so it is
+safe on rounded/glowing elevated controls — a transient scale on those is the
+black-render hazard this project has hit on-device, un-verifiable without a phone.
+Scale press is confined to the dock (no elevation, no `overflow:hidden`). No
+identity transform is bound under reduced motion. Existing overflow/transform
+guards preserved; the dock guard test now asserts "no `overflow:hidden` on the
+transformed surface" rather than "no transform."
+
+**Tests:** `interactionMotion.test.tsx` (10) — press forwarding + disabled guard,
+dim vs scale transform by mode/reduced-motion, dock reduced-motion + pending
+no-trigger, tray selection lift, timer transform, modal appear. Updated the
+`DragGhost` reduced-motion guard (translate present, scale absent) and the dock
+overflow guard. 88 suites / 551 tests, coverage 91.81%.
+
+**Verification:** typecheck ✅, lint ✅, tests ✅, coverage ✅, format ✅,
+expo-doctor 19/20 (pre-existing upstream Expo patch drift, no deps changed),
+Android export ✅.
+
+**Device finding (REQUIRED, deferred):** no Android device on the build machine,
+so the physical release/profile drag pass — all three tray pieces, slow and fast
+dragging, valid and invalid drops, board corners, timers + rubble present,
+reduced-motion ON/OFF, Reactor + one alternative theme, development and
+release/profile build, and confirming no visible drag lag — is the user's step. It
+is recorded here, not captured or fabricated (no synthetic screenshots as device
+proof).
+
+**Risks:** (1) Drag smoothness is architecturally improved (no per-frame render)
+but only a real device confirms the felt result. (2) Press feedback is opacity by
+design on elevated controls; if a device shows it too subtle, revisit per-control.
+(3) Pre-existing expo-doctor dependency drift, unrelated.
