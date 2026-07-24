@@ -3,6 +3,7 @@ import { fireEvent, render } from "@testing-library/react-native";
 import { StorageServiceProvider, createMemoryStorageService } from "../../src/services/storage";
 import { GameSessionProvider } from "../../src/state/GameSessionProvider";
 import { ProfileProvider } from "../../src/state/ProfileProvider";
+import { SettingsProvider } from "../../src/state/SettingsProvider";
 
 const mockPush = jest.fn();
 
@@ -20,12 +21,17 @@ function renderHome() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const HomeScreen = require("../../app/index").default;
   return render(
+    // Mirrors the real provider stack (app/_layout): the Home route reads the
+    // effective reduced-motion setting for its button press feedback, so it
+    // renders under SettingsProvider like it does in production.
     <StorageServiceProvider service={createMemoryStorageService()}>
-      <ProfileProvider>
-        <GameSessionProvider>
-          <HomeScreen />
-        </GameSessionProvider>
-      </ProfileProvider>
+      <SettingsProvider>
+        <ProfileProvider>
+          <GameSessionProvider>
+            <HomeScreen />
+          </GameSessionProvider>
+        </ProfileProvider>
+      </SettingsProvider>
     </StorageServiceProvider>,
   );
 }

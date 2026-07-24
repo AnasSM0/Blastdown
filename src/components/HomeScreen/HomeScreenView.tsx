@@ -15,6 +15,10 @@ type HomeScreenViewProps = {
   onSettings: () => void;
   onHowToPlay: () => void;
   onPrivacy: () => void;
+  /** Effective reduced-motion (OS + persisted override), threaded from the route
+   *  so the buttons' press feedback honors the in-app Settings toggle, not just
+   *  the OS setting. Falls back to the OS hook when omitted (isolated renders). */
+  reducedMotion?: boolean;
 };
 
 function formatNumber(value: number): string {
@@ -36,11 +40,13 @@ export function HomeScreenView({
   onSettings,
   onHowToPlay,
   onPrivacy,
+  reducedMotion,
 }: HomeScreenViewProps) {
   return (
     <SafeAreaView style={styles.screen} testID="home-screen">
       <View style={styles.topRow}>
         <PressableFeedback
+          reducedMotion={reducedMotion}
           style={styles.iconButton}
           onPress={onSettings}
           accessibilityRole="button"
@@ -63,6 +69,7 @@ export function HomeScreenView({
         </View>
 
         <PressableFeedback
+          reducedMotion={reducedMotion}
           style={[styles.playButton, neonGlow(colors.scoreOrange, "high")]}
           onPress={onPlay}
           accessibilityRole="button"
@@ -75,6 +82,7 @@ export function HomeScreenView({
 
         {canContinue ? (
           <PressableFeedback
+            reducedMotion={reducedMotion}
             style={styles.continueButton}
             onPress={onContinue}
             accessibilityRole="button"
@@ -89,6 +97,7 @@ export function HomeScreenView({
       <View style={styles.footer}>
         <View style={styles.menuRow}>
           <PressableFeedback
+            reducedMotion={reducedMotion}
             style={styles.menuButton}
             onPress={onThemes}
             accessibilityRole="button"
@@ -99,6 +108,7 @@ export function HomeScreenView({
             <Text style={styles.menuLabel}>THEMES</Text>
           </PressableFeedback>
           <PressableFeedback
+            reducedMotion={reducedMotion}
             style={styles.menuButton}
             onPress={onHowToPlay}
             accessibilityRole="button"
@@ -110,6 +120,7 @@ export function HomeScreenView({
           </PressableFeedback>
         </View>
         <PressableFeedback
+          reducedMotion={reducedMotion}
           onPress={onPrivacy}
           accessibilityRole="link"
           accessibilityLabel="Privacy policy"

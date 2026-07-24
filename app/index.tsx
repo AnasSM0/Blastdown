@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 
 import { HomeScreenView } from "../src/components/HomeScreen";
+import { useEffectiveReducedMotion } from "../src/hooks/useEffectiveReducedMotion";
 import { useGameSession } from "../src/state/GameSessionProvider";
 import { useProfile } from "../src/state/ProfileProvider";
 
@@ -10,6 +11,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { canContinue, startNewRun } = useGameSession();
   const { profile, loaded } = useProfile();
+  const reducedMotion = useEffectiveReducedMotion();
 
   // First run only: once the profile has loaded and shows the tutorial has
   // never been completed, send the player to it automatically. Guarded so it
@@ -43,6 +45,7 @@ export default function HomeScreen() {
         onSettings={() => router.push("/settings")}
         onHowToPlay={() => router.push("/tutorial")}
         onPrivacy={() => {}}
+        reducedMotion={reducedMotion}
       />
       <StatusBar style="light" />
     </>
