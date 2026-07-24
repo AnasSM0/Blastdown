@@ -142,12 +142,13 @@ export function GridCell({
   const cellTransform = reducedMotion ? undefined : { transform: [{ scale: snap }] };
 
   // A placement hint only on empty cells — the only cells a placement can land
-  // on — and phrased conditionally: tapping does nothing unless a piece is
-  // selected, so an unconditional "places the piece here" would mislead when
-  // nothing is selected or the cell is occupied.
+  // on. Phrased as an ATTEMPT, not a promise: tapping does nothing unless a piece
+  // is selected, and even an empty cell can be an invalid anchor (the piece may
+  // extend into occupied or off-board cells), so the tap tries and may be
+  // rejected. The cell has no per-piece validity to make a stronger claim.
   const placementHint =
     onPress && cell.kind === "empty"
-      ? "If a piece is selected, double tap to place it here"
+      ? "If a piece is selected, double tap to try to place it here"
       : undefined;
 
   return (

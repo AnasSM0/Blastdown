@@ -1245,9 +1245,11 @@ Claude-reviewed; only proven regressions fixed).
   bound large-OS-font growth; the timer numeral is `allowFontScaling={false}` (a
   spatial indicator; the count is also in its a11y label).
 - **A11y labels/hints** enriched (rubble "blocked", a conditional placement hint on
-  empty cells only — "If a piece is selected, double tap to place it here", so it
-  never claims a placement that a no-selection/occupied tap won't make — pause hint,
-  dock per-state hints + rewarded-ad cost, pending → `accessibilityState.disabled`).
+  empty cells only — "If a piece is selected, double tap to try to place it here",
+  phrased as an ATTEMPT so it never claims a placement that a no-selection/occupied
+  tap won't make, nor promises success on an empty cell that is itself an invalid
+  anchor — pause hint, dock per-state hints + rewarded-ad cost,
+  pending → `accessibilityState.disabled`).
 
 Affects: `app/game.tsx`, `src/components/{TimerBadge,GameBoard,PieceTray,DragGhost,
 GridCell,ScoreHeader,ComboIndicator,RewardedActionButton}`, and

@@ -94,10 +94,12 @@ describe("accessibility labels and hints (P1-10)", () => {
       <GridCell cell={{ kind: "empty" }} row={1} column={1} size={40} onPress={jest.fn()} />,
     );
     // Conditional phrasing: tapping only places WHEN a piece is selected, so the
-    // hint must not claim an unconditional placement.
-    expect(actionable.getByTestId("cell-1-1").props.accessibilityHint).toMatch(
-      /if a piece is selected/i,
-    );
+    // hint must not claim an unconditional placement. It is also phrased as an
+    // ATTEMPT ("try to place") — even an empty cell can be an invalid anchor, so
+    // the hint must not promise the placement will succeed.
+    const hint = actionable.getByTestId("cell-1-1").props.accessibilityHint;
+    expect(hint).toMatch(/if a piece is selected/i);
+    expect(hint).toMatch(/try to place/i);
 
     const inert = await render(<GridCell cell={{ kind: "empty" }} row={2} column={2} size={40} />);
     expect(inert.getByTestId("cell-2-2").props.accessibilityHint).toBeUndefined();

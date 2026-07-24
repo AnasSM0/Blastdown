@@ -140,9 +140,10 @@ scales can't push controls off-screen or clip: combo pill (`numberOfLines`,
 also in the badge's accessibility label).
 
 **Labels & hints.** Rubble now announces "Blocked rubble cell…"; actionable board
-empty cells carry a conditional "If a piece is selected, double tap to place it
-here" hint (only empty cells are placement targets, and the phrasing avoids
-claiming a placement when nothing is selected); the pause control gained a
+empty cells carry a conditional "If a piece is selected, double tap to try to
+place it here" hint (only empty cells are placement targets, the phrasing avoids
+claiming a placement when nothing is selected, and "try to place" avoids promising
+success on an empty cell that is itself an invalid anchor); the pause control gained a
 hint; the dock exposes a per-state hint (pending→"Loading the rewarded ad",
 unavailable/disabled/failure/cancelled variants) and announces the rewarded-ad
 cost ("Watch a rewarded ad to use this") when the "▷ AD" chip shows; a pending
