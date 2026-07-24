@@ -1244,14 +1244,27 @@ Claude-reviewed; only proven regressions fixed).
 - **Text-scaling caps** added (combo, dock label/caption/chip, timer numeral) to
   bound large-OS-font growth; the timer numeral is `allowFontScaling={false}` (a
   spatial indicator; the count is also in its a11y label).
-- **A11y labels/hints** enriched (rubble "blocked", a conditional placement hint on
-  empty cells only — "If a piece is selected, double tap to try to place it here",
-  phrased as an ATTEMPT so it never claims a placement that a no-selection/occupied
-  tap won't make, nor promises success on an empty cell that is itself an invalid
-  anchor — pause hint, dock per-state hints + rewarded-ad cost,
-  pending → `accessibilityState.disabled`).
+- **A11y labels/hints** enriched (rubble "blocked", pause hint, dock per-state hints
+  - rewarded-ad cost, pending → `accessibilityState.disabled`).
+- **Board-cell hint contract (validity-aware).** After Stop-hook review of three
+  successive misleading revisions ("place it here" → "double tap to place it here"
+  → "try to place it here"), the placement hint was made truthful by wiring it to
+  the domain's own read-only preview. `app/game.tsx` computes a `placementHints`
+  map (empty cell → "valid"/"invalid") from `controller.previewAt`
+  (`getPlacementPreview`, pure — no mutation, no duplicated rules) while a piece is
+  selected, null otherwise, threaded through `GameBoard.placementHints` to
+  `GridCell.placementState`. Hint: valid anchor → "Double tap to place the selected
+  piece here"; invalid → "The selected piece can't be placed here"; no selection →
+  no hint; occupied/rubble → never a placement target. Timed-cell **labels** now
+  speak the countdown + state ("… N move(s) left[, frozen | urgent] …") so the
+  timer is never color-only; frozen suppresses "urgent". New props: `GridCell`
+  gains `placementState`/`remainingTurns`/`frozen`, `GameBoard` gains
+  `placementHints`. Covered by `boardCellHints.test.tsx` (15 tests, Codex-authored
+  under a bounded test-only delegation, Claude-reviewed) + updated
+  `responsiveA11y.test.tsx`.
 
 Affects: `app/game.tsx`, `src/components/{TimerBadge,GameBoard,PieceTray,DragGhost,
 GridCell,ScoreHeader,ComboIndicator,RewardedActionButton}`, and
-`__tests__/{components/responsiveA11y,integration/gameLayout}`. No gameplay,
-domain, economy, analytics, reward, ad, or dependency change.
+`__tests__/{components/responsiveA11y,components/boardCellHints,integration/gameLayout}`.
+No gameplay, domain, economy, analytics, reward, ad, or dependency change (the
+placement hint reads the existing pure `getPlacementPreview` selector only).

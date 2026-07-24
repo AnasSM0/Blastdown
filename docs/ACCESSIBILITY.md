@@ -139,11 +139,26 @@ scales can't push controls off-screen or clip: combo pill (`numberOfLines`,
 (`allowFontScaling={false}` — a spatial indicator sized to its badge; the count is
 also in the badge's accessibility label).
 
-**Labels & hints.** Rubble now announces "Blocked rubble cell…"; actionable board
-empty cells carry a conditional "If a piece is selected, double tap to try to
-place it here" hint (only empty cells are placement targets, the phrasing avoids
-claiming a placement when nothing is selected, and "try to place" avoids promising
-success on an empty cell that is itself an invalid anchor); the pause control gained a
+**Labels & hints.** Rubble now announces "Blocked rubble cell…". The board-cell
+placement hint is **validity-aware**, driven by the domain's own read-only
+placement preview (`getPlacementPreview` via `controller.previewAt`) — the UI
+duplicates no gameplay rule and mutates nothing. Only empty cells (the sole legal
+anchors) ever carry a placement hint, and only while a piece is selected:
+
+- valid anchor → "Double tap to place the selected piece here" (announces the
+  placement the tap will perform);
+- invalid anchor → "The selected piece can't be placed here" (states
+  unavailability; never promises success);
+- no piece selected → **no hint** (the label already says "Empty cell"), so it
+  never implies an action a bare tap won't perform;
+- occupied/rubble cells → never announce placement.
+
+`app/game.tsx` builds a `placementHints` map (empty cell → valid/invalid) while a
+piece is selected and passes it through `GameBoard` to each `GridCell`; it is null
+otherwise and recomputes on selection/board change, so hints never go stale.
+Timed-cell **labels** also speak the countdown and state rather than relying on
+color/glow — "{color} block with timer, N move(s) left[, frozen | urgent], row R,
+column C" (a frozen piece never also says "urgent"). The pause control gained a
 hint; the dock exposes a per-state hint (pending→"Loading the rewarded ad",
 unavailable/disabled/failure/cancelled variants) and announces the rewarded-ad
 cost ("Watch a rewarded ad to use this") when the "▷ AD" chip shows; a pending

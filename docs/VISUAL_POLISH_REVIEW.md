@@ -945,6 +945,40 @@ changed), Android export ✅.
 (short phone, large font, gesture vs three-button nav, real reduced-motion) is
 recorded, not captured/fabricated.
 
+### P1-10 follow-up — board-cell hint & label contract
+
+Stop-hook review flagged the first-pass board-cell placement hint as misleading:
+a static "double tap to place it here" (and its "…try to place…" revision)
+promised a placement on cells where no piece was selected, or where the selected
+piece would extend into an occupied/off-board cell. Reworked into a validity-aware
+contract driven by the domain's own read-only preview — no gameplay rule is
+duplicated or mutated in the UI:
+
+- **Placement hint (empty cells only, the only legal anchors):**
+  - piece selected + this cell is a **valid** anchor → "Double tap to place the
+    selected piece here" (announces the placement the tap will perform);
+  - piece selected + **invalid** anchor → "The selected piece can't be placed
+    here" (states unavailability, never promises success);
+  - **no piece selected** → no hint (the label already says "Empty cell"), so it
+    never implies an action a bare tap won't perform;
+  - occupied/rubble cells → never announce placement.
+- **Per-cell validity source:** `app/game.tsx` builds a `placementHints` map by
+  calling the existing `controller.previewAt` (→ `getPlacementPreview`, pure) for
+  each empty cell while a piece is selected; it is `null` otherwise and recomputes
+  when the selection or board changes, so hints never go stale. Threaded through
+  `GameBoard` (`placementHints`) to `GridCell` (`placementState`).
+- **Timed-cell labels** now speak the countdown and state instead of relying on
+  color/glow: "{color} block with timer, N move(s) left[, frozen | urgent], row
+  R, column C" (from `remainingTurns` + `critical`/`frozen`; a frozen piece never
+  also says "urgent"). Identity labels for empty/normal/rubble unchanged.
+
+**Contract tests:** `boardCellHints.test.tsx` (new; Codex-authored, Claude-reviewed
+and normalized — 15 tests) covers valid/invalid/no-selection/non-interactive
+hints, occupied+rubble never-a-target, empty/normal/rubble/timed labels
+(singular+urgent, plural+frozen), the `GameBoard` map integration, hint updates on
+selection change (rerender), the 64-cell board, and read-only `getPlacementPreview`
+(no grid mutation). `responsiveA11y.test.tsx` updated to the new contract.
+
 **Risks:** (1) The board-cell 44px shortfall is an accepted grid constraint, not
 resolved. (2) `RESERVED_BELOW_BOARD` is an estimate (200); if the tray/dock chrome
 grows it should track. (3) Text-scaling caps bound growth but a device pass at the

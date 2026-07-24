@@ -1082,6 +1082,18 @@ column)` — deterministic, never randomized at render — so a full rubble boar
     on-device matrix recorded, not fabricated. UI code touched only to fix
     audit-proven regressions (the `docs/**`+`__tests__/**` allowance explicitly
     permits regression fixes).
+  - Follow-up (2026-07-25): the board-cell placement hint went through three
+    Stop-hook rounds for over-promising placement. Final fix makes the hint
+    **validity-aware** — `app/game.tsx` derives a `placementHints` map from the
+    pure `getPlacementPreview` selector (read-only) and threads it through
+    `GameBoard`→`GridCell`, so an empty cell only announces "place the selected
+    piece here" on a valid anchor, says "can't be placed here" on an invalid one,
+    and stays silent with no selection; occupied/rubble never announce placement.
+    Timed-cell labels now speak moves-left + urgent/frozen (never color-only).
+    New `boardCellHints.test.tsx` (15 tests, Codex test-only delegation,
+    Claude-reviewed) + updated `responsiveA11y.test.tsx`. Full battery green;
+    see the 2026-07-25 Decisions entry, `VISUAL_POLISH_REVIEW.md`
+    §"P1-10 follow-up", and `ACCESSIBILITY.md` §"Labels & hints".
 
 - [ ] **P1-11 Before/after screenshot comparison**
   - Allowed: `docs/**`, add an AFTER capture under `docs/current game images/`
