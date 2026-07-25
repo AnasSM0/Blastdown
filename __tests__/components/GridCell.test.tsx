@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react-native";
 import { StyleSheet, type ViewStyle } from "react-native";
 
-import { GridCell } from "../../src/components/GridCell";
+import { GridCell, contourMaskOf } from "../../src/components/GridCell";
 import type { GridCell as DomainGridCell } from "../../src/domain/gameTypes";
 import { blockColor, resolveTheme } from "../../src/ui/themes";
 import { blockSurface } from "../../src/ui/blockSurface";
@@ -137,7 +137,7 @@ describe("GridCell premium block surfaces (P1-4)", () => {
         row={0}
         column={0}
         size={40}
-        contourEdges={{ top: true, right: false, bottom: true, left: true }}
+        contourMask={contourMaskOf({ top: true, right: false, bottom: true, left: true })}
       />,
     );
     const contour = StyleSheet.flatten(
@@ -216,7 +216,7 @@ describe("GridCell premium block surfaces (P1-4)", () => {
         row={0}
         column={0}
         size={40}
-        contourEdges={{ top: true, right: true, bottom: true, left: true }}
+        contourMask={contourMaskOf({ top: true, right: true, bottom: true, left: true })}
       />,
     );
     const contour = styleOf(result.getByTestId("contour-0-0"));

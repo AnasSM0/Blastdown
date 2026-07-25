@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, View } from "react-native";
 
 import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
+import type { CellPosition } from "../../domain/placement";
 import { radius } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import { blockColor } from "../../ui/themes";
@@ -15,6 +16,23 @@ export type CellPreviewState = "valid" | "invalid" | "conflict";
  *  is a boundary when its neighbor is not part of the same timed piece. Drives
  *  the piece contour. Computed by the board from existing piece metadata. */
 export type CellEdges = { top: boolean; right: boolean; bottom: boolean; left: boolean };
+
+/** The same four sides packed into one number, so the prop is a primitive and a
+ *  cell can be memoized (a fresh `CellEdges` object every render would defeat
+ *  `memo` on every timed cell). */
+export const CONTOUR_TOP = 1;
+export const CONTOUR_RIGHT = 2;
+export const CONTOUR_BOTTOM = 4;
+export const CONTOUR_LEFT = 8;
+
+export function contourMaskOf(edges: CellEdges): number {
+  return (
+    (edges.top ? CONTOUR_TOP : 0) |
+    (edges.right ? CONTOUR_RIGHT : 0) |
+    (edges.bottom ? CONTOUR_BOTTOM : 0) |
+    (edges.left ? CONTOUR_LEFT : 0)
+  );
+}
 
 /** Contour stroke weight — heavier than the block's own edge so a timed piece's
  *  silhouette reads as one bounded group, distinct from a plain block. */
@@ -32,10 +50,14 @@ type GridCellProps = {
    *  drives the "critical" block material (color preserved, intensified edge +
    *  glow). Derived from existing badge metadata by the board, not here. */
   critical?: boolean;
-  /** Boundary sides of this cell within its timed piece. Present only for timed
-   *  cells; drives the shared piece contour. */
-  contourEdges?: CellEdges;
-  onPress?: () => void;
+  /** Boundary sides of this cell within its timed piece, packed as a bitmask
+   *  (see `contourMaskOf`). Present only for timed cells; drives the shared
+   *  piece contour. A number rather than an object so the cell stays memoizable. */
+  contourMask?: number;
+  /** Called with this cell's own position. Taking the position (instead of a
+   *  bound closure) lets the board pass one stable handler to all 64 cells, so
+   *  a re-render of the board doesn't hand every cell a new prop. */
+  onPress?: (position: CellPosition) => void;
   /** Changes each turn a piece lands on this cell, triggering a brief settle
    *  "snap" (docs/ANIMATION_SPEC.md "Placement feedback"). Undefined = no
    *  recent placement here. */
@@ -101,7 +123,7 @@ function cellLabel(
 /** Presentation of one board cell. The "glass" look is approximated with a
  *  translucent fill + colored border — deliberately no per-cell blur
  *  (docs/UI_REFERENCE_AUDIT.md item 9). All colors come from the active theme. */
-export function GridCell({
+function GridCellImpl({
   cell,
   row,
   column,
@@ -109,7 +131,7 @@ export function GridCell({
   previewState,
   highlighted,
   critical,
-  contourEdges,
+  contourMask,
   onPress,
   flashNonce,
   reducedMotion,
@@ -121,6 +143,7 @@ export function GridCell({
   const base = { width: size, height: size };
   const [snap] = useState(() => new Animated.Value(1));
   const lastFlash = useRef<number | undefined>(undefined);
+  const handlePress = useCallback(() => onPress?.({ row, column }), [onPress, row, column]);
 
   useEffect(() => {
     if (flashNonce === undefined || flashNonce === lastFlash.current) {
@@ -193,7 +216,7 @@ export function GridCell({
   return (
     <AnimatedPressable
       style={[styles.cell, base, visual, cellTransform]}
-      onPress={onPress}
+      onPress={onPress ? handlePress : undefined}
       disabled={onPress === undefined}
       testID={`cell-${row}-${column}`}
       accessibilityLabel={cellLabel(cell, row, column, { remainingTurns, critical, frozen })}
@@ -208,7 +231,7 @@ export function GridCell({
           testID={`block-${row}-${column}`}
         />
       ) : null}
-      {contourEdges && blockAccent ? (
+      {contourMask !== undefined && blockAccent ? (
         // A bright boundary stroke in the piece's own accent, drawn only on the
         // sides that face outside the timed piece. Internal (shared) sides get
         // nothing, so a multi-cell piece reads as one bounded group. Inset,
@@ -219,10 +242,10 @@ export function GridCell({
           style={[
             styles.contour,
             {
-              borderTopWidth: contourEdges.top ? CONTOUR_WIDTH : 0,
-              borderRightWidth: contourEdges.right ? CONTOUR_WIDTH : 0,
-              borderBottomWidth: contourEdges.bottom ? CONTOUR_WIDTH : 0,
-              borderLeftWidth: contourEdges.left ? CONTOUR_WIDTH : 0,
+              borderTopWidth: contourMask & CONTOUR_TOP ? CONTOUR_WIDTH : 0,
+              borderRightWidth: contourMask & CONTOUR_RIGHT ? CONTOUR_WIDTH : 0,
+              borderBottomWidth: contourMask & CONTOUR_BOTTOM ? CONTOUR_WIDTH : 0,
+              borderLeftWidth: contourMask & CONTOUR_LEFT ? CONTOUR_WIDTH : 0,
               borderColor: blockAccent,
             },
           ]}
@@ -268,6 +291,12 @@ export function GridCell({
     </AnimatedPressable>
   );
 }
+
+/** Memoized: every prop is a primitive or a stable reference (the domain reuses
+ *  unchanged cell objects between turns, the board passes one shared press
+ *  handler, and the contour is a bitmask), so a board re-render caused by an
+ *  unrelated change re-renders only the cells that actually changed. */
+export const GridCell = memo(GridCellImpl);
 
 const styles = StyleSheet.create({
   cell: {

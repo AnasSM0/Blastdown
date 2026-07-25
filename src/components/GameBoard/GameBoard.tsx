@@ -1,4 +1,4 @@
-import { forwardRef, memo, useEffect, useState } from "react";
+import { forwardRef, memo, useEffect, useMemo, useState } from "react";
 import { Animated, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 
 import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
@@ -9,7 +9,7 @@ import { useReducedMotion } from "../../hooks/useReducedMotion";
 import { getTimerVisualState } from "../../ui/timerStates";
 import { radius, spacing } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
-import { GridCell, type CellEdges, type CellPreviewState } from "../GridCell";
+import { GridCell, contourMaskOf, type CellEdges, type CellPreviewState } from "../GridCell";
 import { TimerBadge } from "../TimerBadge";
 
 type GameBoardProps = {
@@ -134,30 +134,61 @@ function GameBoardImpl(
     };
   }, [effectKey, explosionCount, reducedMotion, shake]);
 
-  const placedSet = new Set((placedCells ?? []).map((cell) => `${cell.row},${cell.column}`));
+  // Derived lookups, each memoized on the one input it actually depends on, so
+  // a board re-render for an unrelated reason (a preview change, a freeze
+  // toggle) doesn't rebuild all of them.
+  const placedSet = useMemo(
+    () => new Set((placedCells ?? []).map((cell) => `${cell.row},${cell.column}`)),
+    [placedCells],
+  );
 
   // Pieces whose countdown is urgent, from the badge data already supplied —
   // drives the "critical" block material on their cells. Reuses the existing
   // visual-state threshold; no new timer logic or piece grouping is introduced.
-  const criticalPieceIds = new Set(
-    badges
-      .filter((badge) => getTimerVisualState(badge.remainingTurns) === "urgent")
-      .map((badge) => badge.pieceId),
+  const criticalPieceIds = useMemo(
+    () =>
+      new Set(
+        badges
+          .filter((badge) => getTimerVisualState(badge.remainingTurns) === "urgent")
+          .map((badge) => badge.pieceId),
+      ),
+    [badges],
   );
 
   // Remaining move count per timed piece, from the same badge data — announced
   // in each timed cell's accessibility label (never signaled by color alone).
-  const remainingByPiece = new Map(badges.map((badge) => [badge.pieceId, badge.remainingTurns]));
+  const remainingByPiece = useMemo(
+    () => new Map(badges.map((badge) => [badge.pieceId, badge.remainingTurns])),
+    [badges],
+  );
 
-  const previewMap = new Map<string, CellPreviewState>();
-  if (preview) {
-    for (const cell of preview.cells) {
-      previewMap.set(`${cell.row},${cell.column}`, preview.valid ? "valid" : "invalid");
+  const previewMap = useMemo(() => {
+    const map = new Map<string, CellPreviewState>();
+    if (preview) {
+      for (const cell of preview.cells) {
+        map.set(`${cell.row},${cell.column}`, preview.valid ? "valid" : "invalid");
+      }
+      for (const cell of preview.conflictCells) {
+        map.set(`${cell.row},${cell.column}`, "conflict");
+      }
     }
-    for (const cell of preview.conflictCells) {
-      previewMap.set(`${cell.row},${cell.column}`, "conflict");
+    return map;
+  }, [preview]);
+
+  // Piece contours, packed per cell so each cell receives a primitive prop and
+  // stays memoizable. Recomputed only when the grid itself changes.
+  const contourMasks = useMemo(() => {
+    const masks = new Map<string, number>();
+    for (let row = 0; row < grid.length; row++) {
+      for (let column = 0; column < grid[row].length; column++) {
+        const edges = contourEdgesFor(grid, row, column);
+        if (edges) {
+          masks.set(`${row},${column}`, contourMaskOf(edges));
+        }
+      }
     }
-  }
+    return masks;
+  }, [grid]);
 
   const outerSize = boardSize ?? measured;
   const contentSize = outerSize - 2 * BOARD_CONTENT_INSET;
@@ -228,8 +259,10 @@ function GameBoardImpl(
                       cell.pieceInstanceId === highlightPieceId
                     }
                     critical={cell.kind === "timed" && criticalPieceIds.has(cell.pieceInstanceId)}
-                    contourEdges={contourEdgesFor(grid, row, column)}
-                    onPress={onCellPress ? () => onCellPress({ row, column }) : undefined}
+                    contourMask={contourMasks.get(`${row},${column}`)}
+                    // One shared handler for all 64 cells — each cell reports
+                    // its own position, so no per-cell closure is created.
+                    onPress={onCellPress}
                     flashNonce={placedSet.has(`${row},${column}`) ? placementNonce : undefined}
                     reducedMotion={reducedMotion}
                     placementState={
