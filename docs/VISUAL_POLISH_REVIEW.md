@@ -1033,15 +1033,20 @@ overflow guard. 88 suites / 551 tests, coverage 91.81%.
 expo-doctor 19/20 (pre-existing upstream Expo patch drift, no deps changed),
 Android export ✅.
 
-**Device finding (REQUIRED, deferred):** no Android device on the build machine,
-so the physical release/profile drag pass — all three tray pieces, slow and fast
-dragging, valid and invalid drops, board corners, timers + rubble present,
-reduced-motion ON/OFF, Reactor + one alternative theme, development and
-release/profile build, and confirming no visible drag lag — is the user's step. It
-is recorded here, not captured or fabricated (no synthetic screenshots as device
-proof).
+**Device review (PASSED, physical Android, 2026-07-25):** run by the repository
+owner on a physical Android phone — the build machine has no device, so this is a
+recorded owner result, not a captured or fabricated artifact (no synthetic
+screenshots were used as device proof). Findings:
 
-**Risks:** (1) Drag smoothness is architecturally improved (no per-frame render)
-but only a real device confirms the felt result. (2) Press feedback is opacity by
-design on elevated controls; if a device shows it too subtle, revisit per-control.
-(3) Pre-existing expo-doctor dependency drift, unrelated.
+- Dragging feels smoother; the per-frame render removal is confirmed in the hand.
+- Gameplay is no longer noticeably laggy.
+- Animations and graphics read as intended on-device.
+- Reduced-motion behavior was exercised and behaves correctly.
+- No black-rendered surfaces, no delayed input, no regressions reported.
+
+Phase 2 is accepted on this basis and merged to `master`, tagged
+`v0.8-ui-interaction-motion`.
+
+**Risks (closed):** drag smoothness — confirmed on-device; opacity press feedback
+legibility — accepted on-device. **Risk (open, unrelated):** pre-existing
+expo-doctor dependency drift (19/20), untouched by this work.

@@ -1136,9 +1136,10 @@ before/after comparison approved. Then Phase 2 (motion polish), Phase 3
     hazard on rounded/elevated/overflow surfaces. New `PressableFeedback.test.tsx`
     equivalents + `interactionMotion.test.tsx` (10 tests) + updated dock/ghost
     guards. 88 suites / 551 tests, coverage 91.81%, full battery + Android export
-    clean, doctor 19/20 (pre-existing Expo drift). **No Android device on the
-    build machine** → the required physical-device release/profile drag pass
-    (all three pieces, slow/fast drags, valid/invalid drops, corners, timers,
-    reduced-motion on/off, Reactor + one alt theme, dev + release build) is the
-    user's step, recorded here, not fabricated. Do NOT begin Phase 3
-    (explosions/particles/line-clear/reward-celebration effects).
+    clean, doctor 19/20 (pre-existing Expo drift).
+  - **Device review: PASSED** (physical Android, repository owner, 2026-07-25).
+    Drag feels smoother, gameplay no longer noticeably laggy, animations and
+    graphics look right, reduced-motion behavior verified. The build machine has
+    no device, so this is the owner's recorded result — not captured or
+    fabricated here. Phase 2 merged to `master` and tagged
+    `v0.8-ui-interaction-motion`.

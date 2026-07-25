@@ -1316,9 +1316,10 @@ New: `src/components/PressableFeedback/**`, `src/hooks/useAppearAnimation.ts`,
 modals, `HomeScreenView`, `app/game.tsx`. 88 suites / 551 tests, coverage 91.81%,
 full battery + Android export clean, doctor 19/20 (pre-existing Expo drift).
 
-**Device gate (open):** the required physical release/profile drag pass (all
-three pieces, slow/fast drags, valid/invalid drops, corners, timers+rubble,
-reduced-motion on/off, Reactor + one alt theme, dev + release build, no visible
-lag) is the user's step — no Android device on the build machine, so it is
-recorded, not fabricated. Phase 3 (event/celebration effects) must not begin
-until this Phase 2 device pass is signed off.
+**Device gate (CLOSED — PASSED, 2026-07-25):** the required physical Android
+release/profile pass was run by the repository owner (the build machine has no
+device, so this is a recorded owner result, never a fabricated artifact). Result:
+drag feels smoother, gameplay no longer noticeably laggy, animations and graphics
+look right, reduced-motion behavior verified. No black surfaces, delayed input,
+or regressions reported. Phase 2 accepted, merged to `master`, tagged
+`v0.8-ui-interaction-motion`; Phase 3 (gameplay event effects) is unblocked.
