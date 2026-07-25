@@ -6,11 +6,14 @@ import { useHaptics } from "./useHaptics";
 const URGENT_REMAINING = new Set([1, 2]);
 
 /** Fires a restrained urgent haptic as a timed piece crosses the countdown-2
- *  and countdown-1 thresholds, driven by the domain's `timerWarning` events —
- *  never inferred from board state. Each (piece, threshold) transition buzzes
- *  exactly once: processing is keyed on the turn counter (no per-render spam)
- *  and deduped per piece+threshold, and the dedupe set resets on restart.
- *  Honors the persisted haptics setting via useHaptics. */
+ *  and countdown-1 thresholds, plus one heavier impact on the turn a timer
+ *  actually expires — all driven by the domain's own events, never inferred
+ *  from board state. Each (piece, threshold) transition buzzes exactly once:
+ *  processing is keyed on the turn counter (no per-render spam) and deduped per
+ *  piece+threshold, and the dedupe set resets on restart. An expiry turn fires
+ *  a single impact however many pieces exploded, so a multi-expiry turn is one
+ *  cue rather than a burst. Honors the persisted haptics setting via
+ *  useHaptics. */
 export function useTimerHaptics({
   turn,
   events,
@@ -39,6 +42,7 @@ export function useTimerHaptics({
       return;
     }
     lastTurnRef.current = turn;
+    let expired = false;
     for (const event of eventsRef.current) {
       if (event.type === "timerWarning" && URGENT_REMAINING.has(event.remainingTurns)) {
         const key = `${event.pieceId}:${event.remainingTurns}`;
@@ -47,6 +51,13 @@ export function useTimerHaptics({
           hapticsRef.current.timerUrgent();
         }
       }
+      if (event.type === "explosionStarted") {
+        expired = true;
+      }
+    }
+    // One impact for the turn, not one per exploded piece.
+    if (expired) {
+      hapticsRef.current.expiry();
     }
   }, [turn]);
 }

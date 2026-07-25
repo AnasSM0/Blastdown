@@ -2,6 +2,13 @@ import { act, renderHook } from "@testing-library/react-native";
 
 import { useEventAnimator } from "../../src/hooks/useEventAnimator";
 import type { GameEvent } from "../../src/domain/events";
+import type { GridCell } from "../../src/domain/gameTypes";
+
+/** The hook reads the grid only to resolve a defused piece's footprint; these
+ *  cases exercise sequencing, so an empty board is enough. */
+const EMPTY_GRID: GridCell[][] = Array.from({ length: 8 }, () =>
+  Array.from({ length: 8 }, (): GridCell => ({ kind: "empty" })),
+);
 
 const CLEAR_TURN: GameEvent[] = [
   { type: "piecePlaced", handId: "h1", pieceId: "piece-1", cells: [{ row: 0, column: 0 }] },
@@ -24,7 +31,7 @@ describe("useEventAnimator", () => {
   it("locks input for a required sequence, then unlocks after its duration", async () => {
     const { result, rerender } = await renderHook(
       (props: { turn: number; events: GameEvent[]; reducedMotion: boolean }) =>
-        useEventAnimator(props),
+        useEventAnimator({ ...props, grid: EMPTY_GRID }),
       {
         initialProps: { turn: 0, events: [] as GameEvent[], reducedMotion: false },
       },
@@ -39,7 +46,7 @@ describe("useEventAnimator", () => {
     expect(result.current.effectKey).toBe(1);
 
     await act(async () => {
-      jest.advanceTimersByTime(320);
+      jest.advanceTimersByTime(340);
     });
     expect(result.current.isAnimating).toBe(false);
     expect(result.current.plan).toBeNull();
@@ -48,7 +55,7 @@ describe("useEventAnimator", () => {
   it("does not lock for a plain placement", async () => {
     const { result, rerender } = await renderHook(
       (props: { turn: number; events: GameEvent[]; reducedMotion: boolean }) =>
-        useEventAnimator(props),
+        useEventAnimator({ ...props, grid: EMPTY_GRID }),
       {
         initialProps: { turn: 0, events: [] as GameEvent[], reducedMotion: false },
       },
@@ -63,7 +70,7 @@ describe("useEventAnimator", () => {
   it("animates each new turn once and not on a restart back to turn 0", async () => {
     const { result, rerender } = await renderHook(
       (props: { turn: number; events: GameEvent[]; reducedMotion: boolean }) =>
-        useEventAnimator(props),
+        useEventAnimator({ ...props, grid: EMPTY_GRID }),
       {
         initialProps: { turn: 1, events: CLEAR_TURN, reducedMotion: false },
       },
@@ -85,7 +92,7 @@ describe("useEventAnimator", () => {
   it("reset cancels a playing sequence immediately", async () => {
     const { result, rerender } = await renderHook(
       (props: { turn: number; events: GameEvent[]; reducedMotion: boolean }) =>
-        useEventAnimator(props),
+        useEventAnimator({ ...props, grid: EMPTY_GRID }),
       {
         initialProps: { turn: 0, events: [] as GameEvent[], reducedMotion: false },
       },

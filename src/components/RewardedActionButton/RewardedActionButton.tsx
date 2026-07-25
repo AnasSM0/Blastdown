@@ -4,9 +4,12 @@ import { StyleSheet, Text, View, type ViewStyle } from "react-native";
 import { radius, spacing, typography } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import type { ThemePalette } from "../../ui/themes";
+// The phase vocabulary is shared with every other reward surface (game-over
+// Revive, results Double Bolts) so an outcome reads the same everywhere.
+import type { RewardActionPhase } from "../../ui/effects/rewardPhase";
 import { PressableFeedback } from "../PressableFeedback";
 
-export type RewardActionPhase = "idle" | "pending" | "success" | "failure" | "cancelled";
+export type { RewardActionPhase };
 
 type RewardedDockActionBase = {
   label: string;

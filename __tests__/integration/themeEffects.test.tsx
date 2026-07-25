@@ -1,6 +1,7 @@
 import { render, waitFor } from "@testing-library/react-native";
 
 import { GameBoard } from "../../src/components/GameBoard";
+import { EffectsLayer } from "../../src/components/effects/EffectsLayer";
 import { buildEffectPlan } from "../../src/ui/effects/eventEffects";
 import { StorageServiceProvider, createMemoryStorageService } from "../../src/services/storage";
 import { STORAGE_KEYS } from "../../src/services/storage/keys";
@@ -59,9 +60,10 @@ describe("theme-aware explosion effects", () => {
                   grid={grid8()}
                   badges={[]}
                   boardSize={328}
-                  effectPlan={EXPLOSION_PLAN}
+                  explosionCount={1}
                   effectKey={1}
                 />
+                <EffectsLayer plan={EXPLOSION_PLAN} cellSize={38} reducedMotion={false} />
               </ThemeProvider>
             </ProfileProvider>
           </SettingsProvider>

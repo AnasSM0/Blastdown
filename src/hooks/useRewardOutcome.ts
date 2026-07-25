@@ -1,0 +1,105 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import type { RewardedResult } from "../services/ads/types";
+import {
+  phaseForResult,
+  REWARD_OUTCOME_MS,
+  REWARD_OUTCOME_REDUCED_MS,
+  type RewardActionPhase,
+} from "../ui/effects/rewardPhase";
+import { useAudio } from "./useAudio";
+import { useHaptics } from "./useHaptics";
+
+export type RewardOutcome = {
+  /** Current transient phase for this action's control. */
+  phase: RewardActionPhase;
+  /** Enter the pending state — call when the ad request goes out. */
+  begin: () => void;
+  /** Record the resolved result: sets the outcome phase, plays the shared
+   *  failure feedback, and schedules the return to idle. Safe to call after
+   *  unmount (it becomes a no-op). */
+  settle: (result: RewardedResult) => void;
+  /** Drop any outcome and pending timer (restart / leaving the screen). */
+  reset: () => void;
+};
+
+/** One rewarded action's transient outcome feedback, shared by Freeze, Defuse,
+ *  Revive, and Double Bolts so all four look and sound the same.
+ *
+ *  Success feedback stays with the caller — only it knows which cue the earned
+ *  reward deserves — but the *non-success* outcomes are handled here so no
+ *  surface can quietly omit them: a failed or unavailable ad gets one warning
+ *  haptic and the `invalid` cue, and a player-dismissed ad stays silent (they
+ *  chose it; a failure noise would misreport their own action).
+ *
+ *  Feedback fires exactly once per settle, from the resolution of a single
+ *  in-flight request, so a replayed effect or a remounted screen cannot
+ *  duplicate it. It applies no game rules and grants nothing. */
+export function useRewardOutcome(reducedMotion = false): RewardOutcome {
+  const audio = useAudio();
+  const haptics = useHaptics();
+  const [phase, setPhase] = useState<RewardActionPhase>("idle");
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, []);
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const reset = useCallback(() => {
+    clearTimer();
+    if (mountedRef.current) {
+      setPhase("idle");
+    }
+  }, [clearTimer]);
+
+  const begin = useCallback(() => {
+    clearTimer();
+    if (mountedRef.current) {
+      setPhase("pending");
+    }
+  }, [clearTimer]);
+
+  const settle = useCallback(
+    (result: RewardedResult) => {
+      // A request that resolves after the screen is gone must not touch state
+      // or fire feedback into a dead tree.
+      if (!mountedRef.current) {
+        return;
+      }
+      const next = phaseForResult(result);
+      if (next === "failure") {
+        haptics.warning();
+        audio.playSfx("invalid");
+      }
+      clearTimer();
+      setPhase(next);
+      timerRef.current = setTimeout(
+        () => {
+          timerRef.current = null;
+          if (mountedRef.current) {
+            setPhase("idle");
+          }
+        },
+        reducedMotion ? REWARD_OUTCOME_REDUCED_MS : REWARD_OUTCOME_MS,
+      );
+    },
+    [audio, clearTimer, haptics, reducedMotion],
+  );
+
+  return { phase, begin, settle, reset };
+}

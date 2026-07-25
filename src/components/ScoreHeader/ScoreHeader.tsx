@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, StyleSheet, Text, View } from "react-native";
 
 import { spacing, typography } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
@@ -11,7 +12,8 @@ type ScoreHeaderProps = {
   best: number;
   combo: number;
   onPause: () => void;
-  /** Effective reduced-motion, for the pause control's press feedback. */
+  /** Effective reduced-motion, for the pause control's press feedback, the
+   *  score bump, and the combo emphasis. */
   reducedMotion?: boolean;
 };
 
@@ -26,8 +28,33 @@ function formatNumber(value: number): string {
 const SCORE_MAX_SCALE = 1.4;
 const LABEL_MAX_SCALE = 1.6;
 
+/** A short bump on the score digits when the score GOES UP, so a gain is
+ *  readable at the HUD as well as at the event that caused it. Never on mount
+ *  and never on a decrease (an explosion penalty already has its own board
+ *  feedback and shouldn't be celebrated here). */
+const BUMP_SCALE = 1.08;
+const BUMP_IN_MS = 90;
+const BUMP_OUT_MS = 150;
+
 export function ScoreHeader({ score, best, combo, onPause, reducedMotion }: ScoreHeaderProps) {
   const theme = useTheme();
+  const [bump] = useState(() => new Animated.Value(1));
+  const previousScore = useRef(score);
+
+  useEffect(() => {
+    const rose = score > previousScore.current;
+    previousScore.current = score;
+    if (!rose || reducedMotion) {
+      return;
+    }
+    const animation = Animated.sequence([
+      Animated.timing(bump, { toValue: BUMP_SCALE, duration: BUMP_IN_MS, useNativeDriver: true }),
+      Animated.timing(bump, { toValue: 1, duration: BUMP_OUT_MS, useNativeDriver: true }),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [bump, reducedMotion, score]);
+
   return (
     <View style={styles.row} testID="score-header">
       <View style={styles.side}>
@@ -51,11 +78,14 @@ export function ScoreHeader({ score, best, combo, onPause, reducedMotion }: Scor
       </View>
 
       <View style={styles.center}>
-        <Text
+        <Animated.Text
           style={[
             typography.scoreMobile,
             { color: theme.score },
             glowFor(theme, theme.score, "low"),
+            // The glow carries Android elevation, so no identity transform is
+            // bound here under reduced motion.
+            reducedMotion ? null : { transform: [{ scale: bump }] },
           ]}
           numberOfLines={1}
           adjustsFontSizeToFit
@@ -64,8 +94,8 @@ export function ScoreHeader({ score, best, combo, onPause, reducedMotion }: Scor
           testID="score-value"
         >
           {formatNumber(score)}
-        </Text>
-        <ComboIndicator combo={combo} />
+        </Animated.Text>
+        <ComboIndicator combo={combo} reducedMotion={reducedMotion} />
       </View>
 
       <View style={[styles.side, styles.sideRight]}>

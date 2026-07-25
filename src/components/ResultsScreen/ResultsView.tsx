@@ -2,6 +2,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { colors, neonGlow, radius, spacing, typography } from "../../ui/theme";
+import type { RewardActionPhase } from "../../ui/effects/rewardPhase";
+import { RewardOutcomeNotice } from "../RewardOutcomeNotice";
 
 export type RunStats = {
   score: number;
@@ -23,6 +25,10 @@ export type DoubleBoltsProps = {
   pending: boolean;
   /** True once the reward has been applied for this run (one-time). */
   applied: boolean;
+  /** Transient outcome of the last request (pending / success / cancelled /
+   *  failure), shown with the same status line every other reward surface uses
+   *  so a dismissed or failed ad is never silent. */
+  phase?: RewardActionPhase;
 };
 
 type ResultsViewProps = {
@@ -105,19 +111,25 @@ export function ResultsView({
               </Text>
             </View>
           ) : (
-            <Pressable
-              onPress={doubleBolts.onPress}
-              disabled={doubleBolts.pending}
-              style={[styles.doubleBolts, neonGlow(colors.scoreOrange, "low")]}
-              accessibilityRole="button"
-              accessibilityLabel={`Watch an ad to double your Bolts, plus ${n(doubleBolts.amount)}`}
-              accessibilityState={{ disabled: doubleBolts.pending }}
-              testID="double-bolts-button"
-            >
-              <Text style={styles.doubleBoltsText}>
-                {doubleBolts.pending ? "LOADING…" : `DOUBLE BOLTS +${n(doubleBolts.amount)} ▶`}
-              </Text>
-            </Pressable>
+            <>
+              <Pressable
+                onPress={doubleBolts.onPress}
+                disabled={doubleBolts.pending}
+                style={[styles.doubleBolts, neonGlow(colors.scoreOrange, "low")]}
+                accessibilityRole="button"
+                accessibilityLabel={`Watch an ad to double your Bolts, plus ${n(doubleBolts.amount)}`}
+                accessibilityState={{ disabled: doubleBolts.pending }}
+                testID="double-bolts-button"
+              >
+                <Text style={styles.doubleBoltsText}>
+                  {doubleBolts.pending ? "LOADING…" : `DOUBLE BOLTS +${n(doubleBolts.amount)} ▶`}
+                </Text>
+              </Pressable>
+              <RewardOutcomeNotice
+                phase={doubleBolts.phase ?? "idle"}
+                testID="double-bolts-outcome"
+              />
+            </>
           )
         ) : null}
 

@@ -2,6 +2,7 @@ import { render } from "@testing-library/react-native";
 import { StyleSheet, type ViewStyle } from "react-native";
 
 import { GameBoard } from "../../src/components/GameBoard";
+import { EffectsLayer } from "../../src/components/effects/EffectsLayer";
 import { buildEffectPlan } from "../../src/ui/effects/eventEffects";
 import type { GridCell } from "../../src/domain/gameTypes";
 import type { TimerBadgePlacement } from "../../src/domain/selectors";
@@ -168,8 +169,13 @@ describe("GameBoard", () => {
       false,
     );
 
+    // The overlay is a SIBLING of the board (so an effect plan never re-renders
+    // the 64 cells), which is exactly how the game screen composes them.
     const result = await render(
-      <GameBoard grid={grid} badges={[]} boardSize={328} effectPlan={plan} effectKey={1} />,
+      <>
+        <GameBoard grid={grid} badges={[]} boardSize={328} explosionCount={1} effectKey={1} />
+        <EffectsLayer plan={plan} cellSize={38} reducedMotion={false} />
+      </>,
     );
 
     // The rubble cell is drawn by the grid, and the burst overlay sits on top.

@@ -2,6 +2,9 @@ import { act, fireEvent, render } from "@testing-library/react-native";
 
 import { createInitialGameState } from "../../src/domain/game";
 import type { GameState } from "../../src/domain/gameTypes";
+import { AudioServiceProvider } from "../../src/services/audio";
+import { StorageServiceProvider, createMemoryStorageService } from "../../src/services/storage";
+import { SettingsProvider } from "../../src/state/SettingsProvider";
 
 const NOW = 1_752_800_000_000;
 const mockReplace = jest.fn();
@@ -65,7 +68,18 @@ describe("results route", () => {
   function renderResults() {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const ResultsScreen = require("../../app/results").default;
-    return render(<ResultsScreen />);
+    // Mirrors the real provider stack (app/_layout): the route plays the shared
+    // reward outcome feedback, which reads the persisted sound/haptics settings
+    // and the audio service.
+    return render(
+      <StorageServiceProvider service={createMemoryStorageService()}>
+        <SettingsProvider>
+          <AudioServiceProvider>
+            <ResultsScreen />
+          </AudioServiceProvider>
+        </SettingsProvider>
+      </StorageServiceProvider>,
+    );
   }
 
   it("shows the finished run's real stats, best score, and Bolts earned", async () => {

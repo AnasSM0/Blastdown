@@ -11,11 +11,13 @@ type PulseRingProps = {
 };
 
 /** One outward ring pulse used for a successful defuse (cyan success, never
- *  the explosion palette — docs/ANIMATION_SPEC.md). Skipped visuals under
- *  reduced motion collapse to a single brief fade with no scale. */
+ *  the explosion palette — docs/ANIMATION_SPEC.md). Under reduced motion it
+ *  collapses to a single brief fade with no scale, and binds no transform at
+ *  all: an identity transform would still promote this rounded view to an
+ *  Android hardware layer for no benefit. */
 export function PulseRing({ centerX, centerY, size, color, reducedMotion }: PulseRingProps) {
   const [opacity] = useState(() => new Animated.Value(0));
-  const [scale] = useState(() => new Animated.Value(reducedMotion ? 1 : 0.4));
+  const [scale] = useState(() => new Animated.Value(0.4));
 
   useEffect(() => {
     if (reducedMotion) {
@@ -40,6 +42,7 @@ export function PulseRing({ centerX, centerY, size, color, reducedMotion }: Puls
   return (
     <Animated.View
       pointerEvents="none"
+      testID="pulse-ring"
       style={[
         styles.ring,
         {
@@ -50,8 +53,8 @@ export function PulseRing({ centerX, centerY, size, color, reducedMotion }: Puls
           borderRadius: size / 2,
           borderColor: color,
           opacity,
-          transform: [{ scale }],
         },
+        reducedMotion ? null : { transform: [{ scale }] },
       ]}
     />
   );

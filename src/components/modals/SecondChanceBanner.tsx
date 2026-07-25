@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Animated, StyleSheet, Text } from "react-native";
+import { Animated, StyleSheet, View } from "react-native";
 
 import { colors, radius, spacing, typography } from "../../ui/theme";
 
@@ -28,15 +28,18 @@ export function SecondChanceBanner({ reducedMotion = false }: SecondChanceBanner
   }, [opacity, reducedMotion]);
 
   return (
-    <Animated.View
+    // The full-screen box is a static, transparent layout container; only the
+    // small text pill fades. Animating opacity on the full-screen view would
+    // promote the whole screen to a compositing layer for a one-line banner.
+    <View
       pointerEvents="none"
-      style={[styles.banner, { opacity }]}
+      style={styles.banner}
       testID="second-chance-banner"
       accessibilityLabel="Second chance"
       accessible
     >
-      <Text style={styles.text}>SECOND CHANCE</Text>
-    </Animated.View>
+      <Animated.Text style={[styles.text, { opacity }]}>SECOND CHANCE</Animated.Text>
+    </View>
   );
 }
 

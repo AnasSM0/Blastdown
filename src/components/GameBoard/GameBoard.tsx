@@ -6,11 +6,9 @@ import type { PlacementPreview, TimerBadgePlacement } from "../../domain/selecto
 import type { CellPosition } from "../../domain/placement";
 import { BOARD_CONTENT_INSET, FRAME_WIDTH } from "../../ui/boardGeometry";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
-import type { EffectPlan } from "../../ui/effects/eventEffects";
 import { getTimerVisualState } from "../../ui/timerStates";
 import { radius, spacing } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
-import { EffectsLayer } from "../effects/EffectsLayer";
 import { GridCell, type CellEdges, type CellPreviewState } from "../GridCell";
 import { TimerBadge } from "../TimerBadge";
 
@@ -28,10 +26,12 @@ type GameBoardProps = {
   placedCells?: readonly CellPosition[];
   /** Bumped each placement so the snap replays even on the same cells. */
   placementNonce?: number;
-  /** Cosmetic effect plan for the current turn's clear/defuse/explosion, or
-   *  null when idle. Rendered as an overlay positioned from the cell size. */
-  effectPlan?: EffectPlan | null;
-  /** Increments per sequence so the overlay remounts instead of interpolating. */
+  /** Number of explosions in the turn currently being animated, paired with
+   *  `effectKey` to retrigger the board's single shake. Deliberately NOT the
+   *  whole effect plan: the cosmetic overlay is a sibling of the board, so a
+   *  plan change must not re-render all 64 cells. */
+  explosionCount?: number;
+  /** Increments per sequence so the shake retriggers on a repeated explosion. */
   effectKey?: number;
   /** Timed piece to ring as the rewarded-defuse target (Stitch 07); its cells
    *  get a solid cyan highlight while the confirm card is open. */
@@ -97,7 +97,7 @@ function GameBoardImpl(
     onCellSizeChange,
     placedCells,
     placementNonce,
-    effectPlan,
+    explosionCount = 0,
     effectKey,
     highlightPieceId,
     reducedMotion: reducedMotionProp,
@@ -116,7 +116,6 @@ function GameBoardImpl(
 
   // Subtle single board shake on an explosion turn (skipped under reduced
   // motion); keyed on effectKey so it retriggers each explosion sequence.
-  const explosionCount = effectPlan?.explosions.length ?? 0;
   useEffect(() => {
     if (explosionCount === 0 || reducedMotion) {
       shake.setValue(0);
@@ -347,14 +346,6 @@ function GameBoardImpl(
             </View>
           ))
         : null}
-      {effectPlan && cellSize > 0 ? (
-        <EffectsLayer
-          key={effectKey}
-          plan={effectPlan}
-          cellSize={cellSize}
-          reducedMotion={reducedMotion}
-        />
-      ) : null}
     </Animated.View>
   );
 }

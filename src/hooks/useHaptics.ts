@@ -18,6 +18,10 @@ export type GameHaptics = {
   /** Restrained urgent cue as a timer crosses a countdown-2 / countdown-1
    *  threshold. Called once per transition by useTimerHaptics. */
   timerUrgent: () => void;
+  /** The heavier impact of a timer reaching zero and leaving rubble. Fired at
+   *  most once per turn by useTimerHaptics, however many pieces expired, so a
+   *  multi-expiry turn is one impact rather than a burst. */
+  expiry: () => void;
 };
 
 function runSafely(action: () => Promise<unknown> | void): void {
@@ -46,6 +50,7 @@ export function useHaptics(): GameHaptics {
       success: gate(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)),
       warning: gate(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)),
       timerUrgent: gate(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)),
+      expiry: gate(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)),
     };
   }, [enabled]);
 }

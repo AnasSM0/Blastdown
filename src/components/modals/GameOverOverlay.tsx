@@ -1,8 +1,10 @@
 import { Animated, StyleSheet, Text, View } from "react-native";
 
 import { colors, neonGlow, radius, spacing, typography } from "../../ui/theme";
+import type { RewardActionPhase } from "../../ui/effects/rewardPhase";
 import { useAppearAnimation } from "../../hooks/useAppearAnimation";
 import { PressableFeedback } from "../PressableFeedback";
+import { RewardOutcomeNotice } from "../RewardOutcomeNotice";
 
 type GameOverOverlayProps = {
   score: number;
@@ -15,6 +17,10 @@ type GameOverOverlayProps = {
   onEndRun: () => void;
   /** Disables both actions while a revive reward is in flight. */
   busy?: boolean;
+  /** Transient outcome of the revive reward (pending / success / cancelled /
+   *  failure), shown as the same status line every other reward surface uses so
+   *  a dismissed or failed ad is never silent. */
+  revivePhase?: RewardActionPhase;
   /** Effective reduced-motion for the appear transition + press feedback. */
   reducedMotion?: boolean;
 };
@@ -30,6 +36,7 @@ export function GameOverOverlay({
   onRevive,
   onEndRun,
   busy = false,
+  revivePhase = "idle",
   reducedMotion = false,
 }: GameOverOverlayProps) {
   const appear = useAppearAnimation(reducedMotion);
@@ -66,8 +73,13 @@ export function GameOverOverlay({
               <Text style={styles.reviveText}>▶ REPAIR &amp; CONTINUE</Text>
             </PressableFeedback>
             <Text style={styles.reviveNote}>CLEAR RUBBLE · ADD +2 MOVES · NEW PIECES</Text>
+            <RewardOutcomeNotice phase={revivePhase} testID="revive-outcome" />
           </>
-        ) : null}
+        ) : (
+          // The revive is spent (or the run never offered one): say so plainly
+          // instead of silently omitting the control.
+          <RewardOutcomeNotice phase="idle" unavailable testID="revive-outcome" />
+        )}
 
         <PressableFeedback
           onPress={busy ? undefined : onEndRun}

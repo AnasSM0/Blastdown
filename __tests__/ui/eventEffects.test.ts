@@ -21,7 +21,7 @@ describe("buildEffectPlan", () => {
     const key = (c: { row: number; column: number }) => `${c.row},${c.column}`;
     expect(new Set(plan.clearedCells.map(key)).size).toBe(15);
     expect(plan.clearedCells[0]).toEqual({ row: 0, column: 0 });
-    expect(plan.durationMs).toBe(320);
+    expect(plan.durationMs).toBe(340);
   });
 
   it("groups rubble under its explosion and keeps multiple explosions ordered", () => {
@@ -47,7 +47,7 @@ describe("buildEffectPlan", () => {
     expect(plan.explosions[1].cells).toEqual([{ row: 5, column: 5 }]);
     // Rubble union is deduped across explosions.
     expect(plan.rubbleCells).toHaveLength(2);
-    expect(plan.durationMs).toBe(520);
+    expect(plan.durationMs).toBe(440);
   });
 
   it("coordinates a defuse and a line clear in the same turn", () => {
@@ -58,13 +58,15 @@ describe("buildEffectPlan", () => {
       { type: "comboChanged", combo: 1 },
     ];
     const plan = buildEffectPlan(events, false);
-    expect(plan.defuses).toEqual([{ pieceId: "piece-2", bonus: 95 }]);
+    // Cells stay empty without a pre-turn grid: the event carries only the id,
+    // so the layer falls back to the cleared lines for its anchor.
+    expect(plan.defuses).toEqual([{ pieceId: "piece-2", bonus: 95, cells: [] }]);
     expect(plan.clearedCells).toHaveLength(8);
     expect(plan.combo).toBe(1);
     expect(plan.comboReset).toBe(false);
     expect(plan.hasRequiredSequence).toBe(true);
     // Clear + defuse share one beat; adding an explosion would extend it.
-    expect(plan.durationMs).toBe(320);
+    expect(plan.durationMs).toBe(340);
   });
 
   it("captures score penalty and combo reset from an explosion turn", () => {
@@ -78,7 +80,7 @@ describe("buildEffectPlan", () => {
     expect(plan.scoreDelta).toBe(-50);
     expect(plan.combo).toBe(0);
     expect(plan.comboReset).toBe(true);
-    expect(plan.durationMs).toBe(520);
+    expect(plan.durationMs).toBe(440);
   });
 
   it("collapses every required sequence to a brief beat under reduced motion", () => {

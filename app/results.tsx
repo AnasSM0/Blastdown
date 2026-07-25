@@ -3,6 +3,10 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 
 import { ResultsView } from "../src/components/ResultsScreen";
+import { useAudio } from "../src/hooks/useAudio";
+import { useEffectiveReducedMotion } from "../src/hooks/useEffectiveReducedMotion";
+import { useHaptics } from "../src/hooks/useHaptics";
+import { useRewardOutcome } from "../src/hooks/useRewardOutcome";
 import { useRewardedAction } from "../src/hooks/useRewardedAction";
 import { REWARD_PLACEMENTS } from "../src/services/ads";
 import { rewardOutcome, useAnalytics } from "../src/services/analytics";
@@ -21,6 +25,12 @@ export default function ResultsScreen() {
   const { profile } = useProfile();
   const { track } = useAnalytics();
   const reward = useRewardedAction();
+  const audio = useAudio();
+  const haptics = useHaptics();
+  const reducedMotion = useEffectiveReducedMotion();
+  // Same transient success / cancelled / failure feedback the in-run rewards
+  // use, so Double Bolts is never the one silent reward surface.
+  const outcome = useRewardOutcome(reducedMotion);
   const [doubled, setDoubled] = useState(false);
   const state = controller.state;
   const boltsEarned = computeBoltsEarned(state);
@@ -43,17 +53,24 @@ export default function ResultsScreen() {
     if (reward.pending || doubled) {
       return;
     }
+    audio.playSfx("button");
     track({ name: "double_bolts_offer" });
+    outcome.begin();
     void reward
       .run(REWARD_PLACEMENTS.doubleBolts, () => {
         // The session applies the doubling exactly once per run; reflect it in
-        // the button state only when it actually applied.
+        // the button state only when it actually applied. Success feedback is
+        // tied to that same guard, so a second earn can never re-fire it.
         if (doubleBoltsForCurrentRun()) {
           setDoubled(true);
+          haptics.success();
         }
       })
-      .then((result) => track({ name: "double_bolts_result", result: rewardOutcome(result) }));
-  }, [doubled, doubleBoltsForCurrentRun, reward, track]);
+      .then((result) => {
+        track({ name: "double_bolts_result", result: rewardOutcome(result) });
+        outcome.settle(result);
+      });
+  }, [audio, doubled, doubleBoltsForCurrentRun, haptics, outcome, reward, track]);
 
   const handlePlayAgain = useCallback(() => {
     startNewRun();
@@ -83,6 +100,7 @@ export default function ResultsScreen() {
           onPress: handleDoubleBolts,
           pending: reward.pending,
           applied: doubled,
+          phase: outcome.phase,
         }}
         onPlayAgain={handlePlayAgain}
         onHome={handleHome}

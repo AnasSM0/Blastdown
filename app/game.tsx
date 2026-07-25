@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
 import { GameBoard, BOARD_CONTENT_INSET } from "../src/components/GameBoard";
+import { EffectsLayer } from "../src/components/effects/EffectsLayer";
 import { PieceTray } from "../src/components/PieceTray";
 import { ReactorBackground } from "../src/components/ReactorBackground";
 import { ScoreHeader } from "../src/components/ScoreHeader";
@@ -11,7 +12,7 @@ import { GameOverOverlay } from "../src/components/modals/GameOverOverlay";
 import { DefuseConfirmCard } from "../src/components/modals/DefuseConfirmCard";
 import { SecondChanceBanner } from "../src/components/modals/SecondChanceBanner";
 import { PauseOverlay } from "../src/components/modals/PauseOverlay";
-import { RewardedActionBar, type RewardActionPhase } from "../src/components/RewardedActionButton";
+import { RewardedActionBar } from "../src/components/RewardedActionButton";
 import { DragGhost, DRAG_LIFT, type DragGhostHandle } from "../src/components/DragGhost";
 import { BOARD_SIZE } from "../src/domain/board";
 import type { CellPosition } from "../src/domain/placement";
@@ -24,6 +25,7 @@ import {
   getTimerBadgePlacements,
 } from "../src/domain/selectors";
 import { dragOriginFromFinger, type BoardLayout, type Point } from "../src/ui/boardGeometry";
+import { cellsOfPiece, rubbleCellsOf } from "../src/ui/effects/eventEffects";
 import {
   useGameController,
   type GameController,
@@ -34,6 +36,7 @@ import { useEffectiveReducedMotion } from "../src/hooks/useEffectiveReducedMotio
 import { useEventAnimator } from "../src/hooks/useEventAnimator";
 import { useGameAnalytics } from "../src/hooks/useGameAnalytics";
 import { useRewardedAction } from "../src/hooks/useRewardedAction";
+import { useRewardOutcome } from "../src/hooks/useRewardOutcome";
 import { useAudio } from "../src/hooks/useAudio";
 import { useGameAudio } from "../src/hooks/useGameAudio";
 import { useTimerHaptics } from "../src/hooks/useTimerHaptics";
@@ -42,7 +45,7 @@ import type { AudioService } from "../src/services/audio";
 import { StorageServiceProvider, createMemoryStorageService } from "../src/services/storage";
 import { SettingsProvider } from "../src/state/SettingsProvider";
 import { AdServiceProvider, REWARD_PLACEMENTS } from "../src/services/ads";
-import type { AdService, RewardedResult } from "../src/services/ads";
+import type { AdService } from "../src/services/ads";
 import { AnalyticsServiceProvider, rewardOutcome, useAnalytics } from "../src/services/analytics";
 import type { AnalyticsService } from "../src/services/analytics";
 import { useGameSession } from "../src/state/GameSessionProvider";
@@ -86,24 +89,6 @@ type GameViewProps = {
 const SECOND_CHANCE_MS = 1500;
 const SECOND_CHANCE_REDUCED_MS = 800;
 
-/** How long a transient reward outcome (success/failure/cancelled) shows on a
- *  dock button before it settles back to its resting state. Presentation only. */
-const ACTION_FLASH_MS = 1400;
-const ACTION_FLASH_REDUCED_MS = 700;
-
-/** Map a rewarded-ad outcome to the dock's transient presentation phase. This
- *  only drives the button's visible feedback — the reward mutation stays
- *  earn-only in `useRewardedAction`, unchanged. */
-function phaseForResult(result: RewardedResult): RewardActionPhase {
-  if (result === "earned") {
-    return "success";
-  }
-  if (result === "closed") {
-    return "cancelled";
-  }
-  return "failure";
-}
-
 /** Upper bound on the board's edge so it never balloons on tablets/wide screens
  *  (mirrors GameBoard's own maxWidth). */
 const MAX_BOARD_SIZE = 420;
@@ -138,6 +123,10 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
   const animator = useEventAnimator({
     turn: state.turn,
     events: controller.lastEvents,
+    // The grid is needed to locate a defused piece's cells: `pieceDefused`
+    // carries only an id, and by the time it is handled the piece is gone from
+    // the current board.
+    grid: state.grid,
     reducedMotion,
   });
   const audio = useAudio();
@@ -181,14 +170,13 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
   const [defuseConfirmOpen, setDefuseConfirmOpen] = useState(false);
   const [secondChance, setSecondChance] = useState(false);
   const secondChanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Transient per-action dock feedback (pending while the ad is in flight, then
-  // a brief success/failure/cancelled flash). Presentation only.
-  const [freezePhase, setFreezePhase] = useState<RewardActionPhase>("idle");
-  const [defusePhase, setDefusePhase] = useState<RewardActionPhase>("idle");
-  const actionPhaseTimers = useRef<{
-    freeze: ReturnType<typeof setTimeout> | null;
-    defuse: ReturnType<typeof setTimeout> | null;
-  }>({ freeze: null, defuse: null });
+  // Transient per-action reward feedback (pending while the ad is in flight,
+  // then a brief success/failure/cancelled outcome). One shared hook per action
+  // so Freeze, Defuse, and Revive — and Double Bolts on the results screen —
+  // present, sound, and time out identically. Presentation only.
+  const freezeOutcome = useRewardOutcome(reducedMotion);
+  const defuseOutcome = useRewardOutcome(reducedMotion);
+  const reviveOutcome = useRewardOutcome(reducedMotion);
   const [previewOrigin, setPreviewOrigin] = useState<CellPosition | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dragOrigin, setDragOrigin] = useState<CellPosition | null>(null);
@@ -200,6 +188,18 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
   const boardLayoutRef = useRef<BoardLayout | null>(null);
   const cellSizeRef = useRef(cellSize);
   const lastDragOriginRef = useRef<CellPosition | null>(null);
+  // The board's press handler must keep a stable identity: `controller` is a
+  // fresh object every render and `inputLocked` flips on every animation,
+  // pause, and reward transition — depending on either would change the prop on
+  // each of those and re-render all 64 cells for something purely cosmetic.
+  // Both are read through refs written in an effect, so the handler stays
+  // referentially stable while still seeing current values when it runs.
+  const controllerRef = useRef(controller);
+  const inputLockedRef = useRef(inputLocked);
+  useEffect(() => {
+    controllerRef.current = controller;
+    inputLockedRef.current = inputLocked;
+  });
 
   const badges = useMemo(() => getTimerBadgePlacements(state), [state]);
 
@@ -262,7 +262,8 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
 
   const handleCellPress = useCallback(
     (position: CellPosition) => {
-      if (inputLocked || controller.selectedHandId === null) {
+      const controller = controllerRef.current;
+      if (inputLockedRef.current || controller.selectedHandId === null) {
         return;
       }
       if (controller.placeAt(position)) {
@@ -277,7 +278,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
         track({ name: "piece_rejected" });
       }
     },
-    [audio, controller, haptics, inputLocked, track],
+    [audio, haptics, track],
   );
 
   const measureBoard = useCallback(() => {
@@ -383,31 +384,6 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
     [audio, clearDrag, controller, haptics, originForPoint, state.hand, track],
   );
 
-  // Sets a dock action's transient phase and auto-clears the outcome flash.
-  // "pending" holds until the ad resolves; success/failure/cancelled fade back
-  // to idle. Never gates or repeats the reward — that stays in useRewardedAction.
-  const setActionPhase = useCallback(
-    (action: "freeze" | "defuse", phase: RewardActionPhase) => {
-      const setter = action === "freeze" ? setFreezePhase : setDefusePhase;
-      const timers = actionPhaseTimers.current;
-      if (timers[action] !== null) {
-        clearTimeout(timers[action] as ReturnType<typeof setTimeout>);
-        timers[action] = null;
-      }
-      setter(phase);
-      if (phase !== "idle" && phase !== "pending") {
-        timers[action] = setTimeout(
-          () => {
-            timers[action] = null;
-            setter("idle");
-          },
-          reducedMotion ? ACTION_FLASH_REDUCED_MS : ACTION_FLASH_MS,
-        );
-      }
-    },
-    [reducedMotion],
-  );
-
   const handleFreeze = useCallback(() => {
     // Guard against re-activation while active/exhausted or mid-reward — the
     // domain would reject anyway, but this avoids a needless ad request.
@@ -418,7 +394,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
     // Offer logged when the ad is actually requested; result logged from the
     // resolution (never inside onEarned, so a reward can't double-log).
     track({ name: "freeze_offer" });
-    setActionPhase("freeze", "pending");
+    freezeOutcome.begin();
     void reward
       .run(REWARD_PLACEMENTS.freeze, () => {
         if (controller.activateFreeze()) {
@@ -428,9 +404,9 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
       })
       .then((result) => {
         track({ name: "freeze_result", result: rewardOutcome(result) });
-        setActionPhase("freeze", phaseForResult(result));
+        freezeOutcome.settle(result);
       });
-  }, [audio, controller, haptics, inputLocked, reward, setActionPhase, state, track]);
+  }, [audio, controller, freezeOutcome, haptics, inputLocked, reward, state, track]);
 
   const handleDefuseOpen = useCallback(() => {
     if (inputLocked || !canApplyRewardedDefuse(state)) {
@@ -454,22 +430,32 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
     }
     audio.playSfx("button");
     track({ name: "defuse_offer" });
-    setActionPhase("defuse", "pending");
+    defuseOutcome.begin();
+    // The piece the domain will target, read BEFORE the action is applied: once
+    // defused its cells are plain blocks, so this is the only point at which the
+    // effect's target can be identified. Read-only — the domain still picks the
+    // target itself inside `controller.defuse()`.
+    const target = getRewardedDefuseTarget(state);
+    const targetCells = target ? cellsOfPiece(state.grid, target.id) : [];
     void reward
       .run(REWARD_PLACEMENTS.defuse, () => {
         if (controller.defuse()) {
           haptics.success();
           audio.playSfx("defuse");
+          // A rewarded defuse advances no turn, so the turn-keyed animator never
+          // sees it — play it explicitly. It holds no input lock: the board is
+          // already updated and must stay usable.
+          animator.playCue("rewardedDefuse", targetCells);
         }
       })
       .then((result) => {
         track({ name: "defuse_result", result: rewardOutcome(result) });
-        setActionPhase("defuse", phaseForResult(result));
+        defuseOutcome.settle(result);
       })
       .finally(() => {
         setDefuseConfirmOpen(false);
       });
-  }, [audio, controller, haptics, reward, setActionPhase, track]);
+  }, [animator, audio, controller, defuseOutcome, haptics, reward, state, track]);
 
   const clearSecondChance = useCallback(() => {
     if (secondChanceTimer.current !== null) {
@@ -485,11 +471,18 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
     }
     audio.playSfx("button");
     track({ name: "revive_offer" });
+    reviveOutcome.begin();
+    // The rubble the revive is about to clear, read before it is applied — the
+    // recovery wave then covers exactly the cells that were restored.
+    const restoredCells = rubbleCellsOf(state.grid);
     void reward
       .run(REWARD_PLACEMENTS.revive, () => {
         if (controller.revive()) {
           haptics.success();
           audio.playSfx("revive");
+          // Revive advances no turn either, so the wave is played explicitly and
+          // holds no input lock — play resumes the moment the domain allows it.
+          animator.playCue("revive", restoredCells);
           // "SECOND CHANCE" banner over the repaired board (Stitch 10), then
           // auto-dismiss. Reduced motion shortens the hold and skips the fade.
           setSecondChance(true);
@@ -505,8 +498,11 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
           );
         }
       })
-      .then((result) => track({ name: "revive_result", result: rewardOutcome(result) }));
-  }, [audio, controller, haptics, reducedMotion, reward, state, track]);
+      .then((result) => {
+        track({ name: "revive_result", result: rewardOutcome(result) });
+        reviveOutcome.settle(result);
+      });
+  }, [animator, audio, controller, haptics, reducedMotion, reward, reviveOutcome, state, track]);
 
   const handleEndRun = useCallback(() => {
     if (reward.pending) {
@@ -539,10 +535,11 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
     setPreviewOrigin(null);
     clearSecondChance();
     clearDrag();
-    setActionPhase("freeze", "idle");
-    setActionPhase("defuse", "idle");
+    freezeOutcome.reset();
+    defuseOutcome.reset();
+    reviveOutcome.reset();
     animator.reset();
-  }, [animator, clearDrag, clearSecondChance, setActionPhase]);
+  }, [animator, clearDrag, clearSecondChance, defuseOutcome, freezeOutcome, reviveOutcome]);
 
   const handleRestart = useCallback(() => {
     audio.playSfx("button");
@@ -556,22 +553,9 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
     onExit?.();
   }, [audio, clearPendingUi, onExit]);
 
-  // Cancel a pending second-chance timer on unmount.
+  // Cancel a pending second-chance timer on unmount. Each reward outcome clears
+  // its own timer (useRewardOutcome), and the animator clears its sequence.
   useEffect(() => () => clearSecondChance(), [clearSecondChance]);
-
-  // Cancel any outstanding dock outcome-flash timers on unmount.
-  useEffect(
-    () => () => {
-      const timers = actionPhaseTimers.current;
-      if (timers.freeze !== null) {
-        clearTimeout(timers.freeze);
-      }
-      if (timers.defuse !== null) {
-        clearTimeout(timers.defuse);
-      }
-    },
-    [],
-  );
 
   const freezeActive = state.freezeTurnsRemaining > 0;
   const defuseTarget = defuseConfirmOpen ? getRewardedDefuseTarget(state) : null;
@@ -607,13 +591,25 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
                   onCellSizeChange={handleCellSizeChange}
                   placedCells={placement.cells}
                   placementNonce={placement.nonce}
-                  effectPlan={animator.plan}
+                  explosionCount={animator.plan?.explosions.length ?? 0}
                   effectKey={animator.effectKey}
                   highlightPieceId={defuseTarget?.id ?? null}
                   reducedMotion={reducedMotion}
                   frozen={freezeActive}
                   placementHints={placementHints}
                 />
+                {/* Cosmetic overlay, a SIBLING of the board rather than a child:
+                    a new effect plan re-renders only this layer, never the 64
+                    cells. Remounted per sequence so two turns' effects never
+                    interpolate into each other. */}
+                {animator.plan && cellSize > 0 ? (
+                  <EffectsLayer
+                    key={animator.effectKey}
+                    plan={animator.plan}
+                    cellSize={cellSize}
+                    reducedMotion={reducedMotion}
+                  />
+                ) : null}
               </View>
             ) : null}
           </View>
@@ -642,7 +638,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
                 // distinct from a temporary input lock.
                 unavailable: !freezeActive && !canActivateFreeze(state),
                 rewarded: true,
-                phase: freezePhase,
+                phase: freezeOutcome.phase,
                 active: freezeActive,
                 placementsRemaining: state.freezeTurnsRemaining,
               }}
@@ -654,7 +650,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
                 disabled: inputLocked || (!defuseConfirmOpen && !canApplyRewardedDefuse(state)),
                 unavailable: !defuseConfirmOpen && !canApplyRewardedDefuse(state),
                 rewarded: true,
-                phase: defusePhase,
+                phase: defuseOutcome.phase,
                 selected: defuseConfirmOpen,
               }}
             />
@@ -684,6 +680,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
             onRevive={handleRevive}
             onEndRun={handleEndRun}
             busy={reward.pending}
+            revivePhase={reviveOutcome.phase}
             reducedMotion={reducedMotion}
           />
         ) : null}

@@ -1,4 +1,5 @@
 import type { GameEvent } from "../../domain/events";
+import type { GridCell } from "../../domain/gameTypes";
 import type { CellPosition } from "../../domain/placement";
 import { BOARD_SIZE } from "../../domain/board";
 
@@ -14,7 +15,19 @@ export type ExplosionEffect = {
 export type DefuseEffect = {
   pieceId: string;
   bonus: number;
+  /** Cells the defused piece occupied immediately before the turn resolved,
+   *  resolved from the pre-turn grid so the effect lands on the piece that was
+   *  actually defused instead of on the cleared lines' midpoint. Empty when no
+   *  pre-turn grid was supplied (the caller then falls back to the clear). */
+  cells: CellPosition[];
 };
+
+/** Effects that are NOT produced by a placement turn. The rewarded defuse and
+ *  the revive mutate the board without advancing `state.turn`, so they can't be
+ *  driven by the turn-keyed event stream — the screen plays them as an explicit
+ *  cue instead, carrying the cells it read from the authoritative pre-action
+ *  state. */
+export type EffectCueKind = "rewardedDefuse" | "revive";
 
 /** A presentation-only translation of one turn's domain events into the visual
  *  beats to play. It never recomputes gameplay — it only reshapes what the
@@ -30,17 +43,35 @@ export type EffectPlan = {
   explosions: ExplosionEffect[];
   /** Deduplicated union of every explosion's rubble cells, row-major. */
   rubbleCells: CellPosition[];
+  /** Cells restored by a revive (the rubble that was cleared), row-major. Only
+   *  ever populated by a revive cue. */
+  reviveCells: CellPosition[];
   scoreDelta: number;
   score: number;
   /** Combo value emitted this turn, or null when unchanged. */
   combo: number | null;
   comboReset: boolean;
+  /** Set when this plan came from an out-of-turn cue rather than the event
+   *  stream; null for a normal placement turn. */
+  cue: EffectCueKind | null;
   /** True when a clear, defuse, or explosion occurred — the beats that must
-   *  lock input until they finish. Plain placements have none. */
+   *  lock input until they finish. Plain placements have none. Cues never set
+   *  this: a rewarded defuse and a revive must leave the board usable at once. */
   hasRequiredSequence: boolean;
-  /** How long the required sequence should hold the input lock, in ms. */
+  /** How long the sequence should play, in ms. For a turn sequence this is also
+   *  how long input stays locked; for a cue it is only how long the overlay
+   *  lives. */
   durationMs: number;
 };
+
+/** View budget per effect group. A clear can legitimately cover the whole board
+ *  (8 rows + 8 columns), so its budget is the board itself; explosion bursts are
+ *  capped well below that because they are the heavier view (border + scale) and
+ *  several pieces can expire on one turn. Anything past the cap is dropped, not
+ *  queued — the effect stays readable and the view count stays bounded. */
+export const MAX_CLEAR_CELLS = BOARD_SIZE * BOARD_SIZE;
+export const MAX_BURST_CELLS = 24;
+export const MAX_REVIVE_CELLS = BOARD_SIZE * BOARD_SIZE;
 
 function cellKey(cell: CellPosition): string {
   return `${cell.row},${cell.column}`;
@@ -67,14 +98,114 @@ function clearedCellsFor(rows: number[], columns: number[], size: number): CellP
   return cells;
 }
 
-const REDUCED_MS = 120;
-const LINE_CLEAR_MS = 320;
-const EXPLOSION_MS = 520;
+type Grid = readonly (readonly GridCell[])[];
 
-/** Build the visual plan for a turn's events. Pure: same events (and reduced
- *  flag) always yield the same plan, so ordering, once-only animation, and
- *  intersection dedup are unit-testable without mounting anything. */
-export function buildEffectPlan(events: readonly GameEvent[], reducedMotion: boolean): EffectPlan {
+/** Cells a timed piece occupies in a grid, row-major. A read-only scan of state
+ *  the domain already produced — no piece grouping is reconstructed, the cells
+ *  carry their own `pieceInstanceId`. */
+export function cellsOfPiece(grid: Grid, pieceId: string): CellPosition[] {
+  const cells: CellPosition[] = [];
+  for (let row = 0; row < grid.length; row++) {
+    const rowCells = grid[row];
+    for (let column = 0; column < rowCells.length; column++) {
+      const cell = rowCells[column];
+      if (cell.kind === "timed" && cell.pieceInstanceId === pieceId) {
+        cells.push({ row, column });
+      }
+    }
+  }
+  return cells;
+}
+
+/** Rubble cells in a grid, row-major. Read by the screen from the pre-revive
+ *  state so the recovery wave covers exactly the cells the revive will restore. */
+export function rubbleCellsOf(grid: Grid): CellPosition[] {
+  const cells: CellPosition[] = [];
+  for (let row = 0; row < grid.length; row++) {
+    const rowCells = grid[row];
+    for (let column = 0; column < rowCells.length; column++) {
+      if (rowCells[column].kind === "rubble") {
+        cells.push({ row, column });
+      }
+    }
+  }
+  return cells;
+}
+
+/** Per-cell start delay (ms) for the line-clear sweep, keyed "row,column".
+ *  A cleared ROW sweeps left→right (delay grows with the column); a cleared
+ *  COLUMN sweeps top→bottom (delay grows with the row). A cell in both takes
+ *  the earlier of the two, so an intersection never stalls behind the slower
+ *  line and simultaneous clears still read as separate directional sweeps. */
+export function sweepDelaysFor(
+  rows: readonly number[],
+  columns: readonly number[],
+  stepMs: number,
+  capMs: number,
+): Map<string, number> {
+  const delays = new Map<string, number>();
+  const put = (row: number, column: number, delay: number) => {
+    const key = `${row},${column}`;
+    const capped = Math.min(delay, capMs);
+    const existing = delays.get(key);
+    if (existing === undefined || capped < existing) {
+      delays.set(key, capped);
+    }
+  };
+  for (const row of rows) {
+    for (let column = 0; column < BOARD_SIZE; column++) {
+      put(row, column, column * stepMs);
+    }
+  }
+  for (const column of columns) {
+    for (let row = 0; row < BOARD_SIZE; row++) {
+      put(row, column, row * stepMs);
+    }
+  }
+  return delays;
+}
+
+const REDUCED_MS = 120;
+const LINE_CLEAR_MS = 340;
+const EXPLOSION_MS = 440;
+const CUE_MS = 400;
+const CUE_REDUCED_MS = 140;
+
+/** Read-only context the plan needs but the event stream doesn't carry. */
+export type EffectPlanContext = {
+  /** The grid as it stood BEFORE this turn resolved, used to locate a defused
+   *  piece's cells (the `pieceDefused` event carries only its id). */
+  previousGrid?: Grid;
+};
+
+function emptyPlan(): EffectPlan {
+  return {
+    rows: [],
+    columns: [],
+    clearedCells: [],
+    defuses: [],
+    explosions: [],
+    rubbleCells: [],
+    reviveCells: [],
+    scoreDelta: 0,
+    score: 0,
+    combo: null,
+    comboReset: false,
+    cue: null,
+    hasRequiredSequence: false,
+    durationMs: 0,
+  };
+}
+
+/** Build the visual plan for a turn's events. Pure: the same events, reduced
+ *  flag, and context always yield the same plan, so ordering, once-only
+ *  animation, and intersection dedup are unit-testable without mounting
+ *  anything. */
+export function buildEffectPlan(
+  events: readonly GameEvent[],
+  reducedMotion: boolean,
+  context: EffectPlanContext = {},
+): EffectPlan {
   let rows: number[] = [];
   let columns: number[] = [];
   const defuses: DefuseEffect[] = [];
@@ -91,7 +222,14 @@ export function buildEffectPlan(events: readonly GameEvent[], reducedMotion: boo
         columns = [...event.columns];
         break;
       case "pieceDefused":
-        defuses.push({ pieceId: event.pieceId, bonus: event.bonus });
+        defuses.push({
+          pieceId: event.pieceId,
+          bonus: event.bonus,
+          // The piece is already gone from the post-turn grid, so its footprint
+          // is read from the pre-turn one. Without it the effect has no target
+          // and the layer falls back to the cleared lines.
+          cells: context.previousGrid ? cellsOfPiece(context.previousGrid, event.pieceId) : [],
+        });
         break;
       case "explosionStarted": {
         const effect: ExplosionEffect = {
@@ -152,6 +290,7 @@ export function buildEffectPlan(events: readonly GameEvent[], reducedMotion: boo
   }
 
   return {
+    ...emptyPlan(),
     rows,
     columns,
     clearedCells,
@@ -165,4 +304,24 @@ export function buildEffectPlan(events: readonly GameEvent[], reducedMotion: boo
     hasRequiredSequence,
     durationMs,
   };
+}
+
+/** Build the plan for an out-of-turn cue (rewarded defuse / revive). The cells
+ *  come from the caller's read of authoritative state before the action was
+ *  applied. `hasRequiredSequence` stays false: neither action may hold input,
+ *  so the overlay plays over a board that is already interactive again. */
+export function buildCuePlan(
+  kind: EffectCueKind,
+  cells: readonly CellPosition[],
+  reducedMotion: boolean,
+): EffectPlan {
+  const plan = emptyPlan();
+  plan.cue = kind;
+  plan.durationMs = reducedMotion ? CUE_REDUCED_MS : CUE_MS;
+  if (kind === "revive") {
+    plan.reviveCells = [...cells].slice(0, MAX_REVIVE_CELLS);
+  } else {
+    plan.defuses = [{ pieceId: "", bonus: 0, cells: [...cells] }];
+  }
+  return plan;
 }
