@@ -1125,9 +1125,10 @@ restart inside the same millisecond reuses the seed and the persistence lifecycl
 test flakes. The test now uses the controller's injectable seed factory;
 production seed generation is unchanged.
 
-**Verification:** typecheck ✅, lint ✅, 586 tests ✅, coverage ✅, format ✅,
-Android export ✅, expo-doctor 19/20 (pre-existing upstream Expo patch drift, no
-dependency changed).
+**Verification (final):** typecheck ✅, lint ✅, 92 suites / 592 tests ✅ (cold
+cache, three warm runs on fresh random seeds, four pinned seeds), coverage 92.4%
+✅, format ✅, Android export ✅, expo-doctor 19/20 (pre-existing upstream Expo
+patch drift, no dependency changed).
 
 **Device finding (REQUIRED, outstanding):** the physical Android release/profile
 pass for the event effects — single and multiple clears, countdown 1 and expiry,
@@ -1157,3 +1158,21 @@ comes from the session's own once-per-run guard (`isCurrentRunDoubled`) instead
 of screen-local state, so a remount no longer re-offers a reward that can never
 be applied. That also closes what was recorded here as a merely cosmetic risk —
 it could cost a player a real ad view. 92 suites / 592 tests.
+
+**Test isolation (fixed).** The results-route suite had been made to pass by
+moving its unmounting test last. That is a workaround, not a fix, so the
+ordering was reverted and the leak traced. React Native Testing Library 14 made
+`render`, `rerender`, `unmount` and `fireEvent` async, each opening its own
+`act()` scope; an un-awaited call leaves that scope open, the next render opens
+a second, React refuses overlapping `act()` and discards the tree — so every
+later render in the file came back empty. 75 `fireEvent` sites and three
+`unmount`/`rerender` calls were awaiting nothing. Behind it sat a second leak of
+the same class: `jest.spyOn` on an already-mocked method returns that same mock
+instead of wrapping it, so overriding `AppState.addEventListener` destroyed the
+preset's implementation and `mockRestore()` cleared it for good, leaving later
+subscribers to throw on `subscription.remove()` at unmount. Handlers now go
+through `test-utils/appState.ts`, which reinstates the preset implementation.
+Jest randomizes test order within each file so this cannot return unnoticed, and
+`testTimeout` is 20s because a few route suites transform a large module graph on
+first load — a cold-cache build cost, not a hang. No production code changed; no
+assertion was weakened and no cleanup coverage was dropped.

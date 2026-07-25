@@ -1181,8 +1181,37 @@ before/after comparison approved. Then Phase 2 (motion polish), Phase 3
     re-renders 64 cells), cells are memoized and stay memoized, and the cell
     press handler no longer changes identity on cosmetic state. (6) **Android** —
     the rounded+clipped rubble tile and the `PulseRing` identity transform are
-    both fixed. 91 suites / 586 tests, coverage 92.56%, full battery + Android
+    both fixed. (7) **Reward truth** — success is reported only when the guarded
+    mutation actually applied; an earned-but-unapplied reward warns instead of
+    congratulating, and the Results screen reads the session's own once-per-run
+    guard so a remount cannot re-offer a reward that can never land.
+    (8) **Test isolation** — the suite no longer depends on test order; see the
+    entry below. 92 suites / 592 tests, coverage 92.4%, full battery + Android
     export clean, doctor 19/20 (pre-existing Expo drift).
+- [x] **P3 test isolation** — done 2026-07-25. The results-route suite passed
+      only with its unmounting test placed last. Ordering was a workaround, so
+      the leak was removed at the source rather than worked around.
+  - Root cause: React Native Testing Library 14 made `render`, `rerender`,
+    `unmount` and `fireEvent` async, each opening its own `act()` scope. Any
+    un-awaited call left that scope open, the next render opened a second
+    overlapping scope, React refused it and discarded the tree — so every later
+    render in the file came back empty. 75 `fireEvent` sites and three
+    `unmount`/`rerender` calls were affected. Redundant `act(async () => …)`
+    wrappers around an awaited `fireEvent` were dropped, not nested.
+  - Second leak, same class: `jest.spyOn` on an already-mocked method returns
+    that same mock instead of wrapping it, so overriding
+    `AppState.addEventListener` destroyed the React Native preset's
+    implementation and `mockRestore()` cleared it permanently. Later subscribers
+    got `undefined` and threw on `subscription.remove()` at unmount.
+    `test-utils/appState.ts` now reinstates the preset implementation explicitly.
+  - Guards: `randomize: true` in `jest.config.js` shuffles test order within
+    each file so order dependence cannot return unnoticed (the seed is printed
+    and `--seed=<n>` replays it), and `testTimeout` is 20s because a few route
+    suites transform a large module graph on first load — a cold-cache build
+    cost, not a hang. The results route is imported at module scope so that cost
+    lands outside the timed tests.
+  - Verified: cold cache, three warm runs on fresh random seeds, four pinned
+    seeds, and every touched suite run alone. No production code changed.
   - **Device review: OUTSTANDING** — the physical Android release/profile pass
     (single and multiple clears, countdown 1 and expiry, rubble creation,
     successful/failed/cancelled Defuse, Freeze, revive, combo and score gain,

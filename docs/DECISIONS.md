@@ -1431,6 +1431,38 @@ new run clears it without any reset). Results renders from that instead of local
 state. This was previously recorded here as an accepted cosmetic gap; the
 stop-hook review was right that it is not cosmetic.
 
+**Test order is not a fix (2026-07-25).** The results-route suite had been made
+to pass by moving its unmounting test last. That hid the defect instead of
+removing it, so the ordering was reverted and the leak traced.
+
+React Native Testing Library 14 made `render`, `rerender`, `unmount` and
+`fireEvent` all async; each wraps its own `act()`. An un-awaited call therefore
+leaves an act scope open, and the next render opens a second one. React refuses
+overlapping `act()` and discards the tree, so every later render in that file
+produced an empty tree and every query failed — which is why the symptom looked
+like cross-test state rather than a missing `await`. 75 `fireEvent` call sites
+and three `unmount`/`rerender` calls were awaiting nothing. Where a call was
+already wrapped in `act(async () => …)`, the wrapper was removed rather than
+nested: `fireEvent` supplies its own scope.
+
+A second leak of the same class sat behind it. `jest.spyOn` on a method that is
+_already_ a jest mock returns that same mock instead of wrapping it, so
+overriding `AppState.addEventListener` overwrote the React Native preset's
+implementation, and `mockRestore()` cleared it for good. Every later subscriber
+received `undefined` and threw in `subscription.remove()` on unmount.
+`test-utils/appState.ts` captures handlers and reinstates the preset
+implementation explicitly; spying on preset-mocked React Native methods is not
+safe and should not be reintroduced.
+
+Two guards keep this from returning. `randomize: true` shuffles test order
+within every file, so a test that quietly comes to depend on a predecessor fails
+immediately (Jest prints the seed; `--seed=<n>` replays it). `testTimeout` moves
+to 20s because several route suites transform a large module graph on first
+load, which alone exceeded the 5s default on a cold cache and failed whichever
+test happened to run first — a build cost, not a hang, and 20s still catches a
+real hang. The results route is now imported at module scope so that cost lands
+outside the timed tests. No production code changed for any of this.
+
 **Device gate (open):** the physical Android release/profile pass for the event
 effects is the user's step — no Android device on the build machine, so it is
 recorded, not fabricated. Phase 6B (production ads/consent) remains paused.
