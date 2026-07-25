@@ -1141,8 +1141,19 @@ device can fully confirm; the geometry argument is sound (a square inset 1 px is
 wholly inside a 2 px radius) but a black-render fix is exactly the class of bug
 that only shows up on hardware. (2) The board shake still transforms a rounded
 board — now with no clipped rounded descendant, which was the actual trap, but
-worth a specific look on-device during an explosion. (3) Double Bolts' `applied`
-state is screen-local, so returning to Results re-shows the offer; the session
-guard still prevents any double credit, so this is cosmetic. Fixing it properly
-means exposing session state, which is out of scope for an effects pass. (4)
-Pre-existing expo-doctor dependency drift, unrelated.
+worth a specific look on-device during an explosion. (3) Pre-existing
+expo-doctor dependency drift, unrelated.
+
+**Stop-hook follow-up (fixed):** the review found that Double Bolts could report
+success when no reward was applied. It was not confined to Double Bolts — all
+four rewards called `settle(result)` with the ad result alone, so an earned ad
+whose action the domain or the session rejected still displayed "✓ DONE".
+`phaseForResult` now takes an `applied` flag and returns a distinct `unapplied`
+phase, every caller passes the real result of its guarded mutation, and an
+earned-but-unapplied reward gets the same restrained warning as a failure — the
+player watched an ad and got nothing, which they must not learn from a success
+cue. The root cause on the Results screen is fixed too: the applied state now
+comes from the session's own once-per-run guard (`isCurrentRunDoubled`) instead
+of screen-local state, so a remount no longer re-offers a reward that can never
+be applied. That also closes what was recorded here as a merely cosmetic risk —
+it could cost a player a real ad view. 92 suites / 592 tests.

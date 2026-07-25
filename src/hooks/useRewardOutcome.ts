@@ -16,9 +16,14 @@ export type RewardOutcome = {
   /** Enter the pending state — call when the ad request goes out. */
   begin: () => void;
   /** Record the resolved result: sets the outcome phase, plays the shared
-   *  failure feedback, and schedules the return to idle. Safe to call after
-   *  unmount (it becomes a no-op). */
-  settle: (result: RewardedResult) => void;
+   *  non-success feedback, and schedules the return to idle. Safe to call after
+   *  unmount (it becomes a no-op).
+   *
+   *  `applied` must say whether the reward's own effect actually landed — an
+   *  earned ad is not the same thing as a granted reward (the run may already
+   *  have used it, or the domain may reject the action). Pass the result of the
+   *  guarded mutation, never `true` by assumption. */
+  settle: (result: RewardedResult, applied?: boolean) => void;
   /** Drop any outcome and pending timer (restart / leaving the screen). */
   reset: () => void;
 };
@@ -75,14 +80,18 @@ export function useRewardOutcome(reducedMotion = false): RewardOutcome {
   }, [clearTimer]);
 
   const settle = useCallback(
-    (result: RewardedResult) => {
+    (result: RewardedResult, applied = true) => {
       // A request that resolves after the screen is gone must not touch state
       // or fire feedback into a dead tree.
       if (!mountedRef.current) {
         return;
       }
-      const next = phaseForResult(result);
-      if (next === "failure") {
+      const next = phaseForResult(result, applied);
+      // Both non-success outcomes that aren't the player's own doing get the
+      // same restrained warning. An earned-but-unapplied reward counts: the
+      // player watched an ad and got nothing, which they must not learn from a
+      // success cue.
+      if (next === "failure" || next === "unapplied") {
         haptics.warning();
         audio.playSfx("invalid");
       }

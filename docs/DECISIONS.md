@@ -1409,11 +1409,27 @@ asserts the same behaviour without depending on the wall clock. Production seed
 generation is deliberately unchanged: altering it in an effects pass would touch
 run determinism for no player-visible benefit.
 
-**Known cosmetic gap (accepted, not fixed here):** the results screen's
-`doubled` flag is screen-local, so returning to Results re-shows the Double Bolts
-offer. The session's own guard still prevents any double credit, so this is
-presentation only. Fixing it properly means exposing session state, which is
-economy-adjacent and out of scope for an effects pass.
+**Success must mean the reward landed (stop-hook fix, 2026-07-25).** The
+review found Double Bolts reporting success when nothing was applied, and it was
+not confined to Double Bolts: all four rewards passed only the ad result to
+`settle`, so an earned ad whose action the domain or the session rejected still
+showed "✓ DONE". An earned ad is not a granted reward — the run may already have
+used it, or the domain may reject the action outright. `phaseForResult` now takes
+an `applied` flag and returns a distinct `unapplied` phase; `settle` takes the
+same flag; and every caller passes the real return value of its guarded mutation
+rather than assuming it succeeded. An earned-but-unapplied reward gets the same
+restrained warning haptic and `invalid` cue as a failure: the player watched an
+ad and received nothing, and must not learn that from a success cue.
+
+**The Results screen's re-offer was the root cause, and is no longer treated as
+cosmetic.** The `doubled` flag was screen-local, so a remount (Back, or Home and
+in again) re-showed an offer that the session guard would then refuse — costing
+the player a real ad view for nothing. `GameSessionProvider` now exposes
+`isCurrentRunDoubled`, a read-only view of the guard it already enforces (it
+grants nothing and changes no rule; the value is derived from the run id, so a
+new run clears it without any reset). Results renders from that instead of local
+state. This was previously recorded here as an accepted cosmetic gap; the
+stop-hook review was right that it is not cosmetic.
 
 **Device gate (open):** the physical Android release/profile pass for the event
 effects is the user's step — no Android device on the build machine, so it is

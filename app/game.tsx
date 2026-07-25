@@ -395,16 +395,21 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
     // resolution (never inside onEarned, so a reward can't double-log).
     track({ name: "freeze_offer" });
     freezeOutcome.begin();
+    // Whether the reward actually landed. An earned ad is not the same thing as
+    // a granted reward — the domain can still reject the action — and a
+    // rejected one must never be reported as a success.
+    let applied = false;
     void reward
       .run(REWARD_PLACEMENTS.freeze, () => {
         if (controller.activateFreeze()) {
+          applied = true;
           haptics.success();
           audio.playSfx("freeze");
         }
       })
       .then((result) => {
         track({ name: "freeze_result", result: rewardOutcome(result) });
-        freezeOutcome.settle(result);
+        freezeOutcome.settle(result, applied);
       });
   }, [audio, controller, freezeOutcome, haptics, inputLocked, reward, state, track]);
 
@@ -437,9 +442,11 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
     // target itself inside `controller.defuse()`.
     const target = getRewardedDefuseTarget(state);
     const targetCells = target ? cellsOfPiece(state.grid, target.id) : [];
+    let applied = false;
     void reward
       .run(REWARD_PLACEMENTS.defuse, () => {
         if (controller.defuse()) {
+          applied = true;
           haptics.success();
           audio.playSfx("defuse");
           // A rewarded defuse advances no turn, so the turn-keyed animator never
@@ -450,7 +457,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
       })
       .then((result) => {
         track({ name: "defuse_result", result: rewardOutcome(result) });
-        defuseOutcome.settle(result);
+        defuseOutcome.settle(result, applied);
       })
       .finally(() => {
         setDefuseConfirmOpen(false);
@@ -475,9 +482,11 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
     // The rubble the revive is about to clear, read before it is applied — the
     // recovery wave then covers exactly the cells that were restored.
     const restoredCells = rubbleCellsOf(state.grid);
+    let applied = false;
     void reward
       .run(REWARD_PLACEMENTS.revive, () => {
         if (controller.revive()) {
+          applied = true;
           haptics.success();
           audio.playSfx("revive");
           // Revive advances no turn either, so the wave is played explicitly and
@@ -500,7 +509,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
       })
       .then((result) => {
         track({ name: "revive_result", result: rewardOutcome(result) });
-        reviveOutcome.settle(result);
+        reviveOutcome.settle(result, applied);
       });
   }, [animator, audio, controller, haptics, reducedMotion, reward, reviveOutcome, state, track]);
 

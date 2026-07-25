@@ -231,7 +231,11 @@ non-motion form:
   and failure are reported as _words_ on every reward surface
   (`RewardOutcomeNotice`, announced via a polite live region), never by color or
   motion alone. Previously Revive and Double Bolts said nothing at all when an ad
-  was dismissed or failed, which read as the app ignoring the tap.
+  was dismissed or failed, which read as the app ignoring the tap. A fifth
+  outcome, **unapplied**, reports the case where the ad played but the reward
+  could not land (already used this run, or the domain rejected it) — it is
+  stated in words rather than shown as a success, so nobody is told they
+  received something they did not.
 
 No effect binds an identity transform under reduced motion (the Android
 rounded-layer black-render guard), and no beat loops, flashes repeatedly, or

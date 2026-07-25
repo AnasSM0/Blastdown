@@ -41,6 +41,7 @@ type PresentationState =
   | "success"
   | "failure"
   | "cancelled"
+  | "unapplied"
   | "unavailable"
   | "disabled"
   | "available";
@@ -96,6 +97,8 @@ function stateStyle(theme: ThemePalette, state: PresentationState): ViewStyle {
       return { borderColor: theme.timerCritical, borderWidth: 2 };
     case "cancelled":
       return { borderColor: theme.outline, borderWidth: 1 };
+    case "unapplied":
+      return { borderColor: theme.timerCritical, borderWidth: 2, opacity: 0.72 };
     case "pending":
       return { borderColor: theme.timerWarning, borderWidth: 1, opacity: 0.72 };
     case "unavailable":
@@ -119,6 +122,8 @@ function captionFor(state: PresentationState): string {
       return "AD FAILED";
     case "cancelled":
       return "CANCELLED";
+    case "unapplied":
+      return "NOT APPLIED";
     case "unavailable":
       return "—";
     case "active":
@@ -144,6 +149,8 @@ function stateHint(state: PresentationState, rewardedVisible: boolean): string |
       return "Ad failed, tap to try again";
     case "cancelled":
       return "Ad cancelled";
+    case "unapplied":
+      return "Ad finished but the reward could not be applied. Nothing was spent";
     case "available":
       return rewardedVisible ? "Watch a rewarded ad to use this" : undefined;
     case "active":
@@ -230,7 +237,12 @@ function DockAction({
           <Text
             style={[
               styles.caption,
-              { color: state === "failure" ? theme.timerCritical : theme.onSurfaceVariant },
+              {
+                color:
+                  state === "failure" || state === "unapplied"
+                    ? theme.timerCritical
+                    : theme.onSurfaceVariant,
+              },
             ]}
             numberOfLines={1}
             maxFontSizeMultiplier={1.3}

@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { useGameController, type GameController } from "../hooks/useGameController";
 import { useGamePersistence } from "../hooks/useGamePersistence";
@@ -32,6 +40,12 @@ export type GameSession = {
    *  Banks the run's Bolts a second time. Returns true if it applied, false if
    *  this run was already doubled (a duplicate can never double-charge). */
   doubleBoltsForCurrentRun: () => boolean;
+  /** True once this run's Bolts have been doubled. Read-only view of the same
+   *  once-per-run guard `doubleBoltsForCurrentRun` enforces — it grants nothing
+   *  and changes no rule. Results needs it because its own local flag resets on
+   *  remount, which would re-offer a reward that can no longer be applied and
+   *  cost the player an ad view for nothing. */
+  isCurrentRunDoubled: boolean;
 };
 
 const GameSessionContext = createContext<GameSession | null>(null);
@@ -51,8 +65,11 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   // App-lifetime guard so a run settles once even if Results remounts or Back
   // re-enters it. A new run has a new id and settles on its own.
   const settledRunIdRef = useRef<string | null>(null);
-  // Separate once-per-run guard for the double-Bolts reward.
+  // Separate once-per-run guard for the double-Bolts reward. The ref is the
+  // synchronous gate (back-to-back calls in one tick must see it); the state
+  // mirrors it so consumers can render from it without reading a ref in render.
   const doubledRunIdRef = useRef<string | null>(null);
+  const [doubledRunId, setDoubledRunId] = useState<string | null>(null);
 
   // Begin a fresh run and log run_start once per start (Play / Play Again are
   // distinct, user-initiated starts, so each is its own event).
@@ -96,9 +113,14 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       return false;
     }
     doubledRunIdRef.current = id;
+    setDoubledRunId(id);
     updateProfile((profile) => applyDoubleBolts(profile, computeBoltsEarned(state)));
     return true;
   }, [controller, updateProfile]);
+
+  // Derived, not stored: a new run has a new id, so the flag falls away with it
+  // and never has to be cleared.
+  const isCurrentRunDoubled = doubledRunId !== null && doubledRunId === runId(controller.state);
 
   const value = useMemo<GameSession>(
     () => ({
@@ -110,6 +132,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       clearActiveRun,
       settleCurrentRun,
       doubleBoltsForCurrentRun,
+      isCurrentRunDoubled,
     }),
     [
       controller,
@@ -120,6 +143,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       clearActiveRun,
       settleCurrentRun,
       doubleBoltsForCurrentRun,
+      isCurrentRunDoubled,
     ],
   );
 

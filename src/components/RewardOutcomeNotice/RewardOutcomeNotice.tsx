@@ -26,6 +26,10 @@ function captionFor(phase: RewardActionPhase, unavailable: boolean): string | nu
       return "AD FAILED · NOTHING SPENT";
     case "cancelled":
       return "CANCELLED · NOTHING SPENT";
+    case "unapplied":
+      // The ad played but the reward could not land (already used this run, or
+      // the game rejected it). Say so plainly — never as a success.
+      return "ALREADY USED · NOT APPLIED";
     case "idle":
       return null;
   }
@@ -39,6 +43,7 @@ function colorFor(phase: RewardActionPhase, unavailable: boolean): string {
     case "success":
       return colors.cyanBlock;
     case "failure":
+    case "unapplied":
       return colors.urgentRed;
     default:
       return colors.onSurfaceVariant;

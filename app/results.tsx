@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 
@@ -21,7 +21,13 @@ import { useGameSession } from "../src/state/GameSessionProvider";
  *  once per run (session guard + single-flight ad request). */
 export default function ResultsScreen() {
   const router = useRouter();
-  const { controller, startNewRun, settleCurrentRun, doubleBoltsForCurrentRun } = useGameSession();
+  const {
+    controller,
+    startNewRun,
+    settleCurrentRun,
+    doubleBoltsForCurrentRun,
+    isCurrentRunDoubled,
+  } = useGameSession();
   const { profile } = useProfile();
   const { track } = useAnalytics();
   const reward = useRewardedAction();
@@ -31,7 +37,11 @@ export default function ResultsScreen() {
   // Same transient success / cancelled / failure feedback the in-run rewards
   // use, so Double Bolts is never the one silent reward surface.
   const outcome = useRewardOutcome(reducedMotion);
-  const [doubled, setDoubled] = useState(false);
+  // Sourced from the session's own once-per-run guard rather than local state:
+  // a local flag resets when Results remounts (Back, or Home and in again),
+  // which would re-offer a reward that can no longer be applied and cost the
+  // player an ad view for nothing.
+  const doubled = isCurrentRunDoubled;
   const state = controller.state;
   const boltsEarned = computeBoltsEarned(state);
 
@@ -56,19 +66,21 @@ export default function ResultsScreen() {
     audio.playSfx("button");
     track({ name: "double_bolts_offer" });
     outcome.begin();
+    // Whether the reward's own effect actually landed. An earned ad is not the
+    // same thing as a granted reward: the session applies the doubling exactly
+    // once per run, so a second earn banks nothing — and must not be reported
+    // as a success.
+    let applied = false;
     void reward
       .run(REWARD_PLACEMENTS.doubleBolts, () => {
-        // The session applies the doubling exactly once per run; reflect it in
-        // the button state only when it actually applied. Success feedback is
-        // tied to that same guard, so a second earn can never re-fire it.
         if (doubleBoltsForCurrentRun()) {
-          setDoubled(true);
+          applied = true;
           haptics.success();
         }
       })
       .then((result) => {
         track({ name: "double_bolts_result", result: rewardOutcome(result) });
-        outcome.settle(result);
+        outcome.settle(result, applied);
       });
   }, [audio, doubled, doubleBoltsForCurrentRun, haptics, outcome, reward, track]);
 

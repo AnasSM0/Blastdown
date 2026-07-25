@@ -26,7 +26,17 @@ jest.mock("expo-router", () => ({
   useRouter: () => ({ replace: mockReplace, push: jest.fn(), back: jest.fn() }),
 }));
 
-const mockDoubleBolts = jest.fn(() => true);
+// Mirrors the real session's once-per-run guard: the first call applies and
+// banks, every later call for the same run returns false and banks nothing.
+// Prefixed 'mock' so the jest.mock factory may reference it.
+let mockRunDoubled = false;
+const mockDoubleBolts = jest.fn(() => {
+  if (mockRunDoubled) {
+    return false;
+  }
+  mockRunDoubled = true;
+  return true;
+});
 
 jest.mock("../../src/state/GameSessionProvider", () => ({
   useGameSession: () => ({
@@ -34,6 +44,7 @@ jest.mock("../../src/state/GameSessionProvider", () => ({
     startNewRun: mockStartNewRun,
     settleCurrentRun: mockSettle,
     doubleBoltsForCurrentRun: mockDoubleBolts,
+    isCurrentRunDoubled: mockRunDoubled,
   }),
 }));
 
@@ -63,6 +74,7 @@ describe("results route", () => {
     mockStartNewRun.mockClear();
     mockSettle.mockClear();
     mockDoubleBolts.mockClear();
+    mockRunDoubled = false;
   });
 
   function renderResults() {
@@ -128,5 +140,41 @@ describe("results route", () => {
     // again (one-time reward).
     expect(result.getByTestId("double-bolts-applied")).toBeTruthy();
     expect(result.queryByTestId("double-bolts-button")).toBeNull();
+  });
+
+  it("never reports success when an earned ad banked nothing", async () => {
+    // Force the offer to be visible while the session guard is already spent —
+    // the state in which an earned ad grants nothing. Reporting "done" here
+    // would tell the player they received Bolts they did not receive.
+    mockDoubleBolts.mockImplementationOnce(() => false);
+    const result = await renderResults();
+
+    await act(async () => {
+      fireEvent.press(result.getByTestId("double-bolts-button"));
+    });
+
+    const notice = await result.findByTestId("double-bolts-outcome");
+    expect(notice.props.children).toMatch(/not applied/i);
+    expect(notice.props.children).not.toMatch(/done/i);
+    // Nothing was banked, so the applied confirmation must not appear either.
+    expect(result.queryByTestId("double-bolts-applied")).toBeNull();
+  });
+
+  it("keeps the reward applied across a remount instead of re-offering it", async () => {
+    const first = await renderResults();
+    await act(async () => {
+      fireEvent.press(first.getByTestId("double-bolts-button"));
+    });
+    expect(mockDoubleBolts).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    // Back / Home-and-in-again remounts the route. The applied state must come
+    // from the session's own guard, not from screen-local state — otherwise the
+    // offer returns and the player spends an ad view on a reward that can no
+    // longer be applied.
+    const second = await renderResults();
+    expect(second.getByTestId("double-bolts-applied")).toBeTruthy();
+    expect(second.queryByTestId("double-bolts-button")).toBeNull();
+    expect(mockDoubleBolts).toHaveBeenCalledTimes(1);
   });
 });
