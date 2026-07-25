@@ -22,8 +22,20 @@ function wrapper(storage: MemoryStorageService) {
   };
 }
 
+// The controller's production seed factory is `run-${Date.now()}`, so two runs
+// created inside the same millisecond share a seed — which a test can hit but a
+// player cannot. Restarts here use the controller's own injectable seed factory
+// with a counter, so "Restart stores the NEW run" is asserted without depending
+// on the wall clock ticking between two synchronous calls.
+let restartCounter = 0;
+
 function useHarness(initialState?: GameState) {
-  const controller = useGameController({ seed: "harness", now: () => NOW, initialState });
+  const controller = useGameController({
+    seed: "harness",
+    now: () => NOW,
+    nextSeed: () => `harness-restart-${++restartCounter}`,
+    initialState,
+  });
   const persistence = useGamePersistence(controller, { now: () => NOW });
   return { controller, persistence };
 }

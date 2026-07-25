@@ -89,6 +89,82 @@ describe("useEventAnimator", () => {
     expect(result.current.isAnimating).toBe(false);
   });
 
+  it("plays an out-of-turn cue without locking input, then clears it", async () => {
+    const { result } = await renderHook(() =>
+      useEventAnimator({ turn: 0, events: [], grid: EMPTY_GRID, reducedMotion: false }),
+    );
+
+    await act(async () => {
+      result.current.playCue("revive", [{ row: 2, column: 2 }]);
+    });
+    expect(result.current.plan?.cue).toBe("revive");
+    expect(result.current.plan?.reviveCells).toEqual([{ row: 2, column: 2 }]);
+    // A revive/rewarded defuse must leave the board usable straight away.
+    expect(result.current.isAnimating).toBe(false);
+
+    await act(async () => {
+      jest.advanceTimersByTime(400);
+    });
+    expect(result.current.plan).toBeNull();
+  });
+
+  it("ignores a cue while a required sequence is playing, so it can't cut one short", async () => {
+    const { result, rerender } = await renderHook(
+      (props: { turn: number; events: GameEvent[]; reducedMotion: boolean }) =>
+        useEventAnimator({ ...props, grid: EMPTY_GRID }),
+      { initialProps: { turn: 0, events: [] as GameEvent[], reducedMotion: false } },
+    );
+    await act(async () => {
+      rerender({ turn: 1, events: CLEAR_TURN, reducedMotion: false });
+    });
+    expect(result.current.isAnimating).toBe(true);
+    const keyDuringSequence = result.current.effectKey;
+
+    await act(async () => {
+      result.current.playCue("revive", [{ row: 0, column: 0 }]);
+    });
+    // The clear keeps the overlay and the input lock.
+    expect(result.current.effectKey).toBe(keyDuringSequence);
+    expect(result.current.plan?.cue).toBeNull();
+    expect(result.current.isAnimating).toBe(true);
+  });
+
+  it("ignores a cue with no cells (nothing was restored or defused)", async () => {
+    const { result } = await renderHook(() =>
+      useEventAnimator({ turn: 0, events: [], grid: EMPTY_GRID, reducedMotion: false }),
+    );
+    await act(async () => {
+      result.current.playCue("revive", []);
+    });
+    expect(result.current.plan).toBeNull();
+  });
+
+  it("resolves a defused piece's cells from the grid as it stood before the turn", async () => {
+    const before: GridCell[][] = EMPTY_GRID.map((row) => [...row]);
+    before[4][4] = { kind: "timed", pieceInstanceId: "p-defused", colorId: "cyan" };
+
+    const { result, rerender } = await renderHook(
+      (props: { turn: number; events: GameEvent[]; grid: GridCell[][] }) =>
+        useEventAnimator({ ...props, reducedMotion: false }),
+      { initialProps: { turn: 0, events: [] as GameEvent[], grid: before } },
+    );
+
+    // The turn clears the piece: it is gone from the NEW grid, so only the
+    // retained pre-turn grid can say where it was.
+    await act(async () => {
+      rerender({
+        turn: 1,
+        events: [
+          { type: "linesCleared", rows: [4], columns: [] },
+          { type: "pieceDefused", pieceId: "p-defused", bonus: 50 },
+        ],
+        grid: EMPTY_GRID,
+      });
+    });
+
+    expect(result.current.plan?.defuses[0].cells).toEqual([{ row: 4, column: 4 }]);
+  });
+
   it("reset cancels a playing sequence immediately", async () => {
     const { result, rerender } = await renderHook(
       (props: { turn: number; events: GameEvent[]; reducedMotion: boolean }) =>
