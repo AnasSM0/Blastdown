@@ -1241,14 +1241,29 @@ before/after comparison approved. Then Phase 2 (motion polish), Phase 3
     interstitial gate (§11.3/§11.4 conditions have no implementation and no
     config home; lifetime run count and session timing are not tracked).
     `app/index.tsx` passes `onPrivacy={() => {}}` — a dead control.
+  - Android build configuration (`docs/MONETIZATION.md` §5, added after a
+    stop-time review found it missing): the RNGMA config plugin writes only four
+    manifest `meta-data` entries and iOS plist keys — it configures no UMP and
+    no permissions. `com.google.android.gms.permission.AD_ID` is merged in
+    automatically by `play-services-ads`, must be declared in Play's Data safety
+    form, and must be **removed** via `tools:node="remove"` if the app is
+    child-directed — so the audience answer gates the native build, not just
+    runtime flags. UMP needs `debugGeography` + a registered
+    `testDeviceIdentifier` (bound to `EXPO_PUBLIC_APP_ENV`, never reachable in
+    production) plus a **published AdMob consent message**, or no form can
+    appear at all. `delayAppMeasurementInit` is unset and should be `true` for a
+    consent-first flow. SDK levels need confirming at first prebuild (the ad SDK
+    declares `minSdk 23`); `expo-build-properties` is the lever and is not a
+    dependency today. None of this can ship as a JS update.
   - Adapter boundary: one new `src/services/ads/GoogleAdService.ts` implementing
     the existing `AdService` unchanged, plus one provider line in
     `app/_layout.tsx`. The mock stays the default and the SDK is required
     lazily, so tests and Expo Go never load native code.
 - [ ] **6B-1 …onward: BLOCKED on owner inputs.** AdMob Android app id, rewarded
       ad-unit ids, privacy-policy URL, the child-directed/audience decision,
-      Play Console configuration, AdMob↔Play linkage, and the iOS scope answer.
+      Play Console configuration, AdMob↔Play linkage, a published AdMob GDPR
+      consent message, the UMP test-device identifier, and the iOS scope answer.
       Also needs an explicit decision on whether interstitials ship in the first
       release or are deferred (rewarded-only is the lower-risk default).
       Do not install dependencies or add production ad ids until these are
-      answered — see `docs/MONETIZATION.md` §5 and §6.
+      answered — see `docs/MONETIZATION.md` §5, §6 and §7.
