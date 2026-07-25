@@ -166,6 +166,57 @@ with no `overflow:hidden`/elevation.
 
 **Performance.** The only per-frame work on the drag path was the ghost's
 `setPoint`; it is gone. The board still updates React preview state only when the
-mapped anchor changes, so a gesture never triggers a 64-cell rerender. Physical
-device release/profile confirmation of drag smoothness is required and is the
-user's step (no device on the build machine).
+mapped anchor changes, so a gesture never triggers a 64-cell rerender. Confirmed
+on a physical Android phone (owner, 2026-07-25): drag feels smoother and
+gameplay is no longer noticeably laggy.
+
+## Phase 3 — gameplay event effects (implemented, 2026-07-25)
+
+The consolidated event-effects pass: what the engine just did, reported back.
+Every beat is driven by the domain's own event stream or by a read-only look at
+authoritative state — no gameplay, scoring, reward, or persistence behaviour
+changed, and no animation dependency was added (RN `Animated` only).
+
+| Event             | Beat                                                                                                          | Duration                      | Reduced motion                            |
+| ----------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------- |
+| Line clear        | directional sweep — rows left→right, columns top→bottom, intersections take the earlier delay — plus a settle | 90 in / 190 out, ≤112 stagger | opacity flash only, no stagger, no settle |
+| Defuse (by clear) | the defused piece's own cells flash; a pulse ring and the `DEFUSED +N` text sit on that piece's centroid      | ring 320                      | brief fade, no scale, no transform bound  |
+| Defuse (rewarded) | the same contained pulse on the target piece, played as an out-of-turn cue; no bonus text (none is awarded)   | cue 400                       | cue 140                                   |
+| Timer countdown 1 | existing urgent badge pulse (unchanged)                                                                       | —                             | static higher-contrast badge              |
+| Timer expiry      | per-rubble-cell burst over the authoritative rubble, one board shake, one heavier haptic for the turn         | burst ~360, shake ~200        | burst omitted; rubble still drawn         |
+| Revive            | recovery wave down the cells the revive restored, over an already-interactive board                           | cue 400                       | low-peak fade, no movement                |
+| Score gain        | floating `+N` at the event, plus a short HUD score bump                                                       | bump ~240                     | no bump                                   |
+| Combo increase    | emphasis pulse on the HUD combo pill (increase only — never a reset)                                          | ~240                          | no pulse                                  |
+| Reward outcome    | shared success / cancelled / failure / unavailable line on all four reward surfaces                           | 1400 (700 reduced)            | static text, never motion-only            |
+
+**Input.** Only a clear, defuse, or explosion holds the input lock, and only for
+its own sequence (340 ms, +440 ms when an explosion is involved; 120 ms under
+reduced motion). The board update itself is always applied first and is never
+delayed by an effect. The revive and rewarded-defuse cues hold **no** lock — the
+board is already updated and must stay usable.
+
+**Out-of-turn cues.** `activateFreeze`, `applyRewardedDefuse`, and `applyRevive`
+do not advance `state.turn`, so the turn-keyed animator never sees them. The
+rewarded defuse and the revive play through `animator.playCue(...)` instead,
+carrying cells the screen read from authoritative state _before_ applying the
+action — the only point at which a defused piece or cleared rubble can still be
+located. A cue is ignored while a required sequence is playing, so it can never
+cut one short.
+
+**Budgets.** Cleared-cell flashes are budgeted to the board itself; explosion
+bursts share one budget of 24 views across every explosion in a turn, so several
+simultaneous expiries can't multiply into an overlapping cascade. Nothing loops,
+nothing blurs, no animated shadow, no full-screen opacity layer.
+
+**Android safety.** Two real hazards were closed. `RubbleSurface` combined a
+rounded tile with `overflow: hidden`, and rubble appears on exactly the turns the
+board plays its shake transform — the hardware-layer black-render trap. The clip
+moved to an inner square view inset 1 px inside the 2 px corner radius. And
+`PulseRing` bound an identity scale under reduced motion; it now binds no
+transform at all, matching every other effect.
+
+**Render cost.** The effects overlay is a sibling of the board, not a child, so a
+new effect plan re-renders only the overlay. Board cells are memoized and stay
+memoized (one shared press handler instead of 64 closures, contour passed as a
+bitmask, derived maps memoized), and the screen's cell-press handler no longer
+changes identity when the animation or reward state flips.

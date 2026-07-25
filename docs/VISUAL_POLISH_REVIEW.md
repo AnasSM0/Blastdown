@@ -1050,3 +1050,99 @@ Phase 2 is accepted on this basis and merged to `master`, tagged
 **Risks (closed):** drag smoothness — confirmed on-device; opacity press feedback
 legibility — accepted on-device. **Risk (open, unrelated):** pre-existing
 expo-doctor dependency drift (19/20), untouched by this work.
+
+## Phase 3 · Gameplay Event Effects (2026-07-25)
+
+**Scope:** one consolidated pass over the effects that report gameplay outcomes —
+line clears, defuse, timer expiry and rubble, revive, combo and score feedback,
+and reward outcomes, plus their audio and haptic pairing. No gameplay, scoring,
+reward, persistence, analytics, or domain change; no new dependency (RN
+`Animated` only). Full contract in `docs/ANIMATION_SPEC.md` §"Phase 3".
+
+**Audit (Codex, read-only):** a genuinely useful pass this time. It confirmed the
+existing coverage and surfaced six things worth acting on: (1) the rewarded
+defuse and revive never reach `useEventAnimator` because they don't increment
+`turn`; (2) revive and Double Bolts have no outcome feedback at all on
+`closed`/`unavailable`/`error`; (3) combo change has no distinct feedback; (4)
+expiry has no haptic; (5) `RubbleSurface` combines a rounded surface with
+`overflow: hidden` _inside_ the view the board shakes; (6) `PulseRing` retains an
+identity scale transform under reduced motion. All six are fixed. It also flagged
+that `handleCellPress` depended on `inputLocked` and that `controller` is a fresh
+object each render, both defeating the board's memo — also fixed.
+
+**Effects implemented:**
+
+- **Line clear** — cleared rows sweep left→right and cleared columns top→bottom,
+  with intersections taking the earlier of the two so neither line stalls;
+  cleared cells settle as they fade rather than blinking out. The authoritative
+  board update still lands first and is never delayed.
+- **Defuse** — the effect now resolves on the _piece that was defused_. The
+  `pieceDefused` event carries only an id and the piece is gone from the
+  post-turn grid, so the animator keeps the previous turn's grid and resolves the
+  footprint from it. Previously the ring and bonus text sat on the cleared lines'
+  midpoint, which identified no piece at all.
+- **Timer expiry and rubble** — rubble is still drawn from the authoritative
+  `rubbleCreated` cells (never speculative UI state); the burst budget is now
+  shared across every explosion in a turn, so simultaneous expiries can't
+  multiply into an overlapping cascade. Expiry gained one heavier haptic per
+  turn — not one per exploded piece.
+- **Revive** — a top-to-bottom recovery wave over exactly the cells the revive
+  restored, played as an out-of-turn cue that holds **no** input lock, so play
+  resumes the moment the domain allows it.
+- **Combo and score** — the combo pill emphasises an increase (never a reset) and
+  the HUD score bumps on a gain. Both stay inside the HUD; nothing covers the
+  board or the tray, and no large floating numbers were added.
+- **Reward outcomes** — Freeze, Defuse, Revive, and Double Bolts now share one
+  `useRewardOutcome` hook and one phase vocabulary, so success, cancelled,
+  unavailable, and failure read, sound, and time out identically. Revive and
+  Double Bolts were previously silent on a dismissed or failed ad. Once-only earn
+  semantics are untouched — the hook presents outcomes, it grants nothing.
+
+**Performance safeguards:** the effects overlay moved out of `GameBoard` and is
+now a sibling of the board, so an effect plan change re-renders only the overlay
+instead of all 64 cells. Board cells are memoized and stay memoized: one shared
+press handler replaces 64 per-render closures, the piece contour is a bitmask
+rather than a fresh object, and `GameBoard`'s derived sets/maps are memoized on
+their real inputs. The screen's cell-press handler reads `controller` and
+`inputLocked` through refs, so a purely cosmetic state change no longer changes a
+prop on every cell. No effect drives per-frame React state; all motion is
+native-driven. The Phase 2 drag path is untouched.
+
+**Android safety:** two real hazards closed, both on the explosion path.
+`RubbleSurface`'s rounded tile was clipped with `overflow: hidden`, and rubble
+appears on exactly the turns the board plays its shake transform — the
+hardware-layer black-render trap this project already hit on-device. The clip
+moved to an inner square view inset 1 px inside the 2 px corner radius, so
+nothing paints outside the rounded silhouette and no rounded view is clipped.
+`PulseRing` bound an identity scale under reduced motion and now binds none.
+`SecondChanceBanner` no longer animates opacity on a full-screen view.
+
+**Tests:** 3 new suites, 35 tests (`eventEffectsPlan`, `eventEffectsFeedback`,
+`eventEffectsGuards`) plus 5 new `useEventAnimator` cases. 91 suites / 586 tests,
+coverage 92.56% (was 91.81%). Also fixed a real intermittent failure this
+surfaced: the controller's production seed factory is `run-${Date.now()}`, so a
+restart inside the same millisecond reuses the seed and the persistence lifecycle
+test flakes. The test now uses the controller's injectable seed factory;
+production seed generation is unchanged.
+
+**Verification:** typecheck ✅, lint ✅, 586 tests ✅, coverage ✅, format ✅,
+Android export ✅, expo-doctor 19/20 (pre-existing upstream Expo patch drift, no
+dependency changed).
+
+**Device finding (REQUIRED, outstanding):** the physical Android release/profile
+pass for the event effects — single and multiple clears, countdown 1 and expiry,
+rubble creation, successful/failed/cancelled Defuse, Freeze, revive, combo and
+score gain, repeated events, reduced motion ON/OFF, Reactor plus one alternative
+theme — is the user's step. There is no Android device on the build machine, so
+it is recorded here, not captured or fabricated.
+
+**Risks:** (1) The `RubbleSurface` clip change is the one visual behaviour only a
+device can fully confirm; the geometry argument is sound (a square inset 1 px is
+wholly inside a 2 px radius) but a black-render fix is exactly the class of bug
+that only shows up on hardware. (2) The board shake still transforms a rounded
+board — now with no clipped rounded descendant, which was the actual trap, but
+worth a specific look on-device during an explosion. (3) Double Bolts' `applied`
+state is screen-local, so returning to Results re-shows the offer; the session
+guard still prevents any double credit, so this is cosmetic. Fixing it properly
+means exposing session state, which is out of scope for an effects pass. (4)
+Pre-existing expo-doctor dependency drift, unrelated.

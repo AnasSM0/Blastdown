@@ -1323,3 +1323,98 @@ drag feels smoother, gameplay no longer noticeably laggy, animations and graphic
 look right, reduced-motion behavior verified. No black surfaces, delayed input,
 or regressions reported. Phase 2 accepted, merged to `master`, tagged
 `v0.8-ui-interaction-motion`; Phase 3 (gameplay event effects) is unblocked.
+
+## 2026-07-25 — Professional UI Polish Phase 3: Gameplay Event Effects
+
+One consolidated pass over the effects that report what the engine did. Branch
+`phase-professional-polish-3-event-effects`. Nothing in `src/domain/**`,
+gameplay, balance, persistence, economy, analytics contracts, reward logic, ads,
+`BUILD_SPEC.md`, or package versions was touched; no animation dependency was
+added (RN `Animated` only).
+
+- **Effects are driven by domain events, or by a read of authoritative state
+  taken before an action — never by re-deriving gameplay.** Two events carry too
+  little to place an effect: `pieceDefused` names a piece that is already gone
+  from the post-turn grid, and the rewarded defuse / revive don't emit cells at
+  all. Rather than widen the domain event payloads (protected), the presentation
+  layer resolves cells itself: `useEventAnimator` retains the previous turn's
+  grid and resolves a defused piece's footprint from it, and the screen reads the
+  target piece's cells (or the board's rubble) _before_ calling the controller.
+  Both are read-only scans of state the domain already produced.
+
+- **Out-of-turn actions get an explicit cue channel.** `activateFreeze`,
+  `applyRewardedDefuse`, and `applyRevive` do not advance `state.turn`, so the
+  turn-keyed animator, audio, haptics, and analytics hooks never see them — which
+  is why the rewarded defuse had no visual at all and the revive had only a
+  banner. `animator.playCue(kind, cells)` plays these without touching the turn
+  pipeline. A cue deliberately does **not** set `isAnimating`: the board is
+  already defused/restored, so holding input would delay play for a decoration.
+  A cue is ignored while a required sequence is playing, so it can't cut one
+  short.
+
+- **The effects overlay is a sibling of the board, not a child.** It previously
+  flowed through `GameBoard`'s props, so every cosmetic frame of a clear or
+  explosion re-rendered all 64 cells. `GameBoard` now takes only an explosion
+  count for its shake. Board cells are memoized and can _stay_ memoized: the
+  press handler is shared (each cell reports its own position instead of the
+  board minting 64 closures), the piece contour is passed as a bitmask instead of
+  a fresh object, and the derived sets/maps are memoized on their real inputs.
+  The screen's `handleCellPress` reads `controller` (a new object each render)
+  and `inputLocked` (which flips on every animation, pause, and reward
+  transition) through refs, so a purely cosmetic state change no longer changes a
+  prop on every cell.
+
+- **Two real Android hazards were closed, both on the explosion path.**
+  `RubbleSurface` combined a rounded tile with `overflow: hidden`, and rubble
+  appears on exactly the turns the board plays its shake transform — the
+  hardware-layer black-render trap from the 2026-07-22 entry. The clip moved to
+  an inner square view inset 1 px, which sits wholly inside the tile's 2 px
+  corner radius (distance from the arc centre to the inset corner is √2 < 2), so
+  the visual is unchanged, nothing paints outside the rounded silhouette, and no
+  rounded view is clipped. `PulseRing` bound an identity scale under reduced
+  motion and now binds no transform at all, matching every other effect.
+
+- **Reward outcomes share one vocabulary.** `RewardActionPhase`,
+  `phaseForResult`, and `useRewardOutcome` moved to shared modules and now back
+  Freeze, Defuse, Revive, and Double Bolts alike. Revive and Double Bolts
+  previously said nothing when an ad was dismissed or failed, which reads as the
+  app ignoring the tap. Non-success feedback lives in the hook so no surface can
+  omit it: a failure gets one warning haptic and the `invalid` cue, and a
+  player-dismissed ad stays silent (they chose it — a failure noise would
+  misreport their own action). The hook presents outcomes only; earn-only,
+  once-only mutation stays in `useRewardedAction` and is unchanged.
+
+- **Reduced motion removes movement, never the message.** Cleared cells still
+  flash, a revive still reads as a wave, rubble is still drawn, the expiry haptic
+  still fires, and every reward outcome is reported as words via a polite live
+  region. No effect binds an identity transform under reduced motion.
+
+New: `src/hooks/useRewardOutcome.ts`, `src/ui/effects/rewardPhase.ts`,
+`src/components/RewardOutcomeNotice/**`, `__tests__/ui/eventEffectsPlan.test.ts`,
+`__tests__/integration/eventEffectsFeedback.test.tsx`,
+`__tests__/components/eventEffectsGuards.test.tsx`. Touched: `EffectsLayer`,
+`CellFlash`, `PulseRing`, `GameBoard`, `GridCell`, `RubbleSurface`,
+`ComboIndicator`, `ScoreHeader`, `GameOverOverlay`, `ResultsView`,
+`SecondChanceBanner`, `useEventAnimator`, `useHaptics`, `useTimerHaptics`,
+`eventEffects`, `app/game.tsx`, `app/results.tsx`. 91 suites / 586 tests,
+coverage 92.56%, full battery + Android export clean, doctor 19/20 (pre-existing
+Expo drift).
+
+**Incidental fix:** the controller's production seed factory is
+`run-${Date.now()}`, so two runs created inside the same millisecond share a
+seed. A player cannot restart twice in under a millisecond, but a test can — and
+this was the intermittent `persistenceLifecycle` failure seen earlier in the
+session. The test now uses the controller's own injectable seed factory, which
+asserts the same behaviour without depending on the wall clock. Production seed
+generation is deliberately unchanged: altering it in an effects pass would touch
+run determinism for no player-visible benefit.
+
+**Known cosmetic gap (accepted, not fixed here):** the results screen's
+`doubled` flag is screen-local, so returning to Results re-shows the Double Bolts
+offer. The session's own guard still prevents any double credit, so this is
+presentation only. Fixing it properly means exposing session state, which is
+economy-adjacent and out of scope for an effects pass.
+
+**Device gate (open):** the physical Android release/profile pass for the event
+effects is the user's step — no Android device on the build machine, so it is
+recorded, not fabricated. Phase 6B (production ads/consent) remains paused.

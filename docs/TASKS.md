@@ -1143,3 +1143,50 @@ before/after comparison approved. Then Phase 2 (motion polish), Phase 3
     no device, so this is the owner's recorded result — not captured or
     fabricated here. Phase 2 merged to `master` and tagged
     `v0.8-ui-interaction-motion`.
+
+## Professional UI Polish — Phase 3 (Gameplay Event Effects)
+
+- [x] **P3 Event-effects pass** — done 2026-07-25 (branch
+      `phase-professional-polish-3-event-effects`). One consolidated pass over
+      line clears, defuse, timer expiry and rubble, revive, combo and score
+      feedback, and reward outcomes, plus their audio/haptic pairing. See
+      `docs/ANIMATION_SPEC.md` §"Phase 3 — gameplay event effects",
+      `docs/VISUAL_POLISH_REVIEW.md` §"Phase 3", `docs/ACCESSIBILITY.md`
+      §"Phase 3 event effects", and the 2026-07-25 Decisions entry.
+  - Allowed: effects components and layer, event/effect hooks, reward-outcome
+    presentation, `app/game.tsx`, `app/results.tsx`, `__tests__/**`, `docs/**`.
+  - Forbidden: `src/domain/**`, gameplay/balance, persistence schemas, economy,
+    analytics/diagnostics contracts, reward logic, ads, `BUILD_SPEC.md`, package
+    versions. No new animation dependency (RN `Animated` only).
+  - Codex: one bounded read-only audit of the line-clear, defuse, expiry,
+    rubble, revive, combo, score, reward, EffectsLayer, audio, and haptic flows.
+    It surfaced six actionable findings (out-of-turn rewards never reaching the
+    animator, silent revive/Double-Bolts outcomes, no combo feedback, no expiry
+    haptic, a rounded+clipped rubble tile under the board's shake transform, and
+    an identity transform in `PulseRing` under reduced motion) plus two memo
+    defeats on the board's press handler. All fixed. Test authorship stayed with
+    Claude: the new cue and plan-context APIs are Claude-owned contracts.
+  - Result: (1) **Targeting** — the defuse effect now lands on the piece that
+    was defused, resolved from the pre-turn grid, instead of on the cleared
+    lines' midpoint. (2) **Out-of-turn cues** — the rewarded defuse and the
+    revive don't advance `state.turn`, so they never reached the turn-keyed
+    animator; both now play as explicit cues carrying cells read from
+    authoritative state before the action, and neither holds an input lock.
+    (3) **Direction and budgets** — clears sweep directionally with intersections
+    taking the earlier delay, and the explosion burst budget is shared across all
+    explosions in a turn. (4) **Reward parity** — one shared `useRewardOutcome`
+    hook and phase vocabulary across Freeze, Defuse, Revive, and Double Bolts;
+    the last two were previously silent on a dismissed or failed ad. (5) **Perf**
+    — the effects overlay is a sibling of the board (an effect plan no longer
+    re-renders 64 cells), cells are memoized and stay memoized, and the cell
+    press handler no longer changes identity on cosmetic state. (6) **Android** —
+    the rounded+clipped rubble tile and the `PulseRing` identity transform are
+    both fixed. 91 suites / 586 tests, coverage 92.56%, full battery + Android
+    export clean, doctor 19/20 (pre-existing Expo drift).
+  - **Device review: OUTSTANDING** — the physical Android release/profile pass
+    (single and multiple clears, countdown 1 and expiry, rubble creation,
+    successful/failed/cancelled Defuse, Freeze, revive, combo and score gain,
+    repeated events, reduced motion ON/OFF, Reactor + one alt theme) is the
+    user's step; there is no Android device on the build machine, so it is
+    recorded, not fabricated.
+  - Do NOT begin production ads/consent (Phase 6B) — it remains paused.

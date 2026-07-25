@@ -203,5 +203,40 @@ is removed under the effective reduced-motion value (OS + persisted override):
   safe areas, and once-only callbacks are unchanged by the motion layer.
 
 Physical-device confirmation with reduced motion ON and OFF (and a smooth drag on
-a real phone) is required and recorded as the user's step — there is no Android
-device on the build machine.
+a real phone) was run by the repository owner on 2026-07-25 and passed — there is
+no Android device on the build machine, so it is recorded as the owner's result.
+
+## Phase 3 event effects — reduced motion and non-visual reporting (2026-07-25)
+
+The event-effects pass reports outcomes, so the accessibility bar is higher than
+for interaction motion: an effect that only exists as movement would make the
+outcome unreadable to anyone who turns motion off. Every beat therefore keeps a
+non-motion form:
+
+- **Line clear** still flashes each cleared cell under reduced motion — the
+  stagger and the settle scale are dropped, not the signal. The board update
+  itself is authoritative and never waited on the effect.
+- **Defuse** collapses to a brief fade on the defused piece's own cells with no
+  scale; the `DEFUSED +N` text stays and holds position instead of floating.
+- **Timer expiry** drops the burst and the board shake but the rubble is drawn
+  from the authoritative result either way, and the expiry haptic still fires
+  (once per turn, honoring the persisted haptics setting).
+- **Revive** keeps the recovery wave as a low-peak fade over the restored cells,
+  so restoration is still visible as a distinct event rather than the board
+  silently changing.
+- **Combo and score** emphasis is dropped, but both values are plain text in the
+  HUD and the combo pill carries its own `Combo xN` label — the numbers were
+  never conveyed by the pulse.
+- **Reward outcomes** are the strongest case: success, cancelled, unavailable,
+  and failure are reported as _words_ on every reward surface
+  (`RewardOutcomeNotice`, announced via a polite live region), never by color or
+  motion alone. Previously Revive and Double Bolts said nothing at all when an ad
+  was dismissed or failed, which read as the app ignoring the tap.
+
+No effect binds an identity transform under reduced motion (the Android
+rounded-layer black-render guard), and no beat loops, flashes repeatedly, or
+covers the board or tray. Labels, roles, hints, focus order, and once-only
+callbacks are unchanged by the effects layer.
+
+Physical-device confirmation with reduced motion ON and OFF for the event effects
+is required and is the user's step — recorded here, not captured or fabricated.
