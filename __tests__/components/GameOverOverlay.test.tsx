@@ -1,4 +1,4 @@
-import { act, fireEvent, render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 
 import { GameOverOverlay } from "../../src/components/modals/GameOverOverlay";
 
@@ -29,12 +29,8 @@ describe("GameOverOverlay", () => {
   it("fires onRevive and onEndRun when pressed", async () => {
     const props = baseProps();
     const result = await render(<GameOverOverlay {...props} />);
-    await act(async () => {
-      fireEvent.press(result.getByTestId("revive-button"));
-    });
-    await act(async () => {
-      fireEvent.press(result.getByTestId("end-run-button"));
-    });
+    await fireEvent.press(result.getByTestId("revive-button"));
+    await fireEvent.press(result.getByTestId("end-run-button"));
     expect(props.onRevive).toHaveBeenCalledTimes(1);
     expect(props.onEndRun).toHaveBeenCalledTimes(1);
   });
@@ -43,10 +39,8 @@ describe("GameOverOverlay", () => {
     const props = baseProps();
     const result = await render(<GameOverOverlay {...props} busy />);
     expect(result.getByTestId("revive-button").props.accessibilityState?.disabled).toBe(true);
-    await act(async () => {
-      fireEvent.press(result.getByTestId("revive-button"));
-      fireEvent.press(result.getByTestId("end-run-button"));
-    });
+    await fireEvent.press(result.getByTestId("revive-button"));
+    await fireEvent.press(result.getByTestId("end-run-button"));
     expect(props.onRevive).not.toHaveBeenCalled();
     expect(props.onEndRun).not.toHaveBeenCalled();
   });

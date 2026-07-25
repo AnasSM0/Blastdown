@@ -1,5 +1,9 @@
-import { act, fireEvent, render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 
+// Imported at module scope, not required inside the test: `jest.mock` calls are
+// hoisted above imports, and loading the route here keeps its (substantial)
+// first-time transform cost out of whichever test happens to run first.
+import ResultsScreen from "../../app/results";
 import { createInitialGameState } from "../../src/domain/game";
 import type { GameState } from "../../src/domain/gameTypes";
 import { AudioServiceProvider } from "../../src/services/audio";
@@ -78,8 +82,6 @@ describe("results route", () => {
   });
 
   function renderResults() {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const ResultsScreen = require("../../app/results").default;
     // Mirrors the real provider stack (app/_layout): the route plays the shared
     // reward outcome feedback, which reads the persisted sound/haptics settings
     // and the audio service.
@@ -111,18 +113,14 @@ describe("results route", () => {
 
   it("Play Again starts a fresh run and navigates to the game", async () => {
     const result = await renderResults();
-    await act(async () => {
-      fireEvent.press(result.getByTestId("play-again-button"));
-    });
+    await fireEvent.press(result.getByTestId("play-again-button"));
     expect(mockStartNewRun).toHaveBeenCalledTimes(1);
     expect(mockReplace).toHaveBeenCalledWith("/game");
   });
 
   it("Home returns to the menu", async () => {
     const result = await renderResults();
-    await act(async () => {
-      fireEvent.press(result.getByTestId("results-home-button"));
-    });
+    await fireEvent.press(result.getByTestId("results-home-button"));
     expect(mockReplace).toHaveBeenCalledWith("/");
   });
 
@@ -131,9 +129,7 @@ describe("results route", () => {
     // Earned Bolts (212) > 0, so the offer is shown.
     expect(result.getByTestId("double-bolts-button")).toBeTruthy();
 
-    await act(async () => {
-      fireEvent.press(result.getByTestId("double-bolts-button"));
-    });
+    await fireEvent.press(result.getByTestId("double-bolts-button"));
 
     expect(mockDoubleBolts).toHaveBeenCalledTimes(1);
     // The offer is replaced by the applied confirmation, so it can't be pressed
@@ -142,31 +138,14 @@ describe("results route", () => {
     expect(result.queryByTestId("double-bolts-button")).toBeNull();
   });
 
-  it("never reports success when an earned ad banked nothing", async () => {
-    // Force the offer to be visible while the session guard is already spent —
-    // the state in which an earned ad grants nothing. Reporting "done" here
-    // would tell the player they received Bolts they did not receive.
-    mockDoubleBolts.mockImplementationOnce(() => false);
-    const result = await renderResults();
-
-    await act(async () => {
-      fireEvent.press(result.getByTestId("double-bolts-button"));
-    });
-
-    const notice = await result.findByTestId("double-bolts-outcome");
-    expect(notice.props.children).toMatch(/not applied/i);
-    expect(notice.props.children).not.toMatch(/done/i);
-    // Nothing was banked, so the applied confirmation must not appear either.
-    expect(result.queryByTestId("double-bolts-applied")).toBeNull();
-  });
-
   it("keeps the reward applied across a remount instead of re-offering it", async () => {
     const first = await renderResults();
-    await act(async () => {
-      fireEvent.press(first.getByTestId("double-bolts-button"));
-    });
+    await fireEvent.press(first.getByTestId("double-bolts-button"));
     expect(mockDoubleBolts).toHaveBeenCalledTimes(1);
-    first.unmount();
+    // `unmount` is async and opens its own act() scope. Leaving it un-awaited
+    // lets the next render open a second, overlapping scope, which React
+    // refuses — the following renders then produce an empty tree.
+    await first.unmount();
 
     // Back / Home-and-in-again remounts the route. The applied state must come
     // from the session's own guard, not from screen-local state — otherwise the
@@ -176,5 +155,21 @@ describe("results route", () => {
     expect(second.getByTestId("double-bolts-applied")).toBeTruthy();
     expect(second.queryByTestId("double-bolts-button")).toBeNull();
     expect(mockDoubleBolts).toHaveBeenCalledTimes(1);
+  });
+
+  it("never reports success when an earned ad banked nothing", async () => {
+    // Force the offer to be visible while the session guard is already spent —
+    // the state in which an earned ad grants nothing. Reporting "done" here
+    // would tell the player they received Bolts they did not receive.
+    mockDoubleBolts.mockImplementationOnce(() => false);
+    const result = await renderResults();
+
+    await fireEvent.press(result.getByTestId("double-bolts-button"));
+
+    const notice = await result.findByTestId("double-bolts-outcome");
+    expect(notice.props.children).toMatch(/not applied/i);
+    expect(notice.props.children).not.toMatch(/done/i);
+    // Nothing was banked, so the applied confirmation must not appear either.
+    expect(result.queryByTestId("double-bolts-applied")).toBeNull();
   });
 });

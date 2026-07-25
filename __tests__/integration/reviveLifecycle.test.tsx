@@ -1,4 +1,4 @@
-import { act, fireEvent, render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 
 import { GameScreenContent } from "../../app/game";
 import { createInitialGameState } from "../../src/domain/game";
@@ -48,9 +48,7 @@ describe("revive lifecycle", () => {
 
     expect(result.getByTestId("game-over-overlay")).toBeTruthy();
 
-    await act(async () => {
-      fireEvent.press(result.getByTestId("revive-button"));
-    });
+    await fireEvent.press(result.getByTestId("revive-button"));
 
     // Back in play: overlay gone, second-chance banner shown, reward spent.
     expect(result.queryByTestId("game-over-overlay")).toBeNull();
@@ -64,9 +62,7 @@ describe("revive lifecycle", () => {
       const service = createMockAdService({ rewarded: { rewarded_revive: outcome } });
       const result = await renderOver(service);
 
-      await act(async () => {
-        fireEvent.press(result.getByTestId("revive-button"));
-      });
+      await fireEvent.press(result.getByTestId("revive-button"));
 
       // Still game over, no second chance.
       expect(result.getByTestId("game-over-overlay")).toBeTruthy();
@@ -89,9 +85,7 @@ describe("revive lifecycle", () => {
     const onResults = jest.fn();
     const result = await renderOver(service, onResults);
 
-    await act(async () => {
-      fireEvent.press(result.getByTestId("end-run-button"));
-    });
+    await fireEvent.press(result.getByTestId("end-run-button"));
 
     expect(onResults).toHaveBeenCalledTimes(1);
     expect(service.shown).toEqual([]);

@@ -45,7 +45,7 @@ describe("Home route wiring", () => {
     // No active run yet, so Continue is hidden.
     expect(result.queryByTestId("continue-button")).toBeNull();
 
-    fireEvent.press(result.getByTestId("play-button"));
+    await fireEvent.press(result.getByTestId("play-button"));
 
     expect(mockPush).toHaveBeenCalledWith("/game");
     // The run is now active, so Continue becomes available (state flushes async).
@@ -54,11 +54,11 @@ describe("Home route wiring", () => {
 
   it("navigates to the game without resetting when Continue is used", async () => {
     const result = await renderHome();
-    fireEvent.press(result.getByTestId("play-button"));
+    await fireEvent.press(result.getByTestId("play-button"));
     const continueButton = await result.findByTestId("continue-button");
     mockPush.mockClear();
 
-    fireEvent.press(continueButton);
+    await fireEvent.press(continueButton);
     expect(mockPush).toHaveBeenCalledWith("/game");
   });
 });

@@ -68,10 +68,8 @@ describe("RewardedActionBar", () => {
     );
 
     await act(async () => {
-      await act(async () => {
-        fireEvent.press(result.getByTestId("freeze-button"));
-      });
-      fireEvent.press(result.getByTestId("defuse-button"));
+      await fireEvent.press(result.getByTestId("freeze-button"));
+      await fireEvent.press(result.getByTestId("defuse-button"));
     });
 
     expect(onFreeze).toHaveBeenCalledTimes(1);
@@ -91,9 +89,7 @@ describe("RewardedActionBar", () => {
       />,
     );
 
-    await act(async () => {
-      fireEvent.press(result.getByTestId("freeze-button"));
-    });
+    await fireEvent.press(result.getByTestId("freeze-button"));
 
     expect(onFreeze).not.toHaveBeenCalled();
   });

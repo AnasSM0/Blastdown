@@ -1,4 +1,4 @@
-import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
+import { fireEvent, render, waitFor } from "@testing-library/react-native";
 
 import { createMemoryStorageService } from "../../src/services/storage/StorageService";
 import { StorageServiceProvider } from "../../src/services/storage/StorageServiceProvider";
@@ -33,9 +33,7 @@ describe("settings screen", () => {
   it("persists a toggle change through the provider", async () => {
     const { getByTestId, storage } = await renderSettings();
 
-    await act(async () => {
-      fireEvent(getByTestId("setting-soundEnabled"), "valueChange", false);
-    });
+    await fireEvent(getByTestId("setting-soundEnabled"), "valueChange", false);
 
     await waitFor(async () => {
       const stored = await loadSettings(storage);
@@ -45,22 +43,16 @@ describe("settings screen", () => {
 
   it("navigates back", async () => {
     const { getByTestId } = await renderSettings();
-    await act(async () => {
-      fireEvent.press(getByTestId("settings-back-button"));
-    });
+    await fireEvent.press(getByTestId("settings-back-button"));
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
   it("navigates to Themes and to the tutorial replay", async () => {
     const { getByTestId } = await renderSettings();
-    await act(async () => {
-      fireEvent.press(getByTestId("settings-themes-button"));
-    });
+    await fireEvent.press(getByTestId("settings-themes-button"));
     expect(mockPush).toHaveBeenCalledWith("/themes");
 
-    await act(async () => {
-      fireEvent.press(getByTestId("settings-replay-tutorial-button"));
-    });
+    await fireEvent.press(getByTestId("settings-replay-tutorial-button"));
     expect(mockPush).toHaveBeenCalledWith("/tutorial");
   });
 });

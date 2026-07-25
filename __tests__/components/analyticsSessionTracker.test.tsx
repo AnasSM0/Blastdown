@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react-native";
+import { render } from "@testing-library/react-native";
 
 import { AnalyticsSessionTracker } from "../../src/components/AnalyticsSessionTracker";
 import { AnalyticsServiceProvider } from "../../src/services/analytics/AnalyticsServiceProvider";
@@ -18,11 +18,11 @@ describe("AnalyticsSessionTracker", () => {
     expect(analytics.count("session_start")).toBe(1);
     expect(analytics.count("session_end")).toBe(0);
 
-    // Advance the clock, then unmount to end the session.
+    // Advance the clock, then unmount to end the session. `unmount` is async and
+    // wraps its own act() — awaiting it directly is required, and wrapping it in
+    // another act() would nest two scopes.
     clock = 6_000;
-    await act(async () => {
-      result.unmount();
-    });
+    await result.unmount();
 
     expect(analytics.count("session_end")).toBe(1);
     expect(analytics.byName("session_end")[0]).toEqual({
@@ -38,7 +38,7 @@ describe("AnalyticsSessionTracker", () => {
         <AnalyticsSessionTracker now={() => 0} />
       </AnalyticsServiceProvider>,
     );
-    result.rerender(
+    await result.rerender(
       <AnalyticsServiceProvider service={analytics}>
         <AnalyticsSessionTracker now={() => 0} />
       </AnalyticsServiceProvider>,

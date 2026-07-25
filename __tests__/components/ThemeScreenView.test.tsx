@@ -35,7 +35,7 @@ describe("ThemeScreenView", () => {
   it("calls onSelect for any tile tap", async () => {
     const onSelect = jest.fn();
     const result = await render(<ThemeScreenView {...baseProps} onSelect={onSelect} />);
-    fireEvent.press(result.getByTestId("theme-tile-magma"));
+    await fireEvent.press(result.getByTestId("theme-tile-magma"));
     expect(onSelect).toHaveBeenCalledWith("magma");
   });
 
@@ -51,7 +51,7 @@ describe("ThemeScreenView", () => {
     );
     expect(result.getByTestId("theme-purchase-panel")).toBeTruthy();
     expect(result.queryByTestId("theme-purchase-insufficient")).toBeNull();
-    fireEvent.press(result.getByTestId("theme-purchase-confirm"));
+    await fireEvent.press(result.getByTestId("theme-purchase-confirm"));
     expect(onConfirm).toHaveBeenCalledWith("magma");
   });
 
@@ -68,7 +68,7 @@ describe("ThemeScreenView", () => {
     expect(result.getByTestId("theme-purchase-insufficient")).toBeTruthy();
     const buy = result.getByTestId("theme-purchase-confirm");
     expect(buy.props.accessibilityState.disabled).toBe(true);
-    fireEvent.press(buy);
+    await fireEvent.press(buy);
     expect(onConfirm).not.toHaveBeenCalled();
   });
 });

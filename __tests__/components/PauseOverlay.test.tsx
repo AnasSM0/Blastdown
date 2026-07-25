@@ -1,4 +1,4 @@
-import { act, fireEvent, render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 
 import { PauseOverlay } from "../../src/components/modals/PauseOverlay";
 
@@ -10,11 +10,9 @@ describe("PauseOverlay", () => {
   it("fires resume, restart, and home", async () => {
     const p = props();
     const result = await render(<PauseOverlay {...p} />);
-    await act(async () => {
-      fireEvent.press(result.getByTestId("resume-button"));
-      fireEvent.press(result.getByTestId("pause-restart-button"));
-      fireEvent.press(result.getByTestId("pause-home-button"));
-    });
+    await fireEvent.press(result.getByTestId("resume-button"));
+    await fireEvent.press(result.getByTestId("pause-restart-button"));
+    await fireEvent.press(result.getByTestId("pause-home-button"));
     expect(p.onResume).toHaveBeenCalledTimes(1);
     expect(p.onRestart).toHaveBeenCalledTimes(1);
     expect(p.onHome).toHaveBeenCalledTimes(1);

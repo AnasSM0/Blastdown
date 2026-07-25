@@ -43,17 +43,17 @@ describe("HomeScreenView", () => {
     const withRun = await render(
       <HomeScreenView {...viewProps({ canContinue: true, onContinue })} />,
     );
-    fireEvent.press(withRun.getByTestId("continue-button"));
+    await fireEvent.press(withRun.getByTestId("continue-button"));
     expect(onContinue).toHaveBeenCalledTimes(1);
   });
 
   it("fires each menu action", async () => {
     const props = viewProps();
     const result = await render(<HomeScreenView {...props} />);
-    fireEvent.press(result.getByTestId("play-button"));
-    fireEvent.press(result.getByTestId("themes-button"));
-    fireEvent.press(result.getByTestId("settings-button"));
-    fireEvent.press(result.getByTestId("how-to-play-button"));
+    await fireEvent.press(result.getByTestId("play-button"));
+    await fireEvent.press(result.getByTestId("themes-button"));
+    await fireEvent.press(result.getByTestId("settings-button"));
+    await fireEvent.press(result.getByTestId("how-to-play-button"));
     expect(props.onPlay).toHaveBeenCalledTimes(1);
     expect(props.onThemes).toHaveBeenCalledTimes(1);
     expect(props.onSettings).toHaveBeenCalledTimes(1);

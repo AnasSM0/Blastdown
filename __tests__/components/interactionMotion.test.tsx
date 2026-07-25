@@ -30,7 +30,7 @@ describe("PressableFeedback", () => {
         <Text>tap</Text>
       </PressableFeedback>,
     );
-    fireEvent.press(result.getByTestId("pf"));
+    await fireEvent.press(result.getByTestId("pf"));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
@@ -41,8 +41,8 @@ describe("PressableFeedback", () => {
         <Text>tap</Text>
       </PressableFeedback>,
     );
-    fireEvent.press(result.getByTestId("pf"));
-    fireEvent.press(result.getByTestId("pf"));
+    await fireEvent.press(result.getByTestId("pf"));
+    await fireEvent.press(result.getByTestId("pf"));
     expect(onPress).not.toHaveBeenCalled();
   });
 
@@ -151,7 +151,7 @@ describe("dock press feedback reduced-motion", () => {
         }}
       />,
     );
-    fireEvent.press(result.getByTestId("freeze-button"));
+    await fireEvent.press(result.getByTestId("freeze-button"));
     expect(onPress).not.toHaveBeenCalled();
   });
 });

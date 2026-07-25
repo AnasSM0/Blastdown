@@ -122,7 +122,7 @@ describe("PieceTray", () => {
     const result = await render(
       <PieceTray hand={hand} selectedHandId={null} onSelect={onSelect} />,
     );
-    fireEvent.press(result.getByTestId("tray-piece-h2"));
+    await fireEvent.press(result.getByTestId("tray-piece-h2"));
     expect(onSelect).toHaveBeenCalledWith("h2");
   });
 
@@ -153,7 +153,7 @@ describe("PieceTray", () => {
       />,
     );
     // Tap fallback (accessibility path) must survive alongside the gesture.
-    fireEvent.press(result.getByTestId("tray-piece-h2"));
+    await fireEvent.press(result.getByTestId("tray-piece-h2"));
     expect(onSelect).toHaveBeenCalledWith("h2");
     expect(result.getAllByTestId(/^tray-piece-/)).toHaveLength(3);
   });

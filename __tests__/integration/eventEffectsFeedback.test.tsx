@@ -226,7 +226,7 @@ describe("effect cleanup", () => {
     await user.press(result.getByTestId("cell-0-0"));
     await waitFor(() => expect(result.getByTestId("effects-layer")).toBeTruthy());
 
-    result.unmount();
+    await result.unmount();
     // Let any timer that survived unmount come due.
     await new Promise((resolve) => setTimeout(resolve, 700));
 

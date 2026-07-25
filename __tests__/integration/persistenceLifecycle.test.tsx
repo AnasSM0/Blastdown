@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native";
-import { AppState } from "react-native";
 import type { ReactNode } from "react";
+
+import { captureAppStateHandlers } from "../../test-utils/appState";
 
 import { createInitialGameState } from "../../src/domain/game";
 import type { GameState, GridCell } from "../../src/domain/gameTypes";
@@ -145,11 +146,7 @@ describe("active run persistence lifecycle", () => {
   });
 
   it("flushes the run when the app backgrounds", async () => {
-    const handlers: ((s: string) => void)[] = [];
-    const spy = jest.spyOn(AppState, "addEventListener").mockImplementation((_event, handler) => {
-      handlers.push(handler as (s: string) => void);
-      return { remove: jest.fn() } as never;
-    });
+    const { handlers, restore } = captureAppStateHandlers();
     try {
       const storage = createMemoryStorageService();
       await writeActiveRun(storage, playingRun(), 1, NOW);
@@ -162,7 +159,7 @@ describe("active run persistence lifecycle", () => {
       });
       await waitFor(async () => expect(await loadActiveRun(storage)).not.toBeNull());
     } finally {
-      spy.mockRestore();
+      restore();
     }
   });
 });

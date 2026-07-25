@@ -1,4 +1,4 @@
-import { act, fireEvent, render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 
 import { ResultsView, type RunStats } from "../../src/components/ResultsScreen";
 
@@ -45,10 +45,8 @@ describe("ResultsView", () => {
         onHome={onHome}
       />,
     );
-    await act(async () => {
-      fireEvent.press(result.getByTestId("play-again-button"));
-      fireEvent.press(result.getByTestId("results-home-button"));
-    });
+    await fireEvent.press(result.getByTestId("play-again-button"));
+    await fireEvent.press(result.getByTestId("results-home-button"));
     expect(onPlayAgain).toHaveBeenCalledTimes(1);
     expect(onHome).toHaveBeenCalledTimes(1);
   });

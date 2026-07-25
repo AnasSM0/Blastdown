@@ -1,4 +1,4 @@
-import { act, fireEvent, render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 
 import { GameScreenContent } from "../../app/game";
 import { createInitialGameState } from "../../src/domain/game";
@@ -32,17 +32,11 @@ describe("game audio UI cues", () => {
     );
 
     // Select a piece -> selection cue.
-    await act(async () => {
-      fireEvent.press(result.getByTestId("tray-piece-h-square"));
-    });
+    await fireEvent.press(result.getByTestId("tray-piece-h-square"));
     // Place onto the occupied origin (0,0) -> rejected -> invalid cue.
-    await act(async () => {
-      fireEvent.press(result.getByTestId("cell-0-0"));
-    });
+    await fireEvent.press(result.getByTestId("cell-0-0"));
     // Open the pause menu -> button cue.
-    await act(async () => {
-      fireEvent.press(result.getByTestId("pause-button"));
-    });
+    await fireEvent.press(result.getByTestId("pause-button"));
 
     expect(audio.sfx).toContain("selection");
     expect(audio.sfx).toContain("invalid");

@@ -58,7 +58,7 @@ describe("ScoreHeader", () => {
   it("fires onPause when the pause button is pressed", async () => {
     const onPause = jest.fn();
     const result = await render(<ScoreHeader score={0} best={0} combo={0} onPause={onPause} />);
-    fireEvent.press(result.getByTestId("pause-button"));
+    await fireEvent.press(result.getByTestId("pause-button"));
     expect(onPause).toHaveBeenCalledTimes(1);
   });
 });

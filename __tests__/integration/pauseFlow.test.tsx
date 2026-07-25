@@ -1,4 +1,4 @@
-import { act, fireEvent, render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 
 import { GameScreenContent } from "../../app/game";
 import { createInitialGameState } from "../../src/domain/game";
@@ -42,25 +42,17 @@ describe("pause flow", () => {
     const result = await renderGame();
     expect(result.queryByTestId("pause-overlay")).toBeNull();
 
-    await act(async () => {
-      fireEvent.press(result.getByTestId("pause-button"));
-    });
+    await fireEvent.press(result.getByTestId("pause-button"));
     expect(result.getByTestId("pause-overlay")).toBeTruthy();
 
-    await act(async () => {
-      fireEvent.press(result.getByTestId("resume-button"));
-    });
+    await fireEvent.press(result.getByTestId("resume-button"));
     expect(result.queryByTestId("pause-overlay")).toBeNull();
   });
 
   it("restarts into a fresh run and closes the menu", async () => {
     const result = await renderGame();
-    await act(async () => {
-      fireEvent.press(result.getByTestId("pause-button"));
-    });
-    await act(async () => {
-      fireEvent.press(result.getByTestId("pause-restart-button"));
-    });
+    await fireEvent.press(result.getByTestId("pause-button"));
+    await fireEvent.press(result.getByTestId("pause-restart-button"));
     expect(result.queryByTestId("pause-overlay")).toBeNull();
     // A fresh seeded run deals a full hand of three.
     expect(result.getAllByTestId(/^tray-piece-/)).toHaveLength(3);
@@ -69,12 +61,8 @@ describe("pause flow", () => {
   it("returns to Home from the pause menu", async () => {
     const onExit = jest.fn();
     const result = await renderGame(onExit);
-    await act(async () => {
-      fireEvent.press(result.getByTestId("pause-button"));
-    });
-    await act(async () => {
-      fireEvent.press(result.getByTestId("pause-home-button"));
-    });
+    await fireEvent.press(result.getByTestId("pause-button"));
+    await fireEvent.press(result.getByTestId("pause-home-button"));
     expect(onExit).toHaveBeenCalledTimes(1);
     expect(result.queryByTestId("pause-overlay")).toBeNull();
   });
@@ -82,16 +70,10 @@ describe("pause flow", () => {
   it("restart clears a pending defuse confirm card", async () => {
     const result = await renderGame();
     // Open the defuse confirm, then pause over it.
-    await act(async () => {
-      fireEvent.press(result.getByTestId("defuse-button"));
-    });
+    await fireEvent.press(result.getByTestId("defuse-button"));
     expect(result.getByTestId("defuse-confirm")).toBeTruthy();
-    await act(async () => {
-      fireEvent.press(result.getByTestId("pause-button"));
-    });
-    await act(async () => {
-      fireEvent.press(result.getByTestId("pause-restart-button"));
-    });
+    await fireEvent.press(result.getByTestId("pause-button"));
+    await fireEvent.press(result.getByTestId("pause-restart-button"));
     // Both overlays are gone after restart.
     expect(result.queryByTestId("pause-overlay")).toBeNull();
     expect(result.queryByTestId("defuse-confirm")).toBeNull();

@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native";
-import { AppState } from "react-native";
 import type { ReactNode } from "react";
+
+import { captureAppStateHandlers } from "../../test-utils/appState";
 
 import type { GameEvent } from "../../src/domain/events";
 import { useGameAudio } from "../../src/hooks/useGameAudio";
@@ -118,11 +119,7 @@ describe("useGameAudio music lifecycle", () => {
   });
 
   it("pauses music when the app backgrounds", async () => {
-    const handlers: ((s: string) => void)[] = [];
-    const spy = jest.spyOn(AppState, "addEventListener").mockImplementation((_e, h) => {
-      handlers.push(h as (s: string) => void);
-      return { remove: jest.fn() } as never;
-    });
+    const { handlers, restore } = captureAppStateHandlers();
     try {
       const audio = createNoOpAudioService();
       const storage = createMemoryStorageService();
@@ -138,7 +135,7 @@ describe("useGameAudio music lifecycle", () => {
       });
       expect(audio.musicCalls).toContain("pause");
     } finally {
-      spy.mockRestore();
+      restore();
     }
   });
 });

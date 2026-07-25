@@ -46,9 +46,7 @@ describe("freeze reward flow", () => {
     const service = createMockAdService({ rewarded: { rewarded_freeze: "earned" } });
     const result = await renderRun(service);
 
-    await act(async () => {
-      fireEvent.press(result.getByTestId("freeze-button"));
-    });
+    await fireEvent.press(result.getByTestId("freeze-button"));
 
     expect(result.getByTestId("freeze-moves-label").props.children).toEqual([2, " ", "MOVES"]);
     expect(service.shown).toEqual(["rewarded_freeze"]);
@@ -62,9 +60,7 @@ describe("freeze reward flow", () => {
       const service = createMockAdService({ rewarded: { rewarded_freeze: outcome } });
       const result = await renderRun(service);
 
-      await act(async () => {
-        fireEvent.press(result.getByTestId("freeze-button"));
-      });
+      await fireEvent.press(result.getByTestId("freeze-button"));
 
       // No active freeze: the moves label never appears.
       expect(result.queryByTestId("freeze-moves-label")).toBeNull();
@@ -78,17 +74,13 @@ describe("defuse reward flow", () => {
     const service = createMockAdService({ rewarded: { rewarded_defuse: "earned" } });
     const result = await renderRun(service);
 
-    await act(async () => {
-      fireEvent.press(result.getByTestId("defuse-button"));
-    });
+    await fireEvent.press(result.getByTestId("defuse-button"));
     // Confirm card up and the target piece's cells are highlighted.
     expect(result.getByTestId("defuse-confirm")).toBeTruthy();
     expect(result.getByTestId("highlight-0-0")).toBeTruthy();
     expect(result.getByTestId("highlight-0-1")).toBeTruthy();
 
-    await act(async () => {
-      fireEvent.press(result.getByTestId("defuse-confirm-button"));
-    });
+    await fireEvent.press(result.getByTestId("defuse-confirm-button"));
     // Card dismissed, reward spent, and the timer badge is gone (piece defused).
     expect(result.queryByTestId("defuse-confirm")).toBeNull();
     expect(result.queryByTestId("highlight-0-0")).toBeNull();
@@ -99,12 +91,8 @@ describe("defuse reward flow", () => {
     const service = createMockAdService();
     const result = await renderRun(service);
 
-    await act(async () => {
-      fireEvent.press(result.getByTestId("defuse-button"));
-    });
-    await act(async () => {
-      fireEvent.press(result.getByTestId("defuse-cancel-button"));
-    });
+    await fireEvent.press(result.getByTestId("defuse-button"));
+    await fireEvent.press(result.getByTestId("defuse-cancel-button"));
 
     expect(result.queryByTestId("defuse-confirm")).toBeNull();
     expect(service.shown).toEqual([]);
@@ -114,18 +102,12 @@ describe("defuse reward flow", () => {
     const service = createMockAdService({ rewarded: { rewarded_defuse: "error" } });
     const result = await renderRun(service);
 
-    await act(async () => {
-      fireEvent.press(result.getByTestId("defuse-button"));
-    });
-    await act(async () => {
-      fireEvent.press(result.getByTestId("defuse-confirm-button"));
-    });
+    await fireEvent.press(result.getByTestId("defuse-button"));
+    await fireEvent.press(result.getByTestId("defuse-confirm-button"));
 
     expect(result.queryByTestId("defuse-confirm")).toBeNull();
     // The piece survived: pressing defuse again re-targets the same cells.
-    await act(async () => {
-      fireEvent.press(result.getByTestId("defuse-button"));
-    });
+    await fireEvent.press(result.getByTestId("defuse-button"));
     expect(result.getByTestId("highlight-0-0")).toBeTruthy();
   });
 });
@@ -144,9 +126,7 @@ describe("dock transient reward feedback", () => {
     const service = createMockAdService({ rewarded: { rewarded_freeze: outcome } });
     const result = await renderRun(service);
 
-    await act(async () => {
-      fireEvent.press(result.getByTestId("freeze-button"));
-    });
+    await fireEvent.press(result.getByTestId("freeze-button"));
     // The outcome is surfaced on the button (freeze is not active on a non-earn).
     expect(result.getByTestId("freeze-button-caption").props.children).toBe(cue);
 
@@ -162,9 +142,7 @@ describe("dock transient reward feedback", () => {
     const service = createMockAdService({ rewarded: { rewarded_freeze: "earned" } });
     const result = await renderRun(service);
 
-    await act(async () => {
-      fireEvent.press(result.getByTestId("freeze-button"));
-    });
+    await fireEvent.press(result.getByTestId("freeze-button"));
     // Active wins immediately: the moves label shows, not a success caption.
     expect(result.getByTestId("freeze-moves-label").props.children).toEqual([2, " ", "MOVES"]);
     expect(result.queryByTestId("freeze-button-caption")).toBeNull();
@@ -183,12 +161,8 @@ describe("dock transient reward feedback", () => {
     const service = createMockAdService({ rewarded: { rewarded_defuse: "error" } });
     const result = await renderRun(service);
 
-    await act(async () => {
-      fireEvent.press(result.getByTestId("defuse-button"));
-    });
-    await act(async () => {
-      fireEvent.press(result.getByTestId("defuse-confirm-button"));
-    });
+    await fireEvent.press(result.getByTestId("defuse-button"));
+    await fireEvent.press(result.getByTestId("defuse-confirm-button"));
     expect(result.getByTestId("defuse-button-caption").props.children).toBe("AD FAILED");
 
     await waitFor(
@@ -201,12 +175,8 @@ describe("dock transient reward feedback", () => {
     const service = createMockAdService();
     const result = await renderRun(service);
 
-    await act(async () => {
-      fireEvent.press(result.getByTestId("defuse-button"));
-    });
-    await act(async () => {
-      fireEvent.press(result.getByTestId("defuse-cancel-button"));
-    });
+    await fireEvent.press(result.getByTestId("defuse-button"));
+    await fireEvent.press(result.getByTestId("defuse-cancel-button"));
 
     // Cancelling the card never ran the ad, so no outcome flash appears.
     expect(result.getByTestId("defuse-button-caption").props.children).toBe("");

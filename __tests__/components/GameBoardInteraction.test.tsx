@@ -50,7 +50,7 @@ describe("GameBoard preview and press", () => {
     const result = await render(
       <GameBoard grid={makeEmptyGrid(8)} badges={[]} boardSize={328} onCellPress={onCellPress} />,
     );
-    fireEvent.press(result.getByTestId("cell-3-4"));
+    await fireEvent.press(result.getByTestId("cell-3-4"));
     expect(onCellPress).toHaveBeenCalledWith({ row: 3, column: 4 });
   });
 });

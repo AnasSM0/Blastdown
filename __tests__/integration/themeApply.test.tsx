@@ -76,7 +76,7 @@ describe("theme application", () => {
       resolveTheme("neon-reactor").boardBg,
     );
 
-    fireEvent.press(result.getByTestId("to-arctic"));
+    await fireEvent.press(result.getByTestId("to-arctic"));
     await waitFor(() =>
       expect(boardBackground(result.getByTestId("game-board"))).toBe(
         resolveTheme("arctic").boardBg,
