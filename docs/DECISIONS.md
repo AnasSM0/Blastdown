@@ -1463,6 +1463,13 @@ test happened to run first — a build cost, not a hang, and 20s still catches a
 real hang. The results route is now imported at module scope so that cost lands
 outside the timed tests. No production code changed for any of this.
 
-**Device gate (open):** the physical Android release/profile pass for the event
-effects is the user's step — no Android device on the build machine, so it is
-recorded, not fabricated. Phase 6B (production ads/consent) remains paused.
+**Device gate (closed, 2026-07-25):** the physical Android release/profile pass
+for the event effects was run by the user and passed — line clears, expiry and
+rubble, Defuse, Freeze, revive, combo, score and reward feedback, reduced motion,
+no black or invisible blocks, no significant stutter, drag responsiveness intact,
+no duplicate audio or haptics, no lingering effects after restart or Home. This
+machine has no Android device, so the findings are the user's, recorded, never
+captured or fabricated here. The `RubbleSurface` clip change and the board shake
+during an explosion — the two hazards that only hardware could settle — are
+confirmed good. Phase 3 merged to master and tagged `v0.9-ui-event-effects`, and
+Phase 6B (production ads/consent) is unpaused as of this entry.

@@ -1212,10 +1212,14 @@ before/after comparison approved. Then Phase 2 (motion polish), Phase 3
     lands outside the timed tests.
   - Verified: cold cache, three warm runs on fresh random seeds, four pinned
     seeds, and every touched suite run alone. No production code changed.
-  - **Device review: OUTSTANDING** — the physical Android release/profile pass
-    (single and multiple clears, countdown 1 and expiry, rubble creation,
-    successful/failed/cancelled Defuse, Freeze, revive, combo and score gain,
-    repeated events, reduced motion ON/OFF, Reactor + one alt theme) is the
-    user's step; there is no Android device on the build machine, so it is
-    recorded, not fabricated.
-  - Do NOT begin production ads/consent (Phase 6B) — it remains paused.
+  - **Device review: PASSED** — physical Android release/profile pass reported
+    by the user 2026-07-25. Line-clear effects correct; expiry and rubble render
+    correctly; Defuse, Freeze, revive, combo, score and reward feedback all
+    work; reduced motion works; no black or invisible blocks; no significant
+    stutter; drag responsiveness still good; no duplicate audio or haptics; no
+    lingering effects after restart or Home. Findings are the user's, recorded
+    verbatim — this machine has no Android device and captured nothing.
+    Closes the two open device risks: the `RubbleSurface` clip change and the
+    board shake during an explosion both render correctly on hardware.
+  - Merged to master and tagged `v0.9-ui-event-effects` on the strength of that
+    pass. Phase 6B (production ads/consent) may now begin.

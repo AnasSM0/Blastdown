@@ -220,3 +220,12 @@ new effect plan re-renders only the overlay. Board cells are memoized and stay
 memoized (one shared press handler instead of 64 closures, contour passed as a
 bitmask, derived maps memoized), and the screen's cell-press handler no longer
 changes identity when the animation or reward state flips.
+
+**Device confirmation (2026-07-25, passed).** A physical Android release/profile
+pass by the user confirmed the effects on hardware: line clears, expiry and
+rubble, Defuse, Freeze, revive, combo, score and reward feedback all correct;
+reduced motion works; no black or invisible blocks; no significant stutter; drag
+responsiveness unchanged from Phase 2; no duplicate audio or haptics; no
+lingering effects after restart or Home. Both Android hazards above are settled
+on device. The finding is the user's, recorded here — the build machine has no
+Android device and captured nothing.

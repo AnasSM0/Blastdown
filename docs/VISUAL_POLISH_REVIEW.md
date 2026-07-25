@@ -1130,20 +1130,20 @@ cache, three warm runs on fresh random seeds, four pinned seeds), coverage 92.4%
 ✅, format ✅, Android export ✅, expo-doctor 19/20 (pre-existing upstream Expo
 patch drift, no dependency changed).
 
-**Device finding (REQUIRED, outstanding):** the physical Android release/profile
-pass for the event effects — single and multiple clears, countdown 1 and expiry,
-rubble creation, successful/failed/cancelled Defuse, Freeze, revive, combo and
-score gain, repeated events, reduced motion ON/OFF, Reactor plus one alternative
-theme — is the user's step. There is no Android device on the build machine, so
-it is recorded here, not captured or fabricated.
+**Device finding (REQUIRED) — PASSED 2026-07-25.** The physical Android
+release/profile pass was run by the user; this machine has no Android device and
+captured nothing. Reported: line-clear effects work correctly; expiry and rubble
+render correctly; Defuse, Freeze, revive, combo, score and reward feedback all
+work; reduced motion works; no black or invisible blocks; no significant stutter;
+drag responsiveness remains good; no duplicate audio or haptics; no lingering
+effects after restart or Home.
 
-**Risks:** (1) The `RubbleSurface` clip change is the one visual behaviour only a
-device can fully confirm; the geometry argument is sound (a square inset 1 px is
-wholly inside a 2 px radius) but a black-render fix is exactly the class of bug
-that only shows up on hardware. (2) The board shake still transforms a rounded
-board — now with no clipped rounded descendant, which was the actual trap, but
-worth a specific look on-device during an explosion. (3) Pre-existing
-expo-doctor dependency drift, unrelated.
+**Risks (both device risks now closed):** (1) The `RubbleSurface` clip change was
+the one visual behaviour only hardware could confirm — the geometry argument (a
+square inset 1 px sits wholly inside a 2 px radius) held: no black or invisible
+blocks on device. (2) The board shake still transforms a rounded board, now with
+no clipped rounded descendant; rubble renders correctly during an explosion on
+device. (3) Pre-existing expo-doctor dependency drift, unrelated and still open.
 
 **Stop-hook follow-up (fixed):** the review found that Double Bolts could report
 success when no reward was applied. It was not confined to Double Bolts — all

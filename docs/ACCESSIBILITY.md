@@ -243,4 +243,7 @@ covers the board or tray. Labels, roles, hints, focus order, and once-only
 callbacks are unchanged by the effects layer.
 
 Physical-device confirmation with reduced motion ON and OFF for the event effects
-is required and is the user's step — recorded here, not captured or fabricated.
+was run by the user and passed on 2026-07-25: reduced motion works, no black or
+invisible blocks, no duplicate audio or haptics, and no lingering effects after
+restart or Home. The finding is the user's, recorded here — this machine has no
+Android device and captured nothing.
