@@ -1223,3 +1223,32 @@ before/after comparison approved. Then Phase 2 (motion polish), Phase 3
     board shake during an explosion both render correctly on hardware.
   - Merged to master and tagged `v0.9-ui-event-effects` on the strength of that
     pass. Phase 6B (production ads/consent) may now begin.
+
+## Phase 6B — Production advertisements and consent (audit only, unpaused)
+
+- [x] **6B-0 Audit and owner-input gate** — done 2026-07-25 (branch
+      `phase-6b-production-ads-consent`). Read-only audit of the ad seam, the
+      four reward entry points, app/native configuration, and the consent gap.
+      No dependency installed, no production ad id added, no behaviour changed.
+      Findings in `docs/MONETIZATION.md` §"Phase 6B audit".
+  - Confirmed sound: `AdService` interface + `MockAdService` + provider default,
+    `useRewardedAction` single-flight/once-only/unmount-guarded, typed
+    `REWARD_PLACEMENTS`, per-run caps enforced in the domain, success reported
+    only when the guarded mutation applied.
+  - Confirmed missing: **all consent/UMP code**, ad _unit_ id configuration
+    (only app ids exist), preload wiring (`preloadRewarded` is never called),
+    request timeouts, a Settings privacy entry, a privacy route, and the entire
+    interstitial gate (§11.3/§11.4 conditions have no implementation and no
+    config home; lifetime run count and session timing are not tracked).
+    `app/index.tsx` passes `onPrivacy={() => {}}` — a dead control.
+  - Adapter boundary: one new `src/services/ads/GoogleAdService.ts` implementing
+    the existing `AdService` unchanged, plus one provider line in
+    `app/_layout.tsx`. The mock stays the default and the SDK is required
+    lazily, so tests and Expo Go never load native code.
+- [ ] **6B-1 …onward: BLOCKED on owner inputs.** AdMob Android app id, rewarded
+      ad-unit ids, privacy-policy URL, the child-directed/audience decision,
+      Play Console configuration, AdMob↔Play linkage, and the iOS scope answer.
+      Also needs an explicit decision on whether interstitials ship in the first
+      release or are deferred (rewarded-only is the lower-risk default).
+      Do not install dependencies or add production ad ids until these are
+      answered — see `docs/MONETIZATION.md` §5 and §6.

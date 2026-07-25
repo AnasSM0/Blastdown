@@ -1,8 +1,11 @@
 # Monetization
 
-Derived from `BUILD_SPEC.md` sections 8 and 11. All numeric caps below must
-be configurable (`src/config/monetization.ts`), never hardcoded at call
-sites.
+Derived from `BUILD_SPEC.md` sections 8 and 11. All numeric caps below must be
+configurable, never hardcoded at call sites. The per-run rewarded caps live in
+`src/config/balance.ts` today (`MAX_REWARDED_FREEZES_PER_RUN`,
+`MAX_REWARDED_DEFUSES_PER_RUN`); revive is a per-run boolean on the domain
+state. A separate `src/config/monetization.ts` will be introduced with the
+interstitial caps, which have no home yet.
 
 ## Ad formats
 
@@ -78,3 +81,196 @@ Claude Code owns the contracts and rules above (frequency caps, consent
 requirements, `AdService` interface, failure-handling contract). Codex owns
 the presentation layer built on top of them (buttons, loading states,
 failure-state UI) — see Phase 6/7 in `docs/TASKS.md`.
+
+---
+
+# Phase 6B audit — production ads and consent (2026-07-25)
+
+Read-only audit of what exists today, taken on branch
+`phase-6b-production-ads-consent` before any implementation. **No dependency was
+installed and no production ad id was added.** Nothing below changes behaviour.
+
+## 1. Existing mock reward architecture
+
+The seam is already the right shape, and it is the only thing the game talks to.
+
+| Piece               | File                                     | What it does                                                                                                                                                                 |
+| ------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AdService`         | `src/services/ads/types.ts`              | Four methods: `preloadRewarded`, `showRewarded`, `preloadInterstitial`, `showInterstitial`. `RewardedResult` is the closed union `earned \| closed \| unavailable \| error`. |
+| `MockAdService`     | `src/services/ads/MockAdService.ts`      | Deterministic in-memory implementation — no timers, no randomness, no network. Per-placement scripted outcomes; records every show for assertions.                           |
+| `AdServiceProvider` | `src/services/ads/AdServiceProvider.tsx` | Single injection point. **Defaults to the mock**, so tests and Expo Go never touch a native SDK.                                                                             |
+| `REWARD_PLACEMENTS` | `src/services/ads/placements.ts`         | Typed placement constants, so a rename is a compile error.                                                                                                                   |
+| `useRewardedAction` | `src/hooks/useRewardedAction.ts`         | Single-flight guard, once-only `onEarned` that fires **only** on `earned`, unmount guard, SDK exceptions caught and reported as `error`.                                     |
+| `useRewardOutcome`  | `src/hooks/useRewardOutcome.ts`          | Shared outcome vocabulary and feedback timing across all four rewards, including the `unapplied` case.                                                                       |
+
+Reward entry points — all four, and there are no others:
+
+- `app/game.tsx:403` — Freeze (`REWARD_PLACEMENTS.freeze`)
+- `app/game.tsx:447` — Defuse (`REWARD_PLACEMENTS.defuse`)
+- `app/game.tsx:487` — Revive (`REWARD_PLACEMENTS.revive`)
+- `app/results.tsx:75` — Double Bolts (`REWARD_PLACEMENTS.doubleBolts`)
+
+Every one follows the same shape: `reward.run(placement, () => { if (guardedMutation()) { applied = true; … } })`
+then `.then((result) => { track(...); outcome.settle(result, applied); })`. The
+mutation is a pure domain call behind its own precondition
+(`canActivateFreeze`, `canApplyRewardedDefuse`, `canRevive`, and the session's
+once-per-run Double Bolts guard), so an ad can never grant a reward the rules
+forbid, and success is reported only when the mutation actually applied.
+
+Per-run caps are already enforced in the domain, not the ad layer:
+`MAX_REWARDED_FREEZES_PER_RUN` = 2, `MAX_REWARDED_DEFUSES_PER_RUN` = 2, revive
+once via `reviveUsed`, Double Bolts once via `doubledRunId`.
+
+## 2. Proposed production adapter boundary
+
+Add one file, change one line. Nothing else.
+
+```
+src/services/ads/GoogleAdService.ts   (new)  createGoogleAdService(): AdService
+app/_layout.tsx                       (edit) <AdServiceProvider service={…}>
+```
+
+Rules for the adapter:
+
+- It implements `AdService` exactly. It does **not** widen the interface, and it
+  does not leak SDK types past its own module boundary — callers keep seeing
+  `RewardedResult`, never a Google reward object.
+- It maps SDK outcomes into the existing union and nothing else: reward earned →
+  `earned`; dismissed without earning → `closed`; no fill / not loaded →
+  `unavailable`; anything thrown, timed out, or unrecognized → `error`.
+- It never applies a reward. Only `useRewardedAction`'s `onEarned` runs a
+  mutation, and only on `earned`.
+- The **mock stays the provider default**. The real adapter is passed in
+  explicitly from `app/_layout.tsx` and only when the SDK is actually available,
+  so jest, Expo Go and any web target keep working with zero native code. The
+  ad SDK module must be required lazily inside the adapter, never at module
+  scope of a shared barrel, or the test suite starts loading native modules.
+- Offline is a first-class path: an unavailable ad resolves `unavailable`, the
+  game continues, and nothing else breaks. This is already how every caller
+  behaves — it must not regress.
+
+Work that belongs to the adapter and does not exist anywhere yet:
+
+- **Preload strategy.** `preloadRewarded` is defined and _never called_ by any
+  screen. Real ads need a load-ahead, or the first Freeze of every run stalls.
+- **Timeouts.** `showRewarded` has no timeout today. `BUILD_SPEC.md` §11.5
+  requires timeout handling; it belongs in the adapter, resolving `error`.
+- **Initialization order.** `mobileAds().initialize()` must not run before the
+  consent step below (§11.7: "do not initialize ad requests in a way that
+  bypasses required consent").
+
+## 3. Consent / UMP flow
+
+**There is no consent code in the repository at all** — no `AdsConsent`, no UMP
+call, no persisted consent state. This is the largest gap in Phase 6B.
+
+Planned flow, using the UMP support built into
+`react-native-google-mobile-ads` (no hand-rolled dialog, per §11.7):
+
+1. On app start, before any ad request: request a consent-info update, passing
+   the child-directed / under-age-of-consent settings the owner decides (§ 5).
+2. If a form is required and available, load and show it.
+3. Only once consent is resolved (or determined not required) initialize the
+   ads SDK and allow preloads.
+4. Respect a non-personalized outcome — request non-personalized ads rather than
+   refusing to serve.
+5. UMP persists its own state; the app stores nothing about the user's choice
+   beyond what the SDK holds. No consent data goes into analytics.
+6. Settings gains a **Privacy choices** entry that re-opens the form on demand
+   (§11.7 requires it; `src/components/SettingsScreen` has no such row today).
+7. Consent failure is non-fatal: the game is fully playable offline and without
+   ads, so a failed consent step degrades to "no ads", never to a blocked app.
+
+Related gap: `app/index.tsx:47` passes `onPrivacy={() => {}}` — the Home privacy
+control is a dead no-op, and there is no `app/privacy` route. It needs the
+owner's privacy-policy URL (§5).
+
+## 4. Test-ad strategy
+
+Already in place:
+
+- `app.config.ts` defaults `androidAppId`/`iosAppId` to Google's published test
+  **app** IDs and passes them to the `react-native-google-mobile-ads` config
+  plugin, which is already wired.
+- It **throws at config-eval time** if a production build lacks
+  `ADMOB_ANDROID_APP_ID`/`ADMOB_IOS_APP_ID`, so test app IDs cannot ship in a
+  production bundle.
+- `.env.example` documents both, and `.env` is gitignored.
+- `eas.json` separates `development` / `preview` / `production` and sets
+  `EXPO_PUBLIC_APP_ENV` per profile.
+
+Missing:
+
+- **Ad _unit_ IDs are not configured anywhere.** Only app IDs are. Development
+  and preview must use the SDK's `TestIds.REWARDED`; production must read real
+  per-placement unit IDs from the environment, and the existing production guard
+  in `app.config.ts` must be extended to cover them too.
+- The project is CNG-managed (no `android/` or `ios/` directory). Ads require a
+  **development build**; Expo Go cannot load the native module. `expo-dev-client`
+  is already a dependency, so this is a build step, not a code change.
+
+Never point a debug or internal build at production ad units — that is invalid
+traffic and risks the AdMob account.
+
+## 5. Required owner inputs
+
+None of these can be derived from the repository. Ads stay unimplemented until
+they are supplied.
+
+| Input                                                           | Why it is needed                                                                                                                                                                                                               | Status   |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| **AdMob Android app ID**                                        | `app.config.ts` production guard; ships in the manifest                                                                                                                                                                        | ❗ owner |
+| **Rewarded ad-unit IDs** (Freeze, Defuse, Revive, Double Bolts) | Per-placement production units; one shared unit is also acceptable if the owner prefers, but that loses per-placement reporting                                                                                                | ❗ owner |
+| **Interstitial ad-unit ID**                                     | Only if the owner wants interstitials at all (see risks)                                                                                                                                                                       | ❗ owner |
+| **Privacy-policy URL**                                          | Required by Play and by UMP; also fills the dead Home privacy control                                                                                                                                                          | ❗ owner |
+| **Audience / child-directed decision**                          | Drives `tagForChildDirectedTreatment`, `tagForUnderAgeOfConsent`, the Play Console content rating, and whether personalized ads are permitted at all. Cannot be guessed — a wrong answer here is a policy violation, not a bug | ❗ owner |
+| **Play Console access and configuration**                       | App created, package `com.blastdown.app` reserved, Data safety form, ads declaration, content rating questionnaire, target audience, and an internal-testing track for the first ad-enabled build                              | ❗ owner |
+| **AdMob ↔ Play linkage**                                        | AdMob app linked to the Play listing before real fill is reliable                                                                                                                                                              | ❗ owner |
+| **iOS scope**                                                   | `app.config.ts` already carries an iOS app ID and the spec is Android-first. Confirm whether iOS is in scope now (adds ATT/SKAdNetwork work) or deferred                                                                       | ❗ owner |
+
+## 6. Risks and unresolved decisions
+
+- **Consent is all-or-nothing for compliance.** Serving a personalized ad before
+  a required consent form is a policy breach, not a degraded experience. The
+  initialization order in §2 is the mitigation and must be tested, not assumed.
+- **The child-directed answer changes the design**, not just a flag. If the app
+  is directed to children, personalized ads are off entirely and the UMP flow
+  simplifies — but the Play content rating and Data safety answers must match.
+  Blocking decision.
+- **Interstitials are entirely unbuilt.** `showInterstitial`/`preloadInterstitial`
+  exist on the interface but are called from nowhere, and none of the §11.3
+  gating conditions (≥2 lifetime runs, ≥60 s run, ≥120 s since last, ≥45 s since
+  a rewarded ad, ≤3 per 20-minute session, loaded, consented) or the session cap
+  has an implementation or a home in config. Lifetime run count and session
+  timing are not currently tracked. Open question for the owner: **ship rewarded
+  ads only for the first release and defer interstitials?** Rewarded alone is
+  lower risk and matches §3.5 ("valuable, not deceptive").
+- **No device-verifiable ad behaviour on this machine.** There is no Android
+  device or emulator here. Every ad path — fill, no-fill, dismissal, timeout,
+  EEA consent form, offline — must be confirmed on hardware by the owner, and
+  will be recorded, never fabricated.
+- **Reward integrity must not regress.** The current guarantees — once-only
+  `onEarned`, mutation behind a domain precondition, success reported only when
+  the mutation applied, state preserved on every failure branch — are the
+  property the real adapter is most likely to break. They are covered by tests
+  today; those tests stay green against the real adapter's mapping, which is why
+  the mapping is the only thing the adapter is allowed to do.
+- **Preload and timeout tuning is unknown until measured on a device.** Values
+  belong in config, not at call sites.
+- Pre-existing `expo-doctor` 19/20 dependency drift is unrelated to ads but sits
+  in the same release path and should be cleared before the first production
+  build.
+
+## 7. Sequencing (proposed, not started)
+
+1. Owner supplies §5 inputs and answers the child-directed and interstitial
+   questions.
+2. Consent/UMP module + Settings privacy entry + privacy-policy route.
+3. Ad-unit configuration and the extended production guard.
+4. `GoogleAdService` adapter with mapping, preload and timeout.
+5. Provider swap behind availability detection; mock stays the default.
+6. Development build, then on-device validation of every branch.
+7. Interstitials only if the owner opts in, with the §11.3 gate implemented
+   against real tracked counters.
+
+Nothing in steps 2–7 begins until step 1 is answered.
