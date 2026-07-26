@@ -11,7 +11,9 @@ import type {
  *  no reward decisions, no retry, no gating. It translates SDK events into
  *  `RewardedAdEvent` and nothing else — every rule lives in `GoogleAdService`. */
 
-function toEvent(type: string, payload: unknown): RewardedAdEvent | null {
+/** Exported for `__tests__/domain/adSdkMapping.test.ts`: a wrong event name or a
+ *  missed case here would be invisible until device QA. */
+export function toEvent(type: string, payload: unknown): RewardedAdEvent | null {
   // Both load events mean the same thing to us; the rewarded one carries the
   // reward metadata, which we deliberately ignore (see `GoogleAdService`).
   if (type === RewardedAdEventType.LOADED || type === AdEventType.LOADED) {
