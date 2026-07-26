@@ -98,18 +98,39 @@ export function ConsentProvider({
     setState({ ...info, phase: "ready", failure: null, errorMessage: null });
   }, []);
 
-  const fail = useCallback((stage: "request" | "form" | "privacyOptions", error: unknown) => {
+  /** The launch sequence failed, so there is no usable snapshot at all. Ads are
+   *  off and the phase goes to `error`. */
+  const failLifecycle = useCallback((stage: "request" | "form", error: unknown) => {
     reportCaught("reward", error, { stage: `consent_${stage}` });
     if (!mountedRef.current) {
       return;
     }
-    // Ads are off on any failure. The rest of the snapshot is left as it was:
-    // a privacy entry point that was already required stays required.
     setState((prev) => ({
       ...prev,
       phase: "error",
       canRequestAds: false,
       failure: stage,
+      errorMessage: messageOf(error),
+    }));
+  }, []);
+
+  /** The privacy options form failed to present. Deliberately *not* a lifecycle
+   *  failure: the snapshot from launch is still valid, the user's existing
+   *  consent is untouched, and only the presentation of a dialog went wrong.
+   *
+   *  The phase therefore stays `ready`, which is what keeps the privacy row on
+   *  screen. Dropping to `error` would hide it — and since the lifecycle runs
+   *  once per launch, nothing would bring it back for the rest of the session.
+   *  That entry point is a right UMP says the user has, not a convenience, so a
+   *  transient failure must never be able to remove it. */
+  const failPrivacyOptions = useCallback((error: unknown) => {
+    reportCaught("reward", error, { stage: "consent_privacyOptions" });
+    if (!mountedRef.current) {
+      return;
+    }
+    setState((prev) => ({
+      ...prev,
+      failure: "privacyOptions",
       errorMessage: messageOf(error),
     }));
   }, []);
@@ -122,26 +143,26 @@ export function ConsentProvider({
     try {
       info = await port.gather(options);
     } catch (error) {
-      fail("request", error);
+      failLifecycle("request", error);
       return;
     }
     apply(info);
     await initializeIfAllowed(info);
-  }, [apply, fail, initializeIfAllowed, options, port]);
+  }, [apply, failLifecycle, initializeIfAllowed, options, port]);
 
   const openPrivacyOptions = useCallback(async () => {
     let info: ConsentInfo;
     try {
       info = await port.showPrivacyOptionsForm();
     } catch (error) {
-      fail("privacyOptions", error);
+      failPrivacyOptions(error);
       return;
     }
     apply(info);
     // Consent can be granted for the first time from this form, so this is a
     // genuine second chance to initialize — still gated to once ever.
     await initializeIfAllowed(info);
-  }, [apply, fail, initializeIfAllowed, port]);
+  }, [apply, failPrivacyOptions, initializeIfAllowed, port]);
 
   const resetConsent = useMemo(() => {
     if (!debugEnabled) {

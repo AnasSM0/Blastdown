@@ -22,12 +22,18 @@ export type ConsentInfo = {
   privacyOptionsRequirement: PrivacyOptionsRequirement;
 };
 
-/** Where the lifecycle currently is. `error` means UMP failed; it never means
- *  the app is unusable — gameplay is entirely offline and continues regardless. */
+/** Where the lifecycle currently is. `error` means the launch sequence failed
+ *  and there is no usable snapshot — never that the app is unusable, since
+ *  gameplay is entirely offline and continues regardless. */
 export type ConsentPhase = "idle" | "loading" | "ready" | "error";
 
 /** Which step failed. Kept separate from the message so the UI can react to the
- *  kind of failure without parsing text. */
+ *  kind of failure without parsing text.
+ *
+ *  Note that a `privacyOptions` failure is recorded *without* leaving the phase
+ *  `ready`: the launch snapshot is still valid and only a dialog failed to
+ *  open. A failure and a `ready` phase together therefore mean "the last action
+ *  failed, the snapshot stands". See `ConsentProvider`. */
 export type ConsentFailure = "request" | "form" | "privacyOptions";
 
 export type ConsentState = ConsentInfo & {
@@ -80,7 +86,11 @@ export function isConsentFormRequired(state: ConsentState): boolean {
 }
 
 /** The Settings privacy row is shown on exactly this condition, and only once
- *  the lifecycle has actually reported — never speculatively while loading. */
+ *  the lifecycle has actually reported — never speculatively while loading.
+ *
+ *  A failed attempt to open the form does not clear it: the row is the entry
+ *  point for retrying, and the lifecycle only runs once per launch, so hiding it
+ *  on failure would remove it for the whole session. */
 export function isPrivacyOptionsRequired(state: ConsentState): boolean {
   return state.phase === "ready" && state.privacyOptionsRequirement === "required";
 }

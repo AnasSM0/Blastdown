@@ -534,7 +534,7 @@ release 1 carries them at all is still an open owner decision (§7).
 ## 9.8 Verification
 
 - `npm run typecheck`, `npm run lint`, `npm run format:check` — clean.
-- Full suite green, twice: 98 suites / 679 tests, with `randomize: true`
+- Full suite green, twice: 98 suites / 682 tests, with `randomize: true`
   shuffling order within every file.
 - `npx expo config --type public` evaluates with both new plugins.
 - `npx expo prebuild --platform android` produces the expected manifest and

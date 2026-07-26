@@ -136,6 +136,8 @@ never infer them. Nothing here can be verified on the repository build machine.
       without granting anything.
 - [ ] Settings shows **PRIVACY OPTIONS** under the forced EEA geography.
 - [ ] The privacy form reopens, and reopens again after being used.
+- [ ] Dismissing or failing the privacy form leaves the row on screen and a
+      second press reopens it.
 - [ ] Settings shows **RESET CONSENT (DEV)**; using it replays the launch form.
 - [ ] With no forced geography, no form appears and no privacy row is shown.
 

@@ -170,9 +170,9 @@ describe("privacy options and reset", () => {
     expect(initializeAds).toHaveBeenCalledTimes(1);
   });
 
-  it("records a privacy options failure without losing the entry point", async () => {
+  it("keeps the entry point available when the privacy form fails to open", async () => {
     const port = createMockConsentPort({
-      gather: { status: "obtained", privacyOptionsRequirement: "required" },
+      gather: { status: "obtained", canRequestAds: true, privacyOptionsRequirement: "required" },
       privacyOptions: { error: "form dismissed by the system" },
     });
     const { result } = await renderController(port);
@@ -182,13 +182,56 @@ describe("privacy options and reset", () => {
       await result.current.openPrivacyOptions();
     });
 
-    expect(result.current.state.phase).toBe("error");
     expect(result.current.state.failure).toBe("privacyOptions");
-    // `isPrivacyOptionsRequired` is false while the phase is `error` -- the row
-    // hides rather than offering a control that has just failed -- but the
-    // requirement itself is preserved for the next successful refresh.
-    expect(isPrivacyOptionsRequired(result.current.state)).toBe(false);
+    // The launch snapshot is still valid -- only a dialog failed to open -- so
+    // the phase stays `ready` and the row stays on screen. Dropping to `error`
+    // would hide the retry control, and since the lifecycle runs once per
+    // launch nothing would bring it back for the rest of the session.
+    expect(result.current.state.phase).toBe("ready");
+    expect(isPrivacyOptionsRequired(result.current.state)).toBe(true);
     expect(result.current.state.privacyOptionsRequirement).toBe("required");
+    // The user's existing consent is untouched by a failed presentation.
+    expect(areAdsAllowed(result.current.state)).toBe(true);
+  });
+
+  it("clears the recorded failure once the form opens successfully", async () => {
+    const port = createMockConsentPort({
+      gather: { status: "obtained", canRequestAds: true, privacyOptionsRequirement: "required" },
+      privacyOptions: { error: "form dismissed by the system" },
+    });
+    const { result } = await renderController(port);
+    await waitFor(() => expect(result.current.state.phase).toBe("ready"));
+
+    await act(async () => {
+      await result.current.openPrivacyOptions();
+    });
+    expect(result.current.state.failure).toBe("privacyOptions");
+
+    // Second attempt succeeds.
+    port.showPrivacyOptionsForm = async () => ({
+      status: "obtained",
+      canRequestAds: true,
+      isConsentFormAvailable: false,
+      privacyOptionsRequirement: "required",
+    });
+    await act(async () => {
+      await result.current.openPrivacyOptions();
+    });
+
+    expect(result.current.state.failure).toBeNull();
+    expect(result.current.state.errorMessage).toBeNull();
+    expect(isPrivacyOptionsRequired(result.current.state)).toBe(true);
+  });
+
+  it("still reports a launch failure as a lifecycle error", async () => {
+    // The contrast case: no snapshot at all, so ads are off and the phase is
+    // `error`. Only the privacy-form failure is scoped.
+    const port = createMockConsentPort({ gather: { error: "UMP unreachable" } });
+    const { result } = await renderController(port);
+
+    await waitFor(() => expect(result.current.state.phase).toBe("error"));
+    expect(result.current.state.failure).toBe("request");
+    expect(areAdsAllowed(result.current.state)).toBe(false);
   });
 
   it("initializes the SDK once only across repeated refreshes", async () => {

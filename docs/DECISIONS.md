@@ -1612,3 +1612,27 @@ ad diagnostic now carries a fixed message plus the normalized error code. An ad
 already on screen when consent is withdrawn is deliberately left to finish — the
 user is watching it and it was requested legitimately. The pattern generalizes:
 **a permission check before an await is not a permission check.**
+
+**A failed privacy form must not remove the privacy control (2026-07-26).** A
+second stop-time Codex review caught this after the Phase 6B docs were written.
+`ConsentProvider.fail` treated every failure alike and set `phase: "error"`, and
+`isPrivacyOptionsRequired` requires `phase === "ready"` — so one failed
+presentation of the privacy options form hid the Settings row, and because the
+lifecycle runs once per launch, nothing brought it back for the rest of the
+session. The user could not revisit their consent choice again until they
+restarted the app.
+
+The failure classes are now distinguished. A launch `gather` failure is a
+lifecycle failure: there is no valid snapshot, so the phase goes to `error` and
+ads stay off. A privacy-form failure is not: the launch snapshot is still valid,
+the user's consent is untouched, and only a dialog failed to open — so the
+failure is recorded while the phase stays `ready`, which is exactly what keeps
+the retry control on screen. `failure` alongside a `ready` phase now means "the
+last action failed, the snapshot stands".
+
+Worth recording that the previous version was not an oversight in the tests —
+it was _asserted_ by one, with a comment claiming the requirement was "preserved
+for the next successful refresh". There was no next refresh. Both replacement
+tests were confirmed to fail against the old code before being kept, which is
+the only thing that distinguishes a regression guard from a description of
+current behaviour.

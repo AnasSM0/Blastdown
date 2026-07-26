@@ -117,6 +117,37 @@ describe("Settings privacy options entry point", () => {
     release!();
     await waitFor(() => expect(port.privacyOptionsCalls).toBe(1));
   });
+
+  it("stays on screen after the form fails, and retries successfully", async () => {
+    const port = createMockConsentPort(PRIVACY_REQUIRED);
+    // First presentation fails the way a system dismissal would.
+    let attempts = 0;
+    const succeed = port.showPrivacyOptionsForm.bind(port);
+    port.showPrivacyOptionsForm = () => {
+      attempts += 1;
+      return attempts === 1 ? Promise.reject(new Error("form dismissed")) : succeed();
+    };
+
+    const utils = await render(
+      <StorageServiceProvider service={createMemoryStorageService()}>
+        <SettingsProvider>
+          <ConsentProvider port={port} debugEnabled={false}>
+            <SettingsScreen />
+          </ConsentProvider>
+        </SettingsProvider>
+      </StorageServiceProvider>,
+    );
+
+    await fireEvent.press(await utils.findByTestId("settings-privacy-options-button"));
+    await waitFor(() => expect(attempts).toBe(1));
+
+    // The regression this guards: a single transient failure used to drop the
+    // lifecycle into `error`, hiding the row for the rest of the session with
+    // nothing to bring it back.
+    const retry = await utils.findByTestId("settings-privacy-options-button");
+    await fireEvent.press(retry);
+    await waitFor(() => expect(attempts).toBe(2));
+  });
 });
 
 describe("Settings consent reset", () => {

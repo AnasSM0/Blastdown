@@ -88,6 +88,18 @@ snapshot, so the row survives being used and can be reopened as often as the
 user likes. A second press while a form is on screen is ignored rather than
 queueing a second form.
 
+**A failed presentation does not remove the row.** If the form fails to open,
+the failure is recorded (`failure: "privacyOptions"`) but the phase stays
+`ready`, so the entry point remains on screen and the user can try again. This
+is deliberate and it matters: the lifecycle runs once per launch, so dropping to
+`error` here would hide the row for the rest of the session with nothing to
+bring it back — and this is a control UMP says the user is entitled to, not a
+convenience. The user's existing consent is untouched by a failed presentation,
+so ads are not switched off either.
+
+A failure of the _launch_ request is different: there is no valid snapshot at
+all, so the phase does go to `error` and ads stay off.
+
 ## Development-only tooling
 
 Forced debug geography, registered test devices, and the consent reset are
@@ -130,7 +142,7 @@ ads without them.
 
 ## Verified
 
-- 98 suites / 679 tests green, including `consentLifecycle.test.tsx` and
+- 98 suites / 682 tests green, including `consentLifecycle.test.tsx` and
   `privacyOptions.test.tsx`, which cover every branch above against an injected
   consent port — no native module involved.
 - On-device confirmation of the real UMP form is the owner's, pending the
