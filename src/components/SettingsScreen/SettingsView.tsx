@@ -14,6 +14,17 @@ type SettingsViewProps = {
   onThemes: () => void;
   onReplayTutorial: () => void;
   onBack: () => void;
+  /** Privacy options row. Shown only when UMP reports that a persistent entry
+   *  point is required for this user — never speculatively, and never for a
+   *  user who is not under a regulation that grants it. */
+  privacyOptionsVisible?: boolean;
+  onPrivacyOptions?: () => void;
+  /** True while the privacy form is being presented, so a second press cannot
+   *  queue a second form. */
+  privacyOptionsPending?: boolean;
+  /** Development builds only: clears UMP's stored decision so the first-launch
+   *  consent flow can be replayed on device. Absent everywhere else. */
+  onResetConsent?: (() => void) | null;
 };
 
 const ROWS: { key: ToggleKey; label: string }[] = [
@@ -34,6 +45,10 @@ export function SettingsView({
   onThemes,
   onReplayTutorial,
   onBack,
+  privacyOptionsVisible = false,
+  onPrivacyOptions,
+  privacyOptionsPending = false,
+  onResetConsent = null,
 }: SettingsViewProps) {
   const valueFor = (key: ToggleKey): boolean =>
     key === "reducedMotion" ? settings.reducedMotionOverride === true : settings[key];
@@ -95,6 +110,40 @@ export function SettingsView({
           <Text style={styles.chevron}>›</Text>
         </Pressable>
       </View>
+
+      {(privacyOptionsVisible || onResetConsent) && (
+        <View style={styles.card}>
+          {privacyOptionsVisible && (
+            <Pressable
+              style={styles.navRow}
+              onPress={onPrivacyOptions}
+              disabled={privacyOptionsPending}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: privacyOptionsPending }}
+              accessibilityLabel="Privacy options"
+              accessibilityHint="Reopens the ad consent choices"
+              testID="settings-privacy-options-button"
+            >
+              <Text style={[styles.label, privacyOptionsPending && styles.labelPending]}>
+                PRIVACY OPTIONS
+              </Text>
+              <Text style={styles.chevron}>›</Text>
+            </Pressable>
+          )}
+          {onResetConsent && (
+            <Pressable
+              style={styles.navRow}
+              onPress={onResetConsent}
+              accessibilityRole="button"
+              accessibilityLabel="Reset consent, development only"
+              testID="settings-reset-consent-button"
+            >
+              <Text style={styles.label}>RESET CONSENT (DEV)</Text>
+              <Text style={styles.chevron}>›</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -166,5 +215,8 @@ const styles = StyleSheet.create({
   label: {
     ...typography.buttonText,
     color: colors.onSurface,
+  },
+  labelPending: {
+    color: colors.onSurfaceVariant,
   },
 });
