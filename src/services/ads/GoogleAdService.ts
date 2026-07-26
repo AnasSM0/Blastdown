@@ -1,5 +1,5 @@
 import { REWARDED_EARN_GRACE_MS, REWARDED_LOAD_TIMEOUT_MS } from "../../config/ads";
-import { reportCaught, reportError } from "../diagnostics/reportError";
+import { reportError } from "../diagnostics/reportError";
 import { isNoAdAvailableCode } from "./rewardedPort";
 import type { RewardedAdEvent, RewardedAdHandle, RewardedAdPort } from "./rewardedPort";
 import type { AdService, InterstitialResult, RewardedPlacement, RewardedResult } from "./types";
@@ -165,7 +165,10 @@ export function createGoogleAdService({
         const code = event.code;
         reportError({
           surface: "reward",
-          message: event.message,
+          // A fixed message, never the SDK's own text: Google's ad error strings
+          // sometimes name the ad unit, and the diagnostics contract forbids
+          // carrying one. The normalized code is the actionable part.
+          message: "Rewarded ad failed to load",
           // Enumerated values only — never the ad unit id.
           context: { placement, stage: "load", code },
         });
@@ -206,7 +209,7 @@ export function createGoogleAdService({
     if (event.type === "error") {
       reportError({
         surface: "reward",
-        message: event.message,
+        message: "Rewarded ad failed to present",
         context: { placement, stage: "show", code: event.code },
       });
       // An error after the reward was earned must not take the reward away.
@@ -275,8 +278,15 @@ export function createGoogleAdService({
     });
     try {
       await handle.show();
-    } catch (error) {
-      reportCaught("reward", error, { placement, stage: "show" });
+    } catch {
+      // The thrown value is dropped for the same reason as above: the SDK's
+      // message may name the ad unit. `show()` rejects almost exclusively
+      // because the ad was not loaded, which the code records.
+      reportError({
+        surface: "reward",
+        message: "Rewarded ad could not be presented",
+        context: { placement, stage: "show", code: "showRejected" },
+      });
       // Nothing was presented, so nothing can have been earned.
       settleShow(slot, "error");
     }
@@ -297,9 +307,13 @@ export function createGoogleAdService({
     try {
       await initialization;
       return true;
-    } catch (error) {
+    } catch {
       initializationFailed = true;
-      reportCaught("reward", error, { placement, stage: "initialize" });
+      reportError({
+        surface: "reward",
+        message: "Mobile Ads SDK failed to initialize",
+        context: { placement, stage: "initialize" },
+      });
       return false;
     }
   }
@@ -350,13 +364,25 @@ export function createGoogleAdService({
         if (!(await ensureReady(placement))) {
           return resultOf("loadError");
         }
+        // Re-checked after every await. Consent can be withdrawn — or the
+        // service disposed — while initialization or a load is in flight, and a
+        // decision made a moment ago must not be overtaken by a request that
+        // passed the gate before it.
+        const beforeLoad = checkRequestable(placement);
+        if (beforeLoad) {
+          return resultOf(beforeLoad);
+        }
         const adUnitId = adUnitIds[placement] as string;
         const loaded = await awaitLoad(placement, adUnitId);
         if (!loaded.ok) {
           return resultOf(loaded.failure);
         }
-        if (disposed) {
-          return resultOf("disposed");
+        const beforeShow = checkRequestable(placement);
+        if (beforeShow) {
+          // Loaded under a permission that no longer holds: drop it rather than
+          // present it.
+          release(slotFor(placement));
+          return resultOf(beforeShow);
         }
         return await present(placement, loaded.handle);
       } finally {
@@ -377,7 +403,23 @@ export function createGoogleAdService({
     },
 
     setAdsAllowed(next: boolean): void {
+      const wasAllowed = allowed;
       allowed = next;
+      if (!wasAllowed || next) {
+        return;
+      }
+      // Consent has been withdrawn. Anything loaded or loading was requested
+      // under a permission that no longer holds, so it is dropped rather than
+      // left sitting as reusable inventory with its listeners alive. An ad
+      // already on screen is left to finish: the user is watching it, and it
+      // was requested legitimately.
+      for (const slot of slots.values()) {
+        if (slot.state === "showing") {
+          continue;
+        }
+        release(slot);
+        settleLoad(slot, { ok: false, failure: "notAllowed" });
+      }
     },
 
     dispose(): void {

@@ -256,11 +256,31 @@ describe("load failures", () => {
   it("never records an ad unit id in a diagnostic", async () => {
     const harness = createHarness();
     const { result: request } = await startShow(harness, REWARD_PLACEMENTS.freeze);
-    harness.port.ads[0].emit({ type: "error", code: "no-fill", message: "no fill" });
+    // Google's own ad error strings sometimes name the ad unit, so the SDK's
+    // message is dropped in favour of a fixed one plus the normalized code.
+    harness.port.ads[0].emit({
+      type: "error",
+      code: "no-fill",
+      message: "No ad to show for ad unit unit/freeze",
+    });
     await request;
 
     const serialized = JSON.stringify(reporter.reports);
     expect(serialized).not.toContain("unit/freeze");
+    expect(reporter.reports.at(-1)?.context?.code).toBe("no-fill");
+  });
+
+  it("never records an ad unit id from a failed presentation either", async () => {
+    const harness = createHarness();
+    const { result } = await showUntilPresented(harness, REWARD_PLACEMENTS.defuse);
+    harness.port.ads[0].emit({
+      type: "error",
+      code: "fullscreen",
+      message: "ad unit unit/defuse could not be presented",
+    });
+    await result;
+
+    expect(JSON.stringify(reporter.reports)).not.toContain("unit/defuse");
   });
 });
 
@@ -312,6 +332,88 @@ describe("gating", () => {
     });
 
     expect(await harness.service.showRewarded(REWARD_PLACEMENTS.freeze)).toBe("unavailable");
+    expect(harness.port.ads).toHaveLength(0);
+  });
+});
+
+describe("consent withdrawn mid-flight", () => {
+  it("does not present an ad loaded before consent was withdrawn", async () => {
+    const harness = createHarness();
+    const { result } = await startShow(harness, REWARD_PLACEMENTS.freeze);
+
+    // The gate closes while the load is still in flight.
+    harness.service.setAdsAllowed(false);
+    harness.port.ads[0].emit({ type: "loaded" });
+
+    expect(await result).toBe("unavailable");
+    expect(harness.port.ads[0].showCalls).toBe(0);
+    expect(harness.port.ads[0].destroyed).toBe(true);
+  });
+
+  it("drops a preloaded ad when consent is withdrawn", async () => {
+    const harness = createHarness();
+    await harness.service.preloadRewarded(REWARD_PLACEMENTS.revive);
+    harness.port.ads[0].emit({ type: "loaded" });
+    expect(harness.port.ads[0].destroyed).toBe(false);
+
+    harness.service.setAdsAllowed(false);
+
+    // Inventory requested under a permission that no longer holds is released,
+    // listeners and all, rather than left sitting ready for reuse.
+    expect(harness.port.ads[0].destroyed).toBe(true);
+    expect(harness.port.ads[0].listenerCount()).toBe(0);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it("settles a request that was waiting on a load when the gate closes", async () => {
+    const harness = createHarness();
+    const { result } = await startShow(harness, REWARD_PLACEMENTS.defuse);
+
+    harness.service.setAdsAllowed(false);
+
+    expect(await result).toBe("unavailable");
+  });
+
+  it("leaves an ad that is already on screen to finish", async () => {
+    const harness = createHarness();
+    const { result } = await showUntilPresented(harness, REWARD_PLACEMENTS.freeze);
+
+    // The user is watching it and it was requested legitimately.
+    harness.service.setAdsAllowed(false);
+    harness.port.ads[0].emit({ type: "earned" });
+    harness.port.ads[0].emit({ type: "closed" });
+
+    expect(await result).toBe("earned");
+  });
+
+  it("does not re-preload after a presentation once consent is withdrawn", async () => {
+    const harness = createHarness();
+    const { result } = await showUntilPresented(harness, REWARD_PLACEMENTS.freeze);
+    harness.service.setAdsAllowed(false);
+    harness.port.ads[0].emit({ type: "earned" });
+    harness.port.ads[0].emit({ type: "closed" });
+    await result;
+    await tick();
+
+    expect(harness.port.ads).toHaveLength(1);
+  });
+
+  it("re-checks the gate after initialization", async () => {
+    let releaseInit: (() => void) | null = null;
+    const harness = createHarness({
+      ensureInitialized: () =>
+        new Promise<void>((resolve) => {
+          releaseInit = resolve;
+        }),
+    });
+    const request = harness.service.showRewarded(REWARD_PLACEMENTS.revive);
+    await tick();
+
+    harness.service.setAdsAllowed(false);
+    releaseInit!();
+
+    expect(await request).toBe("unavailable");
+    // Nothing was ever created: the gate was re-read after the await.
     expect(harness.port.ads).toHaveLength(0);
   });
 });
