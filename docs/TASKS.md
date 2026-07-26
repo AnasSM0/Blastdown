@@ -1327,7 +1327,7 @@ before/after comparison approved. Then Phase 2 (motion polish), Phase 3
       confirmation, per-run caps, analytics and outcome feedback untouched.
 - [x] **6B-7 Consent and reward safety tests** — done 2026-07-26. 68 new tests
       across six files, all against injected ports or the SDK stub. Full suite
-      99 suites / 688 tests green under `randomize: true`, run twice. Commits
+      99 suites / 687 tests green under `randomize: true`, run twice. Commits
       `test(ads): guard consent and reward safety`,
       `fix(ads): close consent gaps found by the integration audit` and
       `test(ads): cover the ad SDK translation layers`.

@@ -1669,3 +1669,18 @@ catch upstream drift.
 `__tests__/integration/adsSdkUnavailable.test.tsx` reproduces a missing native
 module and asserts the app renders and stays playable — the check that should
 have existed before the SDK was ever wired into the root layout.
+
+**Catching the throw was not enough (2026-07-26, same day).** The first attempt
+at the above wrapped the `require` in a try/catch. The app still showed an
+`Invariant Violation` on every launch: React Native surfaces the error in
+development whether or not it is caught, and the failing module was
+`RNGoogleMobileAdsModule` rather than the consent one — the package's entry
+point loads eight spec modules and every one calls `getEnforcing` eagerly, so
+any single missing module breaks the import.
+
+`adsSdk.ts` now probes all eight with `TurboModuleRegistry.get`, the
+non-throwing variant, and requires the package only when every one is present.
+The distinction is the lesson: **handling an exception is not the same as not
+raising one**, and in React Native the difference is visible to the user. The
+guard test asserts the package factory is never invoked, not merely that no
+error escapes.

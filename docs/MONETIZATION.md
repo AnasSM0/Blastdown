@@ -537,7 +537,7 @@ release 1 carries them at all is still an open owner decision (§7).
 ## 9.8 Verification
 
 - `npm run typecheck`, `npm run lint`, `npm run format:check` — clean.
-- Full suite green, twice: 99 suites / 688 tests, with `randomize: true`
+- Full suite green, twice: 99 suites / 687 tests, with `randomize: true`
   shuffling order within every file.
 - `npx expo config --type public` evaluates with both new plugins.
 - `npx expo prebuild --platform android` produces the expected manifest and
@@ -587,8 +587,17 @@ suite was checking, but said nothing about the _runtime_. That is the gap: the
 invariant "gameplay never depends on ads" was documented and believed, and was
 not actually true.
 
-The fix is `src/services/ads/adsSdk.ts`: one lazy, memoized, try/catch-guarded
-`require`. Absent SDK now means no ads and nothing else —
+The first fix — a lazy, try/catch-guarded `require` — was not enough. Catching
+the throw does not stop React Native surfacing an `Invariant Violation` in
+development, so a build without ads still showed a red error on every launch,
+and the real failing module turned out to be `RNGoogleMobileAdsModule` (the
+package's entry point loads **eight** spec modules, every one of them calling
+`getEnforcing` eagerly, so a single missing module breaks the import).
+
+`src/services/ads/adsSdk.ts` therefore does not catch the throw — it avoids
+causing one. `TurboModuleRegistry.get` is the non-throwing variant, so all eight
+native modules are probed first and the package is required only when every one
+is present. Absent SDK now means no ads, silently, and nothing else —
 
 - `createUmpConsentPort()` and `createGoogleRewardedAdPort()` construct without
   touching the SDK (both are built during render in `app/_layout.tsx`, which is

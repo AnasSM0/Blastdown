@@ -9,30 +9,39 @@ import {
 } from "../../src/services/diagnostics/reportError";
 
 /** Expo Go, and any development build made before the ad SDK was autolinked,
- *  have no Google Mobile Ads native module. The package cannot even be imported
- *  there: its entry point pulls in a module that calls
- *  `TurboModuleRegistry.getEnforcing(...)` while loading, which throws.
+ *  have no Google Mobile Ads native modules. The package cannot be imported
+ *  there at all: its entry point loads eight spec modules, each of which calls
+ *  `TurboModuleRegistry.getEnforcing(...)` while loading, and that throws.
  *
- *  This suite is the guard for the regression that caused it — the root layout
- *  imported the SDK at module scope, so the whole app crashed on startup before
- *  a single screen rendered. Gameplay must never depend on ads. */
+ *  This suite guards the regression that caused: the root layout reached the
+ *  SDK during render, so the app raised an `Invariant Violation` on every
+ *  launch. Gameplay must never depend on ads.
+ *
+ *  The jest environment registers none of those native modules, so it is
+ *  naturally the "SDK absent" case — no mocking is needed to reach it. */
+
+/** A factory that fails the test if it is ever called. The package must not be
+ *  required when the native modules are missing; catching the throw is not
+ *  enough, because React Native surfaces it in development regardless. */
+const packageFactory = jest.fn(() => {
+  throw new Error("react-native-google-mobile-ads must not be required without its native modules");
+});
 
 function loadModulesWithoutSdk() {
   let modules!: {
+    hasAdsNativeModules: typeof import("../../src/services/ads/adsSdk").hasAdsNativeModules;
     isAdsSdkAvailable: typeof import("../../src/services/ads/adsSdk").isAdsSdkAvailable;
     createUmpConsentPort: typeof import("../../src/services/consent/UmpConsentPort").createUmpConsentPort;
     createGoogleRewardedAdPort: typeof import("../../src/services/ads/GoogleRewardedAdPort").createGoogleRewardedAdPort;
     initializeMobileAdsOnce: typeof import("../../src/services/ads/mobileAdsRuntime").initializeMobileAdsOnce;
   };
   jest.isolateModules(() => {
-    // Exactly what the real package does when the native module is missing.
-    jest.doMock("react-native-google-mobile-ads", () => {
-      throw new Error("TurboModuleRegistry.getEnforcing(...): 'RNGoogleMobileAdsConsentModule'");
-    });
+    jest.doMock("react-native-google-mobile-ads", packageFactory);
     // `require` is required here: the modules must be loaded *after* doMock,
     // inside the isolated registry, which a static import cannot do.
     /* eslint-disable @typescript-eslint/no-require-imports */
     modules = {
+      hasAdsNativeModules: require("../../src/services/ads/adsSdk").hasAdsNativeModules,
       isAdsSdkAvailable: require("../../src/services/ads/adsSdk").isAdsSdkAvailable,
       createUmpConsentPort: require("../../src/services/consent/UmpConsentPort")
         .createUmpConsentPort,
@@ -60,6 +69,7 @@ function ConsentProbe() {
 let reporter = createMemoryErrorReporter();
 
 beforeEach(() => {
+  packageFactory.mockClear();
   reporter = createMemoryErrorReporter();
   setActiveErrorReporter(reporter);
 });
@@ -69,27 +79,30 @@ afterEach(() => {
   jest.dontMock("react-native-google-mobile-ads");
 });
 
-describe("no Google Mobile Ads native module", () => {
-  it("reports the SDK as unavailable instead of throwing on import", () => {
-    const { isAdsSdkAvailable } = loadModulesWithoutSdk();
+describe("no Google Mobile Ads native modules", () => {
+  it("detects the missing native modules without importing the package", () => {
+    const { hasAdsNativeModules, isAdsSdkAvailable } = loadModulesWithoutSdk();
+
+    expect(hasAdsNativeModules()).toBe(false);
     expect(isAdsSdkAvailable()).toBe(false);
+    // The important half: the package was never required, so nothing threw and
+    // no `Invariant Violation` reached the user.
+    expect(packageFactory).not.toHaveBeenCalled();
   });
 
-  it("constructs the consent port without touching the SDK", () => {
-    const { createUmpConsentPort } = loadModulesWithoutSdk();
-    // Constructing must be safe even here -- app/_layout.tsx does it during
-    // render, which is precisely where the crash used to happen.
+  it("constructs both ports without touching the SDK", () => {
+    const { createUmpConsentPort, createGoogleRewardedAdPort } = loadModulesWithoutSdk();
+    // Both are constructed during render in app/_layout.tsx, which is precisely
+    // where the crash used to happen.
     expect(() => createUmpConsentPort()).not.toThrow();
-  });
-
-  it("constructs the rewarded port without touching the SDK", () => {
-    const { createGoogleRewardedAdPort } = loadModulesWithoutSdk();
     expect(() => createGoogleRewardedAdPort()).not.toThrow();
+    expect(packageFactory).not.toHaveBeenCalled();
   });
 
   it("rejects a consent request with an explanation rather than crashing", async () => {
     const { createUmpConsentPort } = loadModulesWithoutSdk();
     await expect(createUmpConsentPort().gather()).rejects.toThrow(/development build/i);
+    expect(packageFactory).not.toHaveBeenCalled();
   });
 
   it("rejects SDK initialization with an explanation", async () => {
