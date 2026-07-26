@@ -5,7 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { useMemo } from "react";
 
-import { AdServiceProvider } from "../src/services/ads";
+import { AdsRuntimeProvider } from "../src/services/ads/AdsRuntimeProvider";
 import { initializeMobileAdsOnce } from "../src/services/ads/mobileAdsRuntime";
 import { AnalyticsServiceProvider } from "../src/services/analytics";
 import { ConsentProvider } from "../src/services/consent";
@@ -47,7 +47,7 @@ export default function RootLayout() {
                             tree: the game is fully offline, so a pending or
                             failed consent request must leave it playable. */}
                         <ConsentProvider port={consentPort} initializeAds={initializeMobileAdsOnce}>
-                          <AdServiceProvider>
+                          <AdsRuntimeProvider>
                             <GameSessionProvider>
                               <AnalyticsSessionTracker />
                               <Stack
@@ -56,7 +56,7 @@ export default function RootLayout() {
                                 }}
                               />
                             </GameSessionProvider>
-                          </AdServiceProvider>
+                          </AdsRuntimeProvider>
                         </ConsentProvider>
                       </AudioServiceProvider>
                     </ThemeProvider>

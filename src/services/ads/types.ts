@@ -27,4 +27,14 @@ export interface AdService {
   showRewarded(placement: RewardedPlacement): Promise<RewardedResult>;
   preloadInterstitial(): Promise<void>;
   showInterstitial(): Promise<InterstitialResult>;
+  /** Whether ads may be requested at all, as decided by the consent lifecycle.
+   *  Pushed in rather than read out so the service holds no reference to the
+   *  consent seam. Optional: an implementation with no real ad network (the
+   *  mock) is never gated. */
+  setAdsAllowed?(allowed: boolean): void;
+  /** Release listeners, timers and any loaded ad instance, and settle anything
+   *  a caller is still awaiting. Optional: an implementation holding no native
+   *  resources (the mock) has nothing to release. Called when the provider that
+   *  owns the service unmounts. */
+  dispose?(): void;
 }
