@@ -378,3 +378,188 @@ they are supplied.
    against real tracked counters.
 
 Nothing in steps 2–8 begins until step 1 is answered.
+
+# Phase 6B implementation — production ads and consent (2026-07-26)
+
+Built on branch `phase-6b-production-ads-consent`, on top of the audit above.
+Google test configuration only: **no production ad unit id is present anywhere
+in this repository, and none may be added until §6 is answered.**
+
+Sections 1–8 above are the audit as written on 2026-07-25. Where implementation
+settled something the audit left open, it is corrected in §9.7 rather than
+edited in place.
+
+## 9.1 What shipped
+
+| Area                | Files                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Build configuration | `app.config.ts`, `expo-build-properties@57.0.7`                                                                                      |
+| Ad configuration    | `src/config/ads.ts`                                                                                                                  |
+| Consent lifecycle   | `src/services/consent/*`, `src/config/consent.ts`                                                                                    |
+| Rewarded provider   | `src/services/ads/rewardedPort.ts`, `GoogleRewardedAdPort.ts`, `GoogleAdService.ts`, `AdsRuntimeProvider.tsx`, `mobileAdsRuntime.ts` |
+| Wiring              | `app/_layout.tsx`, `app/settings.tsx`, `src/components/SettingsScreen/SettingsView.tsx`                                              |
+| Tests               | `adConfig.test.ts`, `googleAdService.test.ts`, `consentLifecycle.test.tsx`, `privacyOptions.test.tsx`, `adsRuntime.test.tsx`         |
+
+## 9.2 Configuration
+
+Ad unit ids are resolved in exactly one place, `src/config/ads.ts`. Screens
+reference `REWARD_PLACEMENTS`; no component, analytics event or diagnostic ever
+sees an id (asserted by a test).
+
+- Development and preview resolve to Google's rewarded test unit for all four
+  placements **even when production variables are set** — a dev build cannot
+  request live inventory by accident.
+- Production reads `EXPO_PUBLIC_ADMOB_REWARDED_FREEZE`, `_DEFUSE`, `_REVIVE` and
+  `_DOUBLE_BOLTS`, with `EXPO_PUBLIC_ADMOB_REWARDED_DEFAULT` as a shared
+  fallback, and leaves a placement **unmapped** when its id is missing or is
+  still a test unit. An unmapped placement reports `unavailable` and is never
+  requested.
+- A production build fails on the build machine when any unit is missing or is a
+  test unit, mirroring the existing app-id guard. The runtime deliberately does
+  not throw: a shipped app degrades to "ads unavailable" rather than crashing.
+
+`app.config.ts` cannot import from `src/` — Expo transpiles only the config entry
+file — so the guard exists twice. `__tests__/domain/adConfig.test.ts` runs both
+copies over the same fixture matrix and asserts they agree.
+
+## 9.3 Native build
+
+- `expo-build-properties@57.0.7` added for one reason: the UMP release ProGuard
+  rule `-keep class com.google.android.gms.internal.consent_sdk.** { *; }`.
+  There is no other Expo-config route to a ProGuard rule.
+- `delayAppMeasurementInit: true` on the RNGMA plugin, so app-measurement does
+  not start collecting before a consent decision exists.
+- Verified against a local `expo prebuild --platform android`: the keep rule
+  lands in the generated `proguard-rules.pro`, and the manifest carries the four
+  RNGMA `meta-data` entries with `DELAY_APP_MEASUREMENT_INIT=true`. The
+  generated `android/` directory was removed afterwards — the project stays
+  CNG-managed.
+- `com.google.android.gms.permission.AD_ID` is **not** declared by us and must
+  not be. It is merged in from `play-services-ads` at Gradle merge time. It still
+  has to be declared in Play's Data safety form, and stripped with
+  `tools:node="remove"` if the app turns out to be child-directed (§5.2).
+
+## 9.4 Consent lifecycle
+
+Full behaviour in `docs/PRIVACY.md`. Design points worth recording here:
+
+- `ConsentPort` is the seam; `UmpConsentPort` is the only consent module that
+  imports the ad SDK, and it is deliberately **not** re-exported from the
+  barrel. `app/_layout.tsx` constructs it. Everything else — lifecycle,
+  Settings, every test — runs with no native module present.
+- The provider never gates its children. Gameplay is offline; a pending,
+  refused or failed consent request means ads are unavailable and nothing else.
+- Consent is never persisted by us. UMP owns it.
+- `canRequestAds` is read from UMP, never re-derived from the consent status.
+- SDK initialization is guarded by a flag set before the await, so the launch
+  gather, a development refresh and a return from the privacy form cannot race
+  into two initializations; `initializeMobileAdsOnce` memoizes as well,
+  including on rejection.
+- Debug geography, test devices and the consent reset are development-build only,
+  gated on `EXPO_PUBLIC_APP_ENV` — a build gate, not a runtime toggle.
+- `tagForUnderAgeOfConsent` is never set, pending the audience decision.
+
+## 9.5 Rewarded provider
+
+`RewardedAdPort` reduces a rewarded ad to four events (loaded / earned / closed /
+error). `GoogleRewardedAdPort` is the only ads module that imports the SDK and
+carries no policy at all; every rule lives in `GoogleAdService`, which is
+therefore fully testable against a fake port.
+
+Reward safety, enforced in the service rather than at the four call sites:
+
+- Only the SDK's earned-reward event produces `earned`. Close, load failure,
+  show failure, timeout, missing ad unit and outstanding consent all resolve to
+  a non-earning outcome.
+- A presentation resolves exactly once — every path into the resolver passes a
+  `settled` guard.
+- A close with no reward yet holds a short grace window for a late earned event
+  (the SDK does not contractually order the two) rather than dropping a reward
+  the player earned. The once-only guard still holds.
+- A presentation error _after_ earning keeps the reward.
+- One ad on screen at a time across all placements; the gate is set
+  synchronously, so two calls in the same tick cannot both pass. This layers
+  under the pre-existing single-flight guard in `useRewardedAction`.
+- Nothing here touches gameplay. The service returns a result; the caller applies
+  the domain change, and only on `earned`.
+
+Lifecycle: a rewarded ad is single-use, so the instance is released after every
+presentation and every failure — a stale ad is never shown twice. The next ad is
+preloaded once the slot frees, never while consent is outstanding. `dispose()`
+settles anything a caller is still awaiting and drops every listener and timer,
+so an unmount mid-presentation cannot leave a promise hanging.
+
+Failure mapping is deliberate: no-fill, network error and load timeout are
+`unavailable` — normal, quiet, no retry prompt, because this game is playable
+entirely offline — while a refused presentation is `error`. Richer internal
+reasons go to diagnostics with enumerated values only.
+
+The consent gate is **pushed into** the service (`setAdsAllowed`) rather than
+read out of it, so the ads seam holds no reference to the consent seam and a
+mid-session decision takes effect on the next request without rebuilding the
+service and discarding a preloaded ad.
+
+## 9.6 Placements
+
+All four wire through the existing seams unchanged: `app/game.tsx` freeze,
+defuse and revive, `app/results.tsx` double Bolts. Eligibility guards,
+confirmation dialog, per-run caps, analytics offer/result events, outcome
+feedback and diagnostics are untouched — only what `AdService` resolves to has
+changed. `rewarded_repair_blast` stays unmapped (post-MVP, BUILD_SPEC §6.18).
+
+Interstitials report `unavailable`. No ad unit, no frequency policy, and whether
+release 1 carries them at all is still an open owner decision (§7).
+
+## 9.7 Corrections to the audit above
+
+- **§5.5 / §7 — `expo-build-properties`.** Now installed (57.0.7), for the
+  ProGuard rule rather than for SDK levels.
+- **§5.5 — SDK levels.** Settled from `ExpoRootProjectPlugin.kt`: Expo SDK 57
+  resolves `minSdk 24`, `compileSdk 35`, `targetSdk 35`. The ad SDK declares
+  `minSdk 23`, so no override is needed. The audit's "must be confirmed at first
+  prebuild" is discharged.
+- **R8 is currently off.** `android.enableMinifyInReleaseBuilds` is unset, so the
+  UMP keep rule is inert today. It is in place so that enabling minification
+  later cannot silently break the consent form — a failure that appears only in
+  a release build, only on device.
+- **Adapter boundary.** The audit proposed a single `GoogleAdService.ts` with a
+  lazy `require`. Implementation split it into a port plus an adapter, and kept
+  the SDK out of both barrels instead of requiring lazily. Same guarantee — no
+  test and no Expo Go path loads native code — with a testable state machine.
+- **The dependency was already installed.** `react-native-google-mobile-ads@16.4.0`
+  has been a committed dependency since Phase 0 and the Expo plugin was already
+  wired in `app.config.ts`; only the JS adapter was missing. The Phase 6B brief
+  stated otherwise.
+
+## 9.8 Verification
+
+- `npm run typecheck`, `npm run lint`, `npm run format:check` — clean.
+- Full suite green, twice: 98 suites / 679 tests, with `randomize: true`
+  shuffling order within every file.
+- `npx expo config --type public` evaluates with both new plugins.
+- `npx expo prebuild --platform android` produces the expected manifest and
+  ProGuard output (see §9.3).
+- `npx expo export --platform android` exits 0.
+- `npx expo-doctor` 19/20 — the one failure is the pre-existing upstream Expo
+  patch-version drift, unchanged by this work; `expo-build-properties@57.0.7`
+  is not among the mismatched packages.
+- A read-only Codex integration audit of the diff found three real defects
+  (consent re-checking across awaits, inventory left alive on withdrawal, raw
+  SDK error text in diagnostics). All three are fixed and covered — see
+  `docs/DECISIONS.md`.
+- **Device validation is the owner's.** This build machine has no Android
+  device, no Android SDK and no JDK. The checklist is in `docs/TEST_ADS.md`;
+  results will be recorded, never fabricated.
+
+## 9.9 Still blocked on the owner
+
+Unchanged from §6, and now the only thing between this and a real ad:
+
+- Audience: general, mixed, or child-directed — gates the native build.
+- Production Android AdMob app id.
+- Production rewarded ad unit id(s).
+- Privacy-policy URL.
+- Play Console: Ads, Advertising ID and Data safety declarations.
+- Published AdMob GDPR consent message (nothing can show a form without it).
+- UMP test-device identifier, read from the physical device.
+- Whether interstitials ship in release 1.

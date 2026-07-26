@@ -1473,3 +1473,142 @@ captured or fabricated here. The `RubbleSurface` clip change and the board shake
 during an explosion — the two hazards that only hardware could settle — are
 confirmed good. Phase 3 merged to master and tagged `v0.9-ui-event-effects`, and
 Phase 6B (production ads/consent) is unpaused as of this entry.
+
+## Phase 6B — production ads and consent (2026-07-26)
+
+**The ad SDK lives behind two ports, and neither is in a barrel.**
+`UmpConsentPort` and `GoogleRewardedAdPort` are the only modules that import
+`react-native-google-mobile-ads`, and both are deliberately excluded from
+`src/services/consent/index.ts` and `src/services/ads/index.ts`. `app/_layout.tsx`
+imports them directly. The audit had proposed a lazy `require` inside a single
+adapter instead; ports turned out better, because they also make the reward state
+machine testable without a native module rather than merely importable. The
+consequence is a rule worth stating: **adding a consent or ads export to a barrel
+can silently pull the native SDK into every consumer**, including Expo Go and the
+whole test suite. `jest.setup.js` stubs the package as a backstop, and every call
+in the stub rejects, so reaching the real SDK from a test is loud rather than
+silent.
+
+**Reward safety lives in the service, not at the call sites.** The four
+placements were already correct — single-flight, once-only `onEarned`, mutation
+behind a domain precondition, success reported only when the mutation applied —
+and none of that changed. What changed is what sits underneath: a reward is
+produced only by the SDK's earned-reward event, and every path into the
+resolver passes a `settled` guard, so no sequence of SDK events can grant twice.
+
+One case needed a deliberate decision. The Android SDK normally emits
+`EARNED_REWARD` before `CLOSED`, but that order is not contractual, and resolving
+on `CLOSED` alone would silently drop a reward the player genuinely earned. A
+close with no reward yet therefore holds a short grace window (400 ms, in
+`src/config/ads.ts`) for a late earned event. The alternative — resolving on
+`EARNED_REWARD` immediately — was rejected because it mutates game state while
+the ad is still on screen, and because it leaves the concurrency gate open early.
+
+**Failures map down to `unavailable` by default, not `error`.** No-fill, network
+error and load timeout are ordinary conditions for a game that is playable
+entirely offline; surfacing them as errors would train players to distrust a
+button that is working correctly. Only a refused presentation maps to `error`.
+The service tracks richer internal reasons and sends them to diagnostics, with
+enumerated values only — a test asserts no diagnostic ever carries an ad unit id.
+
+**The consent gate is pushed into the ad service, not read out of it.**
+`setAdsAllowed` rather than a `canRequestAds` callback. Two reasons. The ads seam
+then holds no reference to the consent seam at all. And the React Compiler lint
+rules in this project forbid both reading a ref during render and mutating a
+memoized value, so the "closure over a mutable box" pattern is not available —
+the setter is the honest form of the same thing. The service is built once for
+the life of the provider: rebuilding it on a consent change would drop a
+preloaded ad and orphan an in-flight presentation.
+
+**Consent is never persisted by us.** UMP owns the decision. A copy in our
+storage would go stale the moment the user changed their mind in the privacy
+options form, and the stale copy would then be the one gating ads. Related:
+`canRequestAds` is read from UMP rather than re-derived from the consent status,
+because the two can legitimately disagree and UMP's answer is the one that
+governs the request.
+
+**Consent never gates gameplay.** `ConsentProvider` always renders its children.
+The game is entirely offline; a pending, refused or failed consent request means
+ads are unavailable and nothing else. This is asserted by a test rather than left
+as an intention.
+
+**Debug tooling is gated on the build environment, not a runtime toggle.**
+Forced debug geography, registered test devices and the consent reset are
+available only when `EXPO_PUBLIC_APP_ENV === "development"`. A runtime flag could
+be reached in a shipped build; a build-environment gate cannot.
+`tagForUnderAgeOfConsent` is never set at all — it depends on the owner's
+audience decision, and a wrong answer is a compliance failure in both
+directions. A test asserts the tag is absent while that decision stands open.
+
+**The production ad configuration guard exists twice, on purpose.**
+`app.config.ts` cannot import from `src/` — Expo transpiles only the config entry
+file, not its relative TypeScript imports — so the "every rewarded unit must be
+present and must not be a Google test unit" rule is written in both places.
+`__tests__/domain/adConfig.test.ts` runs both copies over the same fixture matrix
+and fails if they diverge. Duplication with a drift test beat the alternatives
+(a shared `.js` file needing `allowJs`, or a build-time-only check with no
+runtime counterpart).
+
+The guard throws at **build** time and degrades at **runtime**: a misconfigured
+release never leaves the build machine, but a shipped app with a missing unit
+reports "ads unavailable" rather than crashing. Development and preview resolve
+to Google's test unit for all four placements _even when production variables are
+set_, so a development build cannot request live inventory by accident.
+
+**`expo-build-properties` was added for one line.** The UMP release ProGuard rule
+`-keep class com.google.android.gms.internal.consent_sdk.** { *; }` has no other
+route through Expo config. It is currently inert —
+`android.enableMinifyInReleaseBuilds` is unset, so R8 is off for release builds —
+and that is precisely why it went in now: enabling minification later would
+otherwise break the consent form in a way that appears only in a release build,
+only on device, and only as "the form never shows".
+
+**Prebuild was used as a verification tool, then thrown away.** A local
+`expo prebuild --platform android` confirmed the ProGuard rule and the four RNGMA
+manifest `meta-data` entries, and settled the SDK levels the audit had left open
+(Expo SDK 57 resolves `minSdk 24` / `compileSdk 35` / `targetSdk 35`, against the
+ad SDK's declared `minSdk 23`). The generated `android/` directory was then
+removed and the `expo run:*` script rewrite prebuild made to `package.json` was
+reverted — the project stays CNG-managed.
+
+`com.google.android.gms.permission.AD_ID` is deliberately **not** declared by us.
+It is merged in from `play-services-ads` at Gradle merge time; writing it into
+`app.config.ts` would duplicate a permission we do not own. It still has to be
+declared in Play's Data safety form, and stripped with `tools:node="remove"` if
+the app turns out to be child-directed — which is why the audience answer gates
+the native build rather than a runtime flag.
+
+**Interstitials report `unavailable` rather than being left unimplemented.**
+`showInterstitial`/`preloadInterstitial` are on the shared interface and have to
+return something. There is no ad unit, no frequency policy, and no tracked
+lifetime-run or session-timing counters to gate them with, and whether release 1
+carries interstitials at all is still an open owner decision. Reporting
+`unavailable` is the honest answer and callers already treat it as a quiet no-op.
+
+**A correction to the brief.** The Phase 6B brief stated that no ads dependency
+was installed. `react-native-google-mobile-ads@16.4.0` has in fact been a
+committed dependency since Phase 0, and the Expo config plugin was already wired
+in `app.config.ts` with Google's sample app ids and a production guard. Only the
+JS adapter and the consent lifecycle were missing. Nothing was reinstalled.
+
+**Device validation remains the owner's.** This machine has no Android device, no
+Android SDK and no JDK, so no native build and no on-device ad behaviour can be
+verified here. The checklist is in `docs/TEST_ADS.md`. Results will be recorded
+when they arrive and never fabricated — the same rule Phase 3 was held to.
+
+**The integration audit earned its keep.** A read-only Codex pass over the
+Phase 6B diff found three real defects that the tests as written could not have
+caught. Consent was read once at the top of `showRewarded` and never again, so a
+withdrawal during SDK initialization or during a load — seconds, on a slow
+network — could still present an ad. Withdrawing consent left loaded and loading
+ad instances resident with their listeners attached, reusable under a permission
+the user had revoked. And raw SDK error text was forwarded to diagnostics, where
+Google's own ad error strings sometimes name the ad unit; the existing "no ad
+unit id in a diagnostic" test used a message that could not have detected it.
+
+All three are fixed: the gate is re-read after every await, `setAdsAllowed(false)`
+releases every non-showing slot and settles anything waiting on a load, and every
+ad diagnostic now carries a fixed message plus the normalized error code. An ad
+already on screen when consent is withdrawn is deliberately left to finish — the
+user is watching it and it was requested legitimately. The pattern generalizes:
+**a permission check before an await is not a permission check.**

@@ -1224,7 +1224,7 @@ before/after comparison approved. Then Phase 2 (motion polish), Phase 3
   - Merged to master and tagged `v0.9-ui-event-effects` on the strength of that
     pass. Phase 6B (production ads/consent) may now begin.
 
-## Phase 6B — Production advertisements and consent (audit only, unpaused)
+## Phase 6B — Production advertisements and consent
 
 - [x] **6B-0 Audit and owner-input gate** — done 2026-07-25 (branch
       `phase-6b-production-ads-consent`). Read-only audit of the ad seam, the
@@ -1259,11 +1259,94 @@ before/after comparison approved. Then Phase 2 (motion polish), Phase 3
     the existing `AdService` unchanged, plus one provider line in
     `app/_layout.tsx`. The mock stays the default and the SDK is required
     lazily, so tests and Expo Go never load native code.
-- [ ] **6B-1 …onward: BLOCKED on owner inputs.** AdMob Android app id, rewarded
-      ad-unit ids, privacy-policy URL, the child-directed/audience decision,
-      Play Console configuration, AdMob↔Play linkage, a published AdMob GDPR
-      consent message, the UMP test-device identifier, and the iOS scope answer.
-      Also needs an explicit decision on whether interstitials ship in the first
-      release or are deferred (rewarded-only is the lower-risk default).
-      Do not install dependencies or add production ad ids until these are
-      answered — see `docs/MONETIZATION.md` §5, §6 and §7.
+- [x] **6B-1 Native ads and consent build configuration** — done 2026-07-26.
+      `expo-build-properties@57.0.7` added for one purpose: the UMP release
+      ProGuard rule (`-keep class com.google.android.gms.internal.consent_sdk.**`).
+      R8 strips the consent SDK's reflected classes, which fails only in a
+      minified release build, only on device, and shows up as a consent form
+      that never appears. `delayAppMeasurementInit: true` added so
+      app-measurement does not start collecting before a consent decision
+      exists. Verified against a local `expo prebuild --platform android` —
+      keep rule in the generated `proguard-rules.pro`, four RNGMA `meta-data`
+      entries in the manifest with `DELAY_APP_MEASUREMENT_INIT=true` — then the
+      generated `android/` directory removed so the project stays CNG-managed.
+      SDK levels settled from `ExpoRootProjectPlugin.kt`: Expo SDK 57 resolves
+      `minSdk 24` / `compileSdk 35` / `targetSdk 35`, so the ad SDK's `minSdk 23`
+      needs no override. `AD_ID` deliberately **not** declared: it is merged in
+      from `play-services-ads`, and duplicating it would be wrong.
+      Commit `build(ads): configure mobile ads native integration`.
+- [x] **6B-2 Ad unit configuration and production guard** — done 2026-07-26.
+      `src/config/ads.ts` is the single place any ad unit id is read. Development
+      and preview resolve to Google's rewarded test unit for all four placements
+      even when production variables are set; production reads per-placement
+      variables with a shared fallback and leaves a placement **unmapped** when
+      its id is missing or is still a test unit, so the service reports it
+      `unavailable` rather than requesting against a bad unit. A production build
+      fails on the build machine when any unit is missing or is a test unit. The
+      rule exists twice — `app.config.ts` cannot import from `src/`, since Expo
+      transpiles only the config entry file — and `adConfig.test.ts` asserts the
+      two copies agree over a fixture matrix.
+- [x] **6B-3 UMP consent lifecycle** — done 2026-07-26. Request fresh consent
+      information, show a form only when UMP says one is required, read
+      `canRequestAds`, then initialize Mobile Ads once ever and only if allowed.
+      `ConsentPort` is the seam; `UmpConsentPort` is the only consent module that
+      touches the SDK and is deliberately absent from the barrel, so the
+      lifecycle, Settings and every test run with no native module present. The
+      provider never gates its children — gameplay is offline and must stay
+      playable through a pending, refused or failed consent request. Consent is
+      never persisted by us; UMP owns it. `canRequestAds` is read from UMP, never
+      re-derived from the status. Commit `feat(consent): add UMP consent lifecycle`.
+- [x] **6B-4 Settings privacy options entry** — done 2026-07-26. Shown only when
+      UMP reports `privacyOptionsRequirement: "required"`, re-openable as often
+      as the user likes, and refusing to queue a second form while one is
+      presented. A development-only consent reset replays the first-install flow
+      on device. Forced debug geography, registered test devices and the reset
+      are all gated on `EXPO_PUBLIC_APP_ENV` — a build gate, not a runtime
+      toggle, so a forced geography cannot reach a shipped app.
+- [x] **6B-5 Production rewarded provider** — done 2026-07-26. `RewardedAdPort`
+      reduces a rewarded ad to four events; `GoogleRewardedAdPort` is the only
+      ads module importing the SDK and carries no policy; every rule lives in
+      `GoogleAdService`, which is therefore testable against a fake port. Rewards
+      come only from the earned-reward event and land exactly once; a close with
+      no reward yet holds a short grace window for a late earned event, since the
+      SDK does not contractually order the two; an error after earning keeps the
+      reward; one ad on screen at a time across all placements, gated
+      synchronously so two calls in one tick cannot both pass. Instances,
+      listeners and timers are released after every presentation and on
+      `dispose()`, which also settles anything still awaited. No-fill, network
+      error and timeout map to `unavailable` (quiet — the game is playable
+      offline); a refused presentation maps to `error`. Commit
+      `feat(ads): add production rewarded provider`.
+- [x] **6B-6 Provider swap and consent gate** — done 2026-07-26.
+      `AdsRuntimeProvider` replaces the bare `AdServiceProvider` in
+      `app/_layout.tsx`, builds the service once, pushes the consent gate in via
+      `setAdsAllowed` rather than letting the ads seam read the consent seam, and
+      disposes on unmount. The mock stays the default everywhere else.
+      All four placements — freeze, defuse, revive in `app/game.tsx`, double
+      Bolts in `app/results.tsx` — wire through unchanged: eligibility,
+      confirmation, per-run caps, analytics and outcome feedback untouched.
+- [x] **6B-7 Consent and reward safety tests** — done 2026-07-26. 68 new tests
+      across six files, all against injected ports or the SDK stub. Full suite
+      98 suites / 679 tests green under `randomize: true`, run twice. Commits
+      `test(ads): guard consent and reward safety`,
+      `fix(ads): close consent gaps found by the integration audit` and
+      `test(ads): cover the ad SDK translation layers`.
+- [x] **6B-8 Documentation** — done 2026-07-26. `docs/MONETIZATION.md` §9
+      (implementation record and corrections to the audit), new `docs/PRIVACY.md`
+      and `docs/TEST_ADS.md`, this section, and `docs/DECISIONS.md`.
+- [ ] **6B-9 Physical device validation with test ads** — OWNER. Checklist in
+      `docs/TEST_ADS.md`: forced EEA consent on first install, privacy-options
+      reopening, the Google test rewarded ad on all four placements, earned,
+      close-without-reward, airplane mode, background/resume, repeated rewards,
+      and the Phase 2/3 performance regression checks. Needs a physical Android
+      development build; this machine has no Android device, no Android SDK and
+      no JDK. Results will be recorded, never fabricated.
+- [ ] **6B-10 Production credentials and Play Console — BLOCKED on owner.**
+      Audience (general / mixed / child-directed — this gates the native build,
+      not just a runtime flag), production Android AdMob app id, production
+      rewarded ad-unit id(s), privacy-policy URL, Play Console Ads / Advertising
+      ID / Data safety declarations, a **published** AdMob GDPR consent message
+      (without it no form can appear however correct the code is), the UMP
+      test-device identifier read from the device, the iOS scope answer, and
+      whether interstitials ship in release 1. See `docs/MONETIZATION.md` §6, §7
+      and §9.9. No production id may be added until these are answered.
