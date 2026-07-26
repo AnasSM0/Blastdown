@@ -1636,3 +1636,36 @@ for the next successful refresh". There was no next refresh. Both replacement
 tests were confirmed to fail against the old code before being kept, which is
 the only thing that distinguishes a regression guard from a description of
 current behaviour.
+
+**The ad SDK cannot be imported at module scope (2026-07-26).** Found by running
+the app, not by a test: the game crashed on startup with an `ExpoRoot` stack as
+soon as `app/_layout.tsx` began importing `react-native-google-mobile-ads`.
+
+The package's entry point re-exports `AdsConsent`, which loads a module that
+calls `TurboModuleRegistry.getEnforcing('RNGoogleMobileAdsConsentModule')` at
+module scope. `getEnforcing` throws when the native module is absent, so the
+import alone kills the app in Expo Go and in any development build made before
+the SDK was autolinked. It had never mattered before, because until Phase 6B no
+JS in the app had ever imported the package.
+
+This is worth recording as a correction rather than a footnote. The Phase 6B
+audit proposed a lazy `require`, and the implementation replaced it with static
+imports plus ports, on the reasoning that keeping the SDK out of both barrels
+gave the same guarantee. It gave the same guarantee **for tests** — which is
+what the suite verified — and none at all **for the runtime**. The documented
+invariant "gameplay never depends on ads" was believed, asserted in three
+documents, and false. A structural argument about imports is not a substitute
+for running the thing.
+
+`src/services/ads/adsSdk.ts` now holds a single lazy, memoized, try/catch-guarded
+`require`. Both ports construct without touching the SDK; a consent request
+rejects with an explanation that the lifecycle already knows how to absorb; and
+`AdsRuntimeProvider` configures no ad units at all when the SDK is missing, so
+placements report `unavailable` and the rewarded port is never reached. The
+event and consent mappings moved to the SDK's wire values so they stay pure,
+with `adSdkMapping.test.ts` still driving them from the real enum members to
+catch upstream drift.
+
+`__tests__/integration/adsSdkUnavailable.test.tsx` reproduces a missing native
+module and asserts the app renders and stays playable — the check that should
+have existed before the SDK was ever wired into the root layout.

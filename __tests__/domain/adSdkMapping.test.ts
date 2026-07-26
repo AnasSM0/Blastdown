@@ -4,7 +4,6 @@ import {
   AdsConsentPrivacyOptionsRequirementStatus,
   AdsConsentStatus,
   RewardedAdEventType,
-  type AdsConsentInfo,
 } from "react-native-google-mobile-ads";
 
 import { toEvent } from "../../src/services/ads/GoogleRewardedAdPort";
@@ -17,11 +16,17 @@ import { toAdsConsentOptions, toConsentInfo } from "../../src/services/consent/U
  *  as "the reward never lands" or "the form never appears". These are the
  *  mappings themselves.
  *
- *  The SDK enums come from the stub in `jest.setup.js`, whose values mirror the
- *  package's published typings. */
+ *  The adapters match the SDK's *wire values* rather than importing its enums,
+ *  because the package cannot be imported when the native module is absent (see
+ *  `src/services/ads/adsSdk.ts`). This suite is what keeps the two in step: it
+ *  drives every mapping with the actual enum members, so a value that changes
+ *  upstream fails here rather than on a device. The enums come from the stub in
+ *  `jest.setup.js`, whose values mirror the package's published typings. */
+
+type RawInfo = Parameters<typeof toConsentInfo>[0];
 
 describe("consent info mapping", () => {
-  function info(overrides: Partial<AdsConsentInfo> = {}): AdsConsentInfo {
+  function info(overrides: Partial<RawInfo> = {}): RawInfo {
     return {
       status: AdsConsentStatus.NOT_REQUIRED,
       canRequestAds: true,
@@ -47,11 +52,7 @@ describe("consent info mapping", () => {
       [AdsConsentPrivacyOptionsRequirementStatus.NOT_REQUIRED]: "notRequired",
     };
     for (const [status, expected] of Object.entries(map)) {
-      const mapped = toConsentInfo(
-        info({
-          privacyOptionsRequirementStatus: status as AdsConsentPrivacyOptionsRequirementStatus,
-        }),
-      );
+      const mapped = toConsentInfo(info({ privacyOptionsRequirementStatus: status }));
       expect(mapped.privacyOptionsRequirement).toBe(expected);
     }
   });
@@ -59,11 +60,7 @@ describe("consent info mapping", () => {
   it("falls back to the conservative reading for an unrecognised enum value", () => {
     // An SDK that grows a new state must not break the launch path.
     const mapped = toConsentInfo(
-      info({
-        status: "SOMETHING_NEW" as AdsConsentStatus,
-        privacyOptionsRequirementStatus:
-          "SOMETHING_NEW" as AdsConsentPrivacyOptionsRequirementStatus,
-      }),
+      info({ status: "SOMETHING_NEW", privacyOptionsRequirementStatus: "SOMETHING_NEW" }),
     );
     expect(mapped.status).toBe("unknown");
     expect(mapped.privacyOptionsRequirement).toBe("unknown");

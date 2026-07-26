@@ -176,3 +176,18 @@ never infer them. Nothing here can be verified on the repository build machine.
    handling in the native build, not just a runtime flag.
 4. Play Console ads, Advertising ID and Data safety declarations match the
    merged manifest.
+
+## Running the app without an ad-enabled build
+
+Ads and consent require a **development build that includes the ad SDK**. They
+do not work in Expo Go, and a dev client built before Phase 6B has no Google
+Mobile Ads native module in it.
+
+Neither case breaks the game. The SDK is resolved lazily behind a guard, so a
+binary without it runs normally with ads switched off: the consent lifecycle
+reports a failure (visible once in diagnostics), every rewarded placement
+resolves `unavailable`, and gameplay is untouched.
+
+If ads appear to do nothing, check this first — a stale dev client is the usual
+explanation, and `npx expo start -c` alone will not fix it because the missing
+piece is native, not JS. Rebuild.

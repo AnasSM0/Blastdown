@@ -523,9 +523,12 @@ release 1 carries them at all is still an open owner decision (§7).
   later cannot silently break the consent form — a failure that appears only in
   a release build, only on device.
 - **Adapter boundary.** The audit proposed a single `GoogleAdService.ts` with a
-  lazy `require`. Implementation split it into a port plus an adapter, and kept
-  the SDK out of both barrels instead of requiring lazily. Same guarantee — no
-  test and no Expo Go path loads native code — with a testable state machine.
+  lazy `require`. Implementation split it into a port plus an adapter — which is
+  the right shape and made the reward state machine testable — but initially
+  dropped the lazy require in favour of static imports, on the mistaken belief
+  that keeping the SDK out of the barrels gave the same guarantee. It did not:
+  see §9.10. Both ports now resolve the SDK lazily, as the audit originally
+  said.
 - **The dependency was already installed.** `react-native-google-mobile-ads@16.4.0`
   has been a committed dependency since Phase 0 and the Expo plugin was already
   wired in `app.config.ts`; only the JS adapter was missing. The Phase 6B brief
@@ -534,7 +537,7 @@ release 1 carries them at all is still an open owner decision (§7).
 ## 9.8 Verification
 
 - `npm run typecheck`, `npm run lint`, `npm run format:check` — clean.
-- Full suite green, twice: 98 suites / 682 tests, with `randomize: true`
+- Full suite green, twice: 99 suites / 688 tests, with `randomize: true`
   shuffling order within every file.
 - `npx expo config --type public` evaluates with both new plugins.
 - `npx expo prebuild --platform android` produces the expected manifest and
@@ -563,3 +566,47 @@ Unchanged from §6, and now the only thing between this and a real ad:
 - Published AdMob GDPR consent message (nothing can show a form without it).
 - UMP test-device identifier, read from the physical device.
 - Whether interstitials ship in release 1.
+
+## 9.10 The ad SDK must never be imported at module scope
+
+Found at runtime, not by any test: the app crashed on startup with an
+`ExpoRoot`/`ContextNavigator` stack the moment `app/_layout.tsx` began importing
+the ad SDK.
+
+`react-native-google-mobile-ads`'s entry point re-exports `AdsConsent`, which
+pulls in a module that runs
+`TurboModuleRegistry.getEnforcing('RNGoogleMobileAdsConsentModule')` **while it
+loads**. `getEnforcing` throws when the native module is absent. So merely
+importing the package takes the whole app down before a single screen renders,
+in Expo Go and in any development build made before the ad SDK was autolinked.
+
+Nothing had noticed because until Phase 6B **no JS in the app had ever imported
+the package** — it was a dependency with a config plugin, never touched at
+runtime. The port structure kept the SDK out of the _tests_, which is what the
+suite was checking, but said nothing about the _runtime_. That is the gap: the
+invariant "gameplay never depends on ads" was documented and believed, and was
+not actually true.
+
+The fix is `src/services/ads/adsSdk.ts`: one lazy, memoized, try/catch-guarded
+`require`. Absent SDK now means no ads and nothing else —
+
+- `createUmpConsentPort()` and `createGoogleRewardedAdPort()` construct without
+  touching the SDK (both are built during render in `app/_layout.tsx`, which is
+  exactly where the crash was).
+- `ConsentPort.gather` rejects with an explanation; `ConsentProvider` treats it
+  as a lifecycle failure, so ads are off and the tree still renders.
+- `AdsRuntimeProvider` configures **no ad units** when the SDK is unavailable,
+  so every placement reports `unavailable` and the rewarded port is never
+  reached.
+- The event and consent mappings now match the SDK's wire values instead of
+  importing its enums, which keeps them pure; `adSdkMapping.test.ts` still drives
+  them with the real enum members, so upstream value changes fail there rather
+  than on a device.
+
+`__tests__/integration/adsSdkUnavailable.test.tsx` reproduces the missing native
+module and asserts the app still renders and stays playable.
+
+**Practical consequence for running the app:** ads and consent need a
+development build that includes the ad SDK. They do not work in Expo Go, and a
+dev client built before Phase 6B needs rebuilding. Neither case breaks the game
+any more — it runs with ads switched off.

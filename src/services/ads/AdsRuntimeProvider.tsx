@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { REWARDED_AD_UNIT_IDS } from "../../config/ads";
 import { areAdsAllowed, useOptionalConsent } from "../consent";
 import { AdServiceProvider } from "./AdServiceProvider";
+import { isAdsSdkAvailable } from "./adsSdk";
 import { createGoogleAdService } from "./GoogleAdService";
 import { createGoogleRewardedAdPort } from "./GoogleRewardedAdPort";
 import { initializeMobileAdsOnce } from "./mobileAdsRuntime";
@@ -34,7 +35,10 @@ export function AdsRuntimeProvider({
     }
     return createGoogleAdService({
       port: createGoogleRewardedAdPort(),
-      adUnitIds: REWARDED_AD_UNIT_IDS,
+      // No native ad SDK in this binary (Expo Go, or a development build made
+      // before it was autolinked) means no ad units, so every placement reports
+      // `unavailable` and the port is never touched. The game is unaffected.
+      adUnitIds: isAdsSdkAvailable() ? REWARDED_AD_UNIT_IDS : {},
       // Closed until the consent lifecycle says otherwise.
       adsAllowed: false,
       ensureInitialized: initializeMobileAdsOnce,

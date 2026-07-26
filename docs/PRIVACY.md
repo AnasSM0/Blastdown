@@ -142,7 +142,7 @@ ads without them.
 
 ## Verified
 
-- 98 suites / 682 tests green, including `consentLifecycle.test.tsx` and
+- 99 suites / 688 tests green, including `consentLifecycle.test.tsx` and
   `privacyOptions.test.tsx`, which cover every branch above against an injected
   consent port — no native module involved.
 - On-device confirmation of the real UMP form is the owner's, pending the
