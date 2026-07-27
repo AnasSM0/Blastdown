@@ -331,6 +331,8 @@ Raising it again means confirming the bundled `play-services-ads` version's
 Kotlin metadata against Expo's Kotlin first, and is a native build to verify —
 `npm run typecheck` cannot see this class of break.
 
+## 6. Required owner inputs
+
 None of these can be derived from the repository. Ads stay unimplemented until
 they are supplied.
 
