@@ -71,6 +71,13 @@ if (IS_PRODUCTION) {
  *  there is no other Expo-config route to a ProGuard rule. */
 const UMP_PROGUARD_RULES = "-keep class com.google.android.gms.internal.consent_sdk.** { *; }";
 
+/** The EAS project this repository builds as: `@anassm0/blastdown`. Written by
+ *  hand because `eas init` cannot edit a dynamic `app.config.ts` — it creates
+ *  the project remotely and then asks for the link to be made here. Changing it
+ *  points builds at a different EAS project, so it is a constant, not an env
+ *  var. */
+const EAS_PROJECT_ID = "12dff6d2-1121-40b4-bc34-e0b481285266";
+
 const config: ExpoConfig = {
   name: "BlastDown",
   slug: "blastdown",
@@ -125,6 +132,9 @@ const config: ExpoConfig = {
   ],
   extra: {
     appEnv: APP_ENV,
+    eas: {
+      projectId: EAS_PROJECT_ID,
+    },
   },
 };
 
