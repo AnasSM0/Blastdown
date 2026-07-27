@@ -1684,3 +1684,43 @@ The distinction is the lesson: **handling an exception is not the same as not
 raising one**, and in React Native the difference is visible to the user. The
 guard test asserts the package factory is never invoked, not merely that no
 error escapes.
+
+## 2026-07-27 — The ad SDK is pinned to an exact version
+
+`react-native-google-mobile-ads` moved from `^16.4.0` to exactly `16.3.4`.
+
+The EAS Android development build failed at
+`:react-native-google-mobile-ads:compileDebugKotlin`. 16.4.0 bundles
+`play-services-ads:25.4.0`, which carries Kotlin metadata 2.3.0; Expo SDK 57
+configures Kotlin 2.1.20, and a Kotlin compiler cannot read metadata newer than
+itself. 16.3.4 bundles `play-services-ads:25.0.0` with UMP unchanged at 4.0.0.
+
+Downgrading the SDK was chosen over raising Kotlin. Overriding the Kotlin
+version means diverging from the one every Expo module in the tree was compiled
+against, which trades a single well-understood failure for an open-ended set of
+them. The ad SDK is the smaller lever and the one that can be reverted without
+touching the build toolchain.
+
+The caret was dropped rather than narrowed. A range is precisely what allowed
+this: nothing in `package.json` distinguished "any 16.x" from "a 16.x whose
+bundled native artifact this toolchain can compile", and the mismatch surfaced
+only during a native build on EAS. `npm run typecheck` cannot detect it, so the
+lockfile is not sufficient protection on its own — the constraint belongs in
+`package.json` where an `npm install` cannot quietly widen it.
+
+Nothing under `src/` changed. The JS API surface is identical across the two
+versions, and every enum wire value the adapters depend on was re-checked
+against the installed package rather than its documentation: consent statuses
+and privacy-options statuses are the same strings, `AdsConsentDebugGeography` is
+the same numeric enum (`DISABLED 0`, `EEA 1`, `REGULATED_US_STATE 3`, `OTHER 4`),
+and the ad events are still `loaded` / `error` / `closed` /
+`rewarded_loaded` / `rewarded_earned_reward`. This check matters because
+`jest.setup.js` stubs the package, so `adSdkMapping.test.ts` drives the mappings
+from the stub's enums, not the real ones — a green suite would not have caught
+an upstream value change.
+
+Verified: 99 suites / 687 tests, typecheck, lint, format, `expo-doctor` 19/20
+(pre-existing Expo patch drift, unrelated and unchanged), and a resolved
+`expo config --json` still carrying the mobile-ads plugin, the development
+AdMob app id, the UMP ProGuard rule and `delayAppMeasurementInit`. The build
+itself is the real verification and is the owner's to run.

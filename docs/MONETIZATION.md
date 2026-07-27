@@ -224,7 +224,7 @@ discovered during it.
 
 ### 5.1 What the config plugin does and does not do
 
-`react-native-google-mobile-ads@16.4.0`'s Expo plugin writes exactly four
+`react-native-google-mobile-ads@16.3.4`'s Expo plugin writes exactly four
 Android manifest `meta-data` entries into the main application —
 `com.google.android.gms.ads.APPLICATION_ID`, `DELAY_APP_MEASUREMENT_INIT`,
 `flag.OPTIMIZE_INITIALIZATION`, `flag.OPTIMIZE_AD_LOADING` — plus iOS Info.plist
@@ -287,8 +287,9 @@ nobody assumes they are off.
 
 ### 5.5 SDK levels
 
-`react-native-google-mobile-ads@16.4.0` declares `minSdk 23` (and Google Mobile
-Ads 25.4.0 / UMP 4.0.0 on Android). Expo SDK 57's generated Android project sets
+`react-native-google-mobile-ads@16.3.4` declares `minSdk 23` (and Google Mobile
+Ads 25.0.0 / UMP 4.0.0 on Android — see §5.7 for why the version is pinned
+rather than ranged). Expo SDK 57's generated Android project sets
 its own levels; the resolved `minSdkVersion`, `compileSdkVersion` and
 `targetSdkVersion` must be confirmed at the first prebuild against Play's
 current target-API requirement. If they need pinning, `expo-build-properties` is
@@ -301,7 +302,34 @@ change, so it waits for approval like any other.
 `app.config.ts` today, and UMP on iOS sits alongside App Tracking Transparency.
 None of that is worth building until the iOS scope question in §6 is answered.
 
-## 6. Required owner inputs
+### 5.7 The ad SDK version is pinned exactly, not ranged (2026-07-27)
+
+`react-native-google-mobile-ads` is pinned to `16.3.4` with no caret. `^16.4.0`
+resolved a native dependency the toolchain cannot compile:
+
+```
+:react-native-google-mobile-ads:compileDebugKotlin FAILED
+```
+
+16.4.0 pulls `play-services-ads:25.4.0`, whose Kotlin metadata is 2.3.0. Expo
+SDK 57 configures Kotlin 2.1.20, and a Kotlin compiler reads metadata only up to
+its own version, so the artifact is unreadable and the module fails to build.
+16.3.4 pulls `play-services-ads:25.0.0` (UMP unchanged at 4.0.0), which carries
+metadata the 2.1.x compiler accepts.
+
+The fix is a downgrade rather than a Kotlin bump on purpose. Overriding Kotlin
+means fighting the version Expo's own modules are compiled against, which
+converts one build failure into a class of them; the SDK version is the smaller,
+more reversible lever. Nothing in `src/` changed — the JS API surface and every
+enum wire value are identical between the two versions (verified against the
+installed package, not its docs).
+
+The caret is gone because a range is what caused this: `^16.4.0` was free to
+resolve a newer native artifact than the toolchain could read, and the failure
+appeared only at native build time on EAS, long after any check that runs here.
+Raising it again means confirming the bundled `play-services-ads` version's
+Kotlin metadata against Expo's Kotlin first, and is a native build to verify —
+`npm run typecheck` cannot see this class of break.
 
 None of these can be derived from the repository. Ads stay unimplemented until
 they are supplied.
