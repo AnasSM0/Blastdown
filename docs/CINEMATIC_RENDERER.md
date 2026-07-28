@@ -214,6 +214,22 @@ explicitly and rebuild.
 
 Everything visual, and this is the important section.
 
+The coverage numbers say it more precisely than prose can:
+
+| Area                                                            | Statements |
+| --------------------------------------------------------------- | ---------- |
+| `rendering/cinematic` (scene, geometry, palette, board picture) | 96%        |
+| `rendering/cinematic/effects` (the effect model)                | 100%       |
+| `components/CinematicBoard` (the React Native wrapper)          | 87%        |
+| **`rendering/cinematic/layers` (everything inside the canvas)** | **2%**     |
+
+That last row is not a gap to close on this machine — it is the shape of
+the problem. Those components live inside `<Canvas>`, which renders null under
+jest, so they never mount. The design puts every decision outside them for
+exactly that reason, which is why the modules that decide what to draw sit at
+96–100% while the modules that draw it sit at 2%. The 2% is a device question,
+and no amount of local testing converts it into anything else.
+
 Skia draws nothing under jest, so no local test has seen a single pixel of this
 renderer. Specifically unverified:
 
