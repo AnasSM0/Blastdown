@@ -9,3 +9,8 @@ require("react-native-gesture-handler/jestSetup");
 jest.mock("@react-native-async-storage/async-storage", () =>
   require("@react-native-async-storage/async-storage/jest/async-storage-mock"),
 );
+
+// Skia has no canvas under jest. The mock's own doc comment explains what it
+// deliberately does NOT do and why the renderer is designed around that;
+// `__tests__/rendering/skiaMockParity.test.ts` guards it against upstream drift.
+jest.mock("@shopify/react-native-skia", () => require("./test-utils/skiaMock"));

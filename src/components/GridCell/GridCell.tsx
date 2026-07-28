@@ -10,30 +10,12 @@ import { blockSurface, type BlockVariant } from "../../ui/blockSurface";
 import { BlockSurface } from "../BlockSurface";
 import { RubbleSurface } from "../RubbleSurface";
 import { motionKey } from "../../ui/motionKey";
+// Shared with the cinematic renderer's accessibility overlay, so a board cell
+// says the same thing whichever renderer drew it.
+import { cellLabel, placementHintFor } from "./cellLabel";
+import { CONTOUR_BOTTOM, CONTOUR_LEFT, CONTOUR_RIGHT, CONTOUR_TOP } from "./contour";
 
 export type CellPreviewState = "valid" | "invalid" | "conflict";
-
-/** Which sides of a timed cell sit on the outer boundary of its piece — a side
- *  is a boundary when its neighbor is not part of the same timed piece. Drives
- *  the piece contour. Computed by the board from existing piece metadata. */
-export type CellEdges = { top: boolean; right: boolean; bottom: boolean; left: boolean };
-
-/** The same four sides packed into one number, so the prop is a primitive and a
- *  cell can be memoized (a fresh `CellEdges` object every render would defeat
- *  `memo` on every timed cell). */
-export const CONTOUR_TOP = 1;
-export const CONTOUR_RIGHT = 2;
-export const CONTOUR_BOTTOM = 4;
-export const CONTOUR_LEFT = 8;
-
-export function contourMaskOf(edges: CellEdges): number {
-  return (
-    (edges.top ? CONTOUR_TOP : 0) |
-    (edges.right ? CONTOUR_RIGHT : 0) |
-    (edges.bottom ? CONTOUR_BOTTOM : 0) |
-    (edges.left ? CONTOUR_LEFT : 0)
-  );
-}
 
 /** Contour stroke weight — heavier than the block's own edge so a timed piece's
  *  silhouette reads as one bounded group, distinct from a plain block. */
@@ -85,41 +67,6 @@ const PREVIEW_VARIANT: Record<CellPreviewState, BlockVariant> = {
 };
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
-type TimerAnnounce = { remainingTurns?: number; critical?: boolean; frozen?: boolean };
-
-function cellLabel(
-  cell: DomainGridCell,
-  row: number,
-  column: number,
-  timer: TimerAnnounce,
-): string {
-  const place = `row ${row + 1}, column ${column + 1}`;
-  switch (cell.kind) {
-    case "empty":
-      return `Empty cell, ${place}`;
-    case "timed": {
-      // The timer state is spoken, never left to color/glow alone: the move
-      // count plus a "frozen"/"urgent" cue mirror the badge's own signals. A
-      // frozen piece isn't counting down, so it never also announces "urgent".
-      const parts = [`${cell.colorId} block with timer`];
-      if (timer.remainingTurns !== undefined) {
-        const noun = timer.remainingTurns === 1 ? "move" : "moves";
-        parts.push(`${timer.remainingTurns} ${noun} left`);
-      }
-      if (timer.frozen) {
-        parts.push("frozen");
-      } else if (timer.critical) {
-        parts.push("urgent");
-      }
-      return `${parts.join(", ")}, ${place}`;
-    }
-    case "normal":
-      return `${cell.colorId} block, ${place}`;
-    case "rubble":
-      return `Blocked rubble cell, ${place}`;
-  }
-}
 
 /** Presentation of one board cell. The "glass" look is approximated with a
  *  translucent fill + colored border — deliberately no per-cell blur
@@ -200,19 +147,7 @@ function GridCellImpl({
   // is only briefly non-identity during the placement snap.
   const cellTransform = reducedMotion ? undefined : { transform: [{ scale: snap }] };
 
-  // The placement hint appears only on empty cells (the only legal anchors) and
-  // only while a piece is selected — `placementState` carries the domain's own
-  // preview verdict for the selected piece anchored here, so the hint mirrors the
-  // engine exactly: it promises a placement only where the engine would accept
-  // one, states plainly where it would not, and stays silent (no hint) when
-  // nothing is held so it never implies an action that a tap won't perform.
-  let placementHint: string | undefined;
-  if (onPress && cell.kind === "empty" && placementState) {
-    placementHint =
-      placementState === "valid"
-        ? "Double tap to place the selected piece here"
-        : "The selected piece can't be placed here";
-  }
+  const placementHint = placementHintFor(cell, onPress !== undefined, placementState);
 
   return (
     <AnimatedPressable

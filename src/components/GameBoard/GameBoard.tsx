@@ -2,8 +2,6 @@ import { forwardRef, memo, useEffect, useMemo, useState } from "react";
 import { Animated, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 
 import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
-import type { PlacementPreview, TimerBadgePlacement } from "../../domain/selectors";
-import type { CellPosition } from "../../domain/placement";
 import { BOARD_CONTENT_INSET, FRAME_WIDTH } from "../../ui/boardGeometry";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import { getTimerVisualState } from "../../ui/timerStates";
@@ -12,43 +10,7 @@ import { useTheme } from "../../ui/ThemeProvider";
 import { GridCell, contourMaskOf, type CellEdges, type CellPreviewState } from "../GridCell";
 import { TimerBadge } from "../TimerBadge";
 import { motionKey } from "../../ui/motionKey";
-
-type GameBoardProps = {
-  grid: readonly (readonly DomainGridCell[])[];
-  badges: readonly TimerBadgePlacement[];
-  /** Optional fixed content size (mostly for tests); defaults to measuring. */
-  boardSize?: number;
-  preview?: PlacementPreview | null;
-  onCellPress?: (position: CellPosition) => void;
-  /** Reports the computed cell edge length whenever it changes, so the screen
-   *  can map finger coordinates to board cells during a drag. */
-  onCellSizeChange?: (cellSize: number) => void;
-  /** Cells of the most recently placed piece, flashed with a settle "snap". */
-  placedCells?: readonly CellPosition[];
-  /** Bumped each placement so the snap replays even on the same cells. */
-  placementNonce?: number;
-  /** Number of explosions in the turn currently being animated, paired with
-   *  `effectKey` to retrigger the board's single shake. Deliberately NOT the
-   *  whole effect plan: the cosmetic overlay is a sibling of the board, so a
-   *  plan change must not re-render all 64 cells. */
-  explosionCount?: number;
-  /** Increments per sequence so the shake retriggers on a repeated explosion. */
-  effectKey?: number;
-  /** Timed piece to ring as the rewarded-defuse target (Stitch 07); its cells
-   *  get a solid cyan highlight while the confirm card is open. */
-  highlightPieceId?: string | null;
-  /** Effective reduced-motion (OS combined with the persisted override). When
-   *  omitted, falls back to the OS setting alone. */
-  reducedMotion?: boolean;
-  /** True while the run's rewarded freeze is active — pauses the countdown and
-   *  puts every timer badge into its frozen (icy, static) cue. */
-  frozen?: boolean;
-  /** Per-empty-cell anchor validity for the currently selected piece, keyed
-   *  "row,column", from the domain's placement preview. Null/absent when no
-   *  piece is selected. Drives each empty cell's placement hint for assistive
-   *  tech — read-only presentation data, never a gameplay input. */
-  placementHints?: ReadonlyMap<string, "valid" | "invalid"> | null;
-};
+import type { GameBoardProps } from "./boardProps";
 
 /** Boundary sides of a timed cell within its piece: a side is a boundary when
  *  its neighbor is not the same timed piece. Reads only the cells' existing
