@@ -45,6 +45,10 @@ export type GameBoardProps = {
   /** True while the run's rewarded freeze is active — pauses the countdown and
    *  puts every timer badge into its frozen (icy, static) cue. */
   frozen?: boolean;
+  /** The effect plan for the turn being animated. Only the cinematic renderer
+   *  reads it: that renderer draws effects INSIDE its canvas, while the React
+   *  Native renderer has them as a sibling overlay the screen mounts itself. */
+  effectPlan?: import("../../ui/effects/eventEffects").EffectPlan | null;
   /** Per-empty-cell anchor validity for the currently selected piece, keyed
    *  "row,column", from the domain's placement preview. Null/absent when no
    *  piece is selected. Drives each empty cell's placement hint for assistive

@@ -2,9 +2,11 @@ import { JetBrainsMono_700Bold } from "@expo-google-fonts/jetbrains-mono";
 import { useFont } from "@shopify/react-native-skia";
 import { forwardRef, memo, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
+import { Easing, cancelAnimation, useSharedValue, withTiming } from "react-native-reanimated";
 
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import { CinematicBoardCanvas } from "../../rendering/cinematic/CinematicBoardCanvas";
+import { buildEffectScene } from "../../rendering/cinematic/effects/effectScene";
 import { buildBoardScene } from "../../rendering/cinematic/scene";
 import { radius } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
@@ -49,6 +51,8 @@ function CinematicBoardImpl(
     reducedMotion: reducedMotionProp,
     frozen = false,
     placementHints,
+    effectPlan,
+    effectKey,
   }: GameBoardProps,
   ref: React.ForwardedRef<View>,
 ) {
@@ -81,6 +85,39 @@ function CinematicBoardImpl(
   );
 
   const { cellSize, pitch, contentInset } = scene.geometry;
+
+  const effects = useMemo(
+    () =>
+      effectPlan
+        ? buildEffectScene(effectPlan, scene.geometry, scene.palette, reducedMotion)
+        : null,
+    [effectPlan, scene.geometry, scene.palette, reducedMotion],
+  );
+
+  // One clock for the whole sequence. Every effect primitive reads it and
+  // derives its own progress from its own delay and duration, so a turn that
+  // plays ninety primitives still runs one animation rather than ninety - and no
+  // React render happens while it plays.
+  const elapsed = useSharedValue(0);
+
+  useEffect(() => {
+    if (!effects || effects.durationMs <= 0) {
+      elapsed.value = 0;
+      return;
+    }
+    elapsed.value = 0;
+    elapsed.value = withTiming(effects.durationMs, {
+      duration: effects.durationMs,
+      // Linear, because this value IS elapsed time. Easing it would make every
+      // delay in the sequence land at the wrong moment.
+      easing: Easing.linear,
+    });
+    // Stopping the clock on unmount matters more than it looks: a sequence
+    // outliving its board would keep the UI thread animating a value nothing
+    // reads, and this board unmounts on restart, Home and game over - three of
+    // the moments most likely to happen mid-effect.
+    return () => cancelAnimation(elapsed);
+  }, [effectKey, effects, elapsed]);
 
   useEffect(() => {
     if (cellSize > 0) {
@@ -123,6 +160,8 @@ function CinematicBoardImpl(
       {cellSize > 0 ? (
         <CinematicBoardCanvas
           scene={scene}
+          effects={effects}
+          elapsed={elapsed}
           font={font}
           style={{ width: boardSide, height: boardSide }}
         />
@@ -168,17 +207,24 @@ function CinematicBoardImpl(
           )
         : null}
 
-      {/* Numeral fallback. Only mounts while the Skia font has not loaded — and
-          if it never loads, the countdown is still readable. A timer that is
-          drawn as a ring with no digit is worse than one drawn as plain text. */}
-      {cellSize > 0 && !font
+      {/* Timer badges. The ring and numeral are drawn on the canvas; this is the
+          accessibility node behind them, carrying the same label, hint and
+          testID the React Native `TimerBadge` exposes. Without it a screen
+          reader loses every countdown announcement — the badges are not
+          placement controls, so the cell overlay above does not cover them.
+          Found by the CIN-A audit, which is exactly the kind of silent
+          regression a build machine with no phone cannot see. */}
+      {cellSize > 0
         ? scene.numerals.map((numeral) => (
             <View
               key={numeral.pieceId}
               pointerEvents="none"
-              testID={`timer-numeral-fallback-${numeral.pieceId}`}
+              testID={`timer-badge-${numeral.pieceId}`}
+              accessible
+              accessibilityLabel={`${numeral.value} moves left${frozen ? ", frozen" : ""}`}
+              accessibilityHint={`Timer state: ${frozen ? "frozen" : numeral.state}`}
               style={[
-                styles.numeralFallback,
+                styles.badge,
                 {
                   left: numeral.rect.x,
                   top: numeral.rect.y,
@@ -187,13 +233,20 @@ function CinematicBoardImpl(
                 },
               ]}
             >
-              <Text
-                allowFontScaling={false}
-                numberOfLines={1}
-                style={[styles.numeralText, { color: numeral.visual.numeralColor }]}
-              >
-                {numeral.value}
-              </Text>
+              {/* Numeral fallback, mounted only while the Skia font has not
+                  loaded. If it never loads the countdown stays readable: a ring
+                  with no digit inside it would show a timer's state while
+                  hiding the timer. */}
+              {font ? null : (
+                <Text
+                  allowFontScaling={false}
+                  numberOfLines={1}
+                  testID={`timer-numeral-fallback-${numeral.pieceId}`}
+                  style={[styles.numeralText, { color: numeral.visual.numeralColor }]}
+                >
+                  {numeral.value}
+                </Text>
+              )}
             </View>
           ))
         : null}
@@ -217,7 +270,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     // Deliberately no background. These exist to be pressed and read, not seen.
   },
-  numeralFallback: {
+  badge: {
     position: "absolute",
     alignItems: "center",
     justifyContent: "center",

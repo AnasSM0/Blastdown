@@ -30,6 +30,14 @@ import type { CinematicPalette, SceneBlock, SceneGeometry } from "../types";
  *  catching light, not a border. */
 const BEVEL_RATIO = 0.14;
 
+/** The sheen, matching `BlockSurface`'s own band exactly (top 45%, 0.22
+ *  opacity). Duplicated as constants rather than imported because the React
+ *  Native version lives in a StyleSheet where the values are a percentage
+ *  string and a style field; `__tests__/rendering/cinematicParity.test.ts` pins
+ *  the two together so this cannot drift silently. */
+const SHEEN_HEIGHT_RATIO = 0.45;
+const SHEEN_OPACITY = 0.22;
+
 function contourLines(
   block: SceneBlock,
   geometry: SceneGeometry,
@@ -101,6 +109,23 @@ export function BlocksLayer({
               r={radius}
               color={surface.fill}
             />
+
+            {/* The sheen, carried over from the React Native block so both
+                renderers share one material family: a soft lit band across the
+                top 45% at low opacity. The bevel below is the cinematic
+                addition on top of it, not a replacement for it. */}
+            {surface.highlight ? (
+              <Group opacity={SHEEN_OPACITY}>
+                <RoundedRect
+                  x={x}
+                  y={y}
+                  width={width}
+                  height={height * SHEEN_HEIGHT_RATIO}
+                  r={radius}
+                  color={surface.highlight}
+                />
+              </Group>
+            ) : null}
 
             {/* Top-left bevel: a bright hairline pair along the two lit edges. */}
             {surface.highlight ? (

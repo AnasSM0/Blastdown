@@ -577,7 +577,8 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
   // component, not a data path. Resolved per render rather than at module load
   // so the choice is observable in a test; the branch is a constant within a
   // build, so this costs one comparison and never remounts on its own.
-  const BoardRenderer = isCinematicRendererEnabled() ? CinematicBoard : GameBoard;
+  const cinematic = isCinematicRendererEnabled();
+  const BoardRenderer = cinematic ? CinematicBoard : GameBoard;
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.appBackground }]} testID="game-screen">
@@ -616,12 +617,17 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
                   reducedMotion={reducedMotion}
                   frozen={freezeActive}
                   placementHints={placementHints}
+                  // Only the cinematic renderer reads this: it draws effects
+                  // inside its own canvas, so the sibling overlay below is
+                  // suppressed for it. Handing the plan to both renderers would
+                  // play every beat twice.
+                  effectPlan={cinematic ? animator.plan : undefined}
                 />
                 {/* Cosmetic overlay, a SIBLING of the board rather than a child:
                     a new effect plan re-renders only this layer, never the 64
                     cells. Remounted per sequence so two turns' effects never
                     interpolate into each other. */}
-                {animator.plan && cellSize > 0 ? (
+                {!cinematic && animator.plan && cellSize > 0 ? (
                   <EffectsLayer
                     key={animator.effectKey}
                     plan={animator.plan}
