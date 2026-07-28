@@ -47,7 +47,7 @@ export function GameOverOverlay({
       accessibilityLabel={`Run over. Final score ${score.toLocaleString("en-US")}`}
       accessible
     >
-      <Animated.View style={[styles.panel, appear]}>
+      <Animated.View key={appear.key} style={[styles.panel, appear.style]}>
         <Text style={typography.labelCaps}>RUN OVER</Text>
         <Text style={[styles.score, neonGlow(colors.scoreOrange, "low")]}>
           {score.toLocaleString("en-US")}

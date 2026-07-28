@@ -11,6 +11,7 @@ import { radius, spacing } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import { GridCell, contourMaskOf, type CellEdges, type CellPreviewState } from "../GridCell";
 import { TimerBadge } from "../TimerBadge";
+import { motionKey } from "../../ui/motionKey";
 
 type GameBoardProps = {
   grid: readonly (readonly DomainGridCell[])[];
@@ -211,6 +212,7 @@ function GameBoardImpl(
 
   return (
     <Animated.View
+      key={motionKey(reducedMotion)}
       ref={ref}
       style={[
         styles.board,

@@ -10,8 +10,8 @@ import type { HandPiece } from "../../src/domain/gameTypes";
 import { useAppearAnimation } from "../../src/hooks/useAppearAnimation";
 
 function AppearProbe({ reducedMotion }: { reducedMotion: boolean }) {
-  const style = useAppearAnimation(reducedMotion);
-  return <Animated.View testID="appear" style={style} />;
+  const appear = useAppearAnimation(reducedMotion);
+  return <Animated.View key={appear.key} testID="appear" style={appear.style} />;
 }
 
 function flat(node: { props: Record<string, unknown> }): ViewStyle {

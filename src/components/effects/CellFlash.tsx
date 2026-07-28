@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Animated, StyleSheet } from "react-native";
+import { motionKey } from "../../ui/motionKey";
 
 type CellFlashProps = {
   left: number;
@@ -77,6 +78,7 @@ export function CellFlash({
 
   return (
     <Animated.View
+      key={motionKey(reducedMotion || !settle)}
       pointerEvents="none"
       testID={testID}
       style={[

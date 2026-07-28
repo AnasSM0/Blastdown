@@ -11,6 +11,7 @@ import { radius, spacing } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import { blockColor } from "../../ui/themes";
 import { blockSurface } from "../../ui/blockSurface";
+import { motionKey } from "../../ui/motionKey";
 
 type PieceTrayProps = {
   hand: readonly HandPiece[];
@@ -190,6 +191,7 @@ function TraySlot({
   const liftTransform = reducedMotion ? undefined : { transform: [{ scale: lift }] };
   const slot = (
     <AnimatedPressable
+      key={motionKey(reducedMotion)}
       onPress={() => onSelect(piece.handId)}
       style={[
         styles.slot,

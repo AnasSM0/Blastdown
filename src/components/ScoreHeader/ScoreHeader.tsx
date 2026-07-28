@@ -6,6 +6,7 @@ import { useTheme } from "../../ui/ThemeProvider";
 import { glowFor } from "../../ui/themes";
 import { ComboIndicator } from "../ComboIndicator";
 import { PressableFeedback } from "../PressableFeedback";
+import { motionKey } from "../../ui/motionKey";
 
 type ScoreHeaderProps = {
   score: number;
@@ -79,6 +80,7 @@ export function ScoreHeader({ score, best, combo, onPause, reducedMotion }: Scor
 
       <View style={styles.center}>
         <Animated.Text
+          key={motionKey(reducedMotion)}
           style={[
             typography.scoreMobile,
             { color: theme.score },
