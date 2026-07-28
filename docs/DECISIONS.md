@@ -1577,3 +1577,54 @@ runs the same code it ran before this renderer existed.
 and enforces the structural rules that keep Skia out of the startup path: no
 static cinematic import in the screen, no Skia or Reanimated import there, and
 no Skia import anywhere in `src/` outside the two directories the flag gates.
+
+## 2026-07-28 — the cinematic renderer was slow, and mostly for one reason
+
+Device testing reported the Skia board as visually correct but noticeably laggy.
+The causes are recorded in `docs/CINEMATIC_PERFORMANCE.md`; what belongs here is
+the decision each one forced.
+
+**Grouped bloom instead of per-cell blur.** Every block carried its own
+`BlurMask`, which is an offscreen render pass each — up to 64 per frame, plus 64
+more from the clear flashes, plus the sweeps. All halos now sit inside one group
+under one mask. The visual cost is that halos blend where blocks touch, which
+for a piece made of adjacent cells reads better than separate glows. The
+alternative — keeping per-cell softness — is not affordable on a mobile GPU at
+this count, and no amount of tuning changes that.
+
+Worth recording plainly: the comment above the original code claimed the halo
+was "a blurred copy of the block rather than a per-cell blur filter". That was
+not a distinction. And commit `d652236`, labelled a performance improvement,
+replaced two stacked flash rects with one rect plus a `BlurMask` — trading 64
+cheap draws for 64 render passes. A confident comment and a plausible
+justification made both look considered.
+
+**Two worklets per effect primitive, not eight.** Each primitive animates a
+group's transform and opacity rather than its own edges or circle centres. For
+debris this is visually indistinguishable and costs a quarter as much with 24
+live. The general rule: animate the container, not the contents.
+
+**The shake binds only while shaking.** It was bound whenever any effect clock
+ran, so a line clear re-composited the whole board — including the cached static
+picture — every frame for its whole sequence. The `Group` stays in the tree
+unconditionally; conditionally wrapping would remount every layer and rebuild
+the cached picture when a shake starts.
+
+**The preview is built separately from the board.** A drag crossing one cell
+boundary rebuilt all 64 cells and handed every layer new array identities, for a
+change affecting about four cells. `buildPreviewCells` is its own pure function
+and every layer is memoized, so the board's arrays keep identity across a drag.
+
+**Renderer-side caps on effects.** Authoritative play already bounds sweeps,
+defuses and rings — an 8x8 board cannot clear 40 rows. The renderer no longer
+relies on that: a duplicated or malformed event must not mount an unbounded
+number of animated components on the busiest frame of a turn.
+
+**No measurement was taken.** Every number in the performance document is a
+count of passes, callbacks or allocations derived from the source, not a frame
+time. This machine has no Android device. The direction is not in doubt; the
+magnitude is unverified, and the branch does not merge until a phone says so.
+
+**No bug inventory was produced.** The brief asked for one and also said not to
+claim a bug without reproduction evidence. "Several bugs remain" is not a bug
+report, so the inventory is empty rather than invented.

@@ -311,3 +311,21 @@ runs the same code it ran before this renderer existed.
 and enforces the structural rules that keep Skia out of the startup path: no
 static cinematic import in the screen, no Skia or Reanimated import there, and
 no Skia import anywhere in `src/` outside the two directories the flag gates.
+
+## Performance pass (2026-07-28)
+
+The first device test found this renderer visually correct and noticeably laggy.
+`docs/CINEMATIC_PERFORMANCE.md` records the causes, the fixes and the counts.
+
+The headline: the renderer applied a blur mask per cell — an offscreen render
+pass each, up to ~80 simultaneously during a full-board clear — and gave every
+effect primitive four to eight per-frame worklets. Both are fixed, and both are
+now guarded by tests, because both regressed silently and neither was visible
+from a build machine.
+
+Two visual deltas are deliberate and are not bugs: block halos blend where
+blocks touch (they are drawn under one grouped blur now), and clear flashes have
+hard rather than soft edges.
+
+The "What is unverified" section above still stands in full, and now has a
+companion: no frame time has been measured before or after.

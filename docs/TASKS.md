@@ -1251,3 +1251,32 @@ Full detail in `docs/CINEMATIC_RENDERER.md`.
 - **Merge — NOT DONE.** The flag stays off and the branch stays unmerged until
   the device pass above is reported. Ads work is untouched and Phase 6B remains
   on its own branch.
+
+## Cinematic renderer performance pass (2026-07-28)
+
+Branch `fix-cinematic-renderer-performance`, from `feature-cinematic-board-renderer`.
+Full detail in `docs/CINEMATIC_PERFORMANCE.md`.
+
+- **Profiling** — static analysis only. No device, so no frame times. Findings
+  are counts of render passes, worklet evaluations and allocations. DONE, with
+  that caveat.
+- **GPU cost** — per-cell blur masks removed. Block and badge halos grouped
+  behind one mask each; effects use none. ~80 offscreen passes per frame during
+  a full-board clear became 2. DONE.
+- **UI-thread cost** — effect primitives reduced from 4-8 derived values each to
+  1-2 by animating group transform/opacity. ~470 callbacks per frame became
+  ~160 primitives at 1-2 each. DONE.
+- **Redraw scope** — the shake transform binds only while shaking, so effects
+  that do not shake no longer re-composite the whole board every frame. DONE.
+- **Drag cost** — preview split out of the board scene, every layer memoized,
+  64 unused empty-cell objects removed per rebuild, shape bounds cached. DONE.
+- **Caps and lifecycle** — sweeps, defuse flashes and rings capped; the debris
+  budget now stops the traversal rather than one cell. DONE.
+- **Guards** — `cinematicGpuBudget.test.ts` pins every invariant above. DONE.
+- **Bug inventory — NOT STARTED.** "Several bugs remain" was reported with no
+  reproduction steps, device details or symptoms. Nothing was claimed or fixed
+  without evidence, per the brief's own rule.
+- **Device QA — NOT DONE, and blocking.** No before/after measurement exists.
+  The acceptance list is in `docs/CINEMATIC_PERFORMANCE.md`.
+- **Merge — NOT DONE.** Flag stays off by default; the fallback renderer is
+  untouched and still never imports Skia.
