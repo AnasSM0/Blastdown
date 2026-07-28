@@ -268,3 +268,46 @@ from master, and master predates that fix; it also said to maintain the fix's
 structural guards. The rendering half of the fix was ported (commit `1b816ad`),
 without any ads or consent code. Both branches now hold byte-identical versions
 of every file involved.
+
+## Two defects found in review
+
+Both were caught by the stop-time review, not by any test here, and both are
+worth recording because of what they say about where this renderer's blind
+spots are.
+
+**The shake never shook.** The board-shake worklet mutated one module-level
+array in place and returned it every frame, to avoid allocating. But
+`useDerivedValue` assigns its result to a shared value, and assigning the same
+object identity emits no change — so the board jumped to the first frame's
+offset and froze there for the rest of the sequence. Nothing local noticed:
+Skia draws nothing under jest, the component still rendered, and every other
+test stayed green. The allocation being avoided was one two-field array per
+frame; the cost of avoiding it was the whole effect.
+
+Fixed by returning a fresh array, and by pulling the curve out into an exported
+pure function (`shakeOffset`) so the part that can be wrong is the part that can
+be checked. `cinematicShake.test.ts` now pins that it starts still, moves,
+swings both ways, decays, stays within amplitude, ends well before the sequence
+it rides on, and is exactly zero at every instant under reduced motion.
+
+**The flag did not isolate Skia's initialisation.** `app/game.tsx` imported the
+cinematic board at module scope, and `@shopify/react-native-skia` installs its
+native JSI bindings when the module is EVALUATED — which is why importing the
+real package under jest throws rather than failing later. So Skia initialised at
+app startup even with the flag off.
+
+That is precisely the job the flag exists to do. The fallback renderer is meant
+to be the thing that rescues a build when the new path is broken; if Skia cannot
+initialise on some device, turning the renderer off has to actually help, and it
+would not have. The flag isolated rendering while leaving initialisation
+unconditional — a safety net with a hole in exactly the shape of the accident it
+was meant to catch.
+
+Fixed by resolving the renderer in `src/rendering/boardRenderer.ts` through a
+require guarded by the build-time flag. With the flag off the cinematic graph —
+Skia, Reanimated, the canvas layers — is never evaluated at all, and the app
+runs the same code it ran before this renderer existed.
+`rendererIsolation.test.ts` exercises both branches of the resolver at runtime
+and enforces the structural rules that keep Skia out of the startup path: no
+static cinematic import in the screen, no Skia or Reanimated import there, and
+no Skia import anywhere in `src/` outside the two directories the flag gates.

@@ -55,18 +55,16 @@ export function CinematicBoardCanvas({
   // half-cycles of a decaying sine over the first ~200 ms, then still. Zero
   // amplitude under reduced motion, where the model has already set `shake` to
   // 0, so this needs no second check.
-  const transform = useDerivedValue(() => {
-    if (shake === 0 || shakeDuration <= 0) {
-      return SHAKE_REST;
-    }
-    const progress = Math.min(1, Math.max(0, elapsed.value / SHAKE_MS));
-    if (progress >= 1) {
-      return SHAKE_REST;
-    }
-    SHAKE_TRANSFORM[0].translateX =
-      Math.sin(progress * Math.PI * 4) * shake * (1 - progress) * (1 - progress);
-    return SHAKE_TRANSFORM;
-  });
+  // A fresh array every frame, and it has to be. `useDerivedValue` assigns its
+  // result to a shared value, and assigning the SAME object identity emits no
+  // change — so an earlier version that mutated one module-level array in place
+  // to avoid allocating never animated at all: the board jumped to frame one's
+  // offset and froze there until the shake ended. The allocation being avoided
+  // was a single two-field array per frame; the cost of avoiding it was the
+  // whole effect.
+  const transform = useDerivedValue(() => [
+    { translateX: shakeOffset(elapsed.value, shake, shakeDuration) },
+  ]);
 
   return (
     <Canvas style={style ?? { width: geometry.boardSide, height: geometry.boardSide }}>
@@ -86,13 +84,25 @@ export function CinematicBoardCanvas({
  *  that lasted a whole 780 ms explosion sequence would read as a fault. */
 const SHAKE_MS = 200;
 
-/** Two module-level arrays, mutated in place by the worklet above.
+/** Horizontal board offset for the explosion shake, in px.
  *
- *  This is deliberate and is the one place in the renderer where mutation beats
- *  clarity. A `useDerivedValue` worklet runs on the UI thread every frame, and
- *  returning a fresh `[{ translateX }]` from it would allocate two objects per
- *  frame per board — garbage generated at exactly the moment the app is trying
- *  to stay smooth through an explosion. `SHAKE_REST` is never written to, so
- *  the still case allocates nothing either. */
-const SHAKE_TRANSFORM: { translateX: number }[] = [{ translateX: 0 }];
-const SHAKE_REST: { translateX: number }[] = [{ translateX: 0 }];
+ *  Four half-cycles of a sine, squared-decayed to zero over `SHAKE_MS`. Pulled
+ *  out of the worklet and exported so the curve is testable — the shake is
+ *  otherwise invisible to every local check, and it has already been broken once
+ *  in a way no test would have noticed.
+ *
+ *  Marked `"worklet"` so it can be called from the UI thread. Returns 0 for a
+ *  zero amplitude, which is what reduced motion produces upstream, so there is
+ *  no second reduced-motion branch here to fall out of step. */
+export function shakeOffset(elapsedMs: number, amplitude: number, sequenceMs: number): number {
+  "worklet";
+  if (amplitude === 0 || sequenceMs <= 0) {
+    return 0;
+  }
+  const progress = Math.min(1, Math.max(0, elapsedMs / SHAKE_MS));
+  if (progress >= 1) {
+    return 0;
+  }
+  const decay = (1 - progress) * (1 - progress);
+  return Math.sin(progress * Math.PI * 4) * amplitude * decay;
+}

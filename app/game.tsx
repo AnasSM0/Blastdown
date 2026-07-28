@@ -3,8 +3,7 @@ import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
-import { CinematicBoard } from "../src/components/CinematicBoard";
-import { GameBoard, BOARD_CONTENT_INSET } from "../src/components/GameBoard";
+import { BOARD_CONTENT_INSET } from "../src/components/GameBoard";
 import { EffectsLayer } from "../src/components/effects/EffectsLayer";
 import { PieceTray } from "../src/components/PieceTray";
 import { ReactorBackground } from "../src/components/ReactorBackground";
@@ -25,7 +24,9 @@ import {
   getRewardedDefuseTarget,
   getTimerBadgePlacements,
 } from "../src/domain/selectors";
-import { isCinematicRendererEnabled } from "../src/config/renderer";
+// Resolved behind the build-time flag, so a build with the cinematic renderer
+// off never evaluates Skia at all. See the module's own comment.
+import { BoardRenderer, CINEMATIC_RENDERER } from "../src/rendering/boardRenderer";
 import { dragOriginFromFinger, type BoardLayout, type Point } from "../src/ui/boardGeometry";
 import { cellsOfPiece, rubbleCellsOf } from "../src/ui/effects/eventEffects";
 import {
@@ -571,14 +572,12 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
   const freezeActive = state.freezeTurnsRemaining > 0;
   const defuseTarget = defuseConfirmOpen ? getRewardedDefuseTarget(state) : null;
 
-  // Which board draws. Both accept the same props (see
-  // `src/components/GameBoard/boardProps.ts`), so the screen hands over one set
-  // of values and never learns which renderer it got — the flag switches a
-  // component, not a data path. Resolved per render rather than at module load
-  // so the choice is observable in a test; the branch is a constant within a
-  // build, so this costs one comparison and never remounts on its own.
-  const cinematic = isCinematicRendererEnabled();
-  const BoardRenderer = cinematic ? CinematicBoard : GameBoard;
+  // Which board draws is decided at module scope (see `BoardRenderer` above),
+  // because deciding it here would mean importing both renderers and so
+  // initialising Skia even when the flag is off. Both accept the same props, so
+  // the screen hands over one set of values and never learns which it got — the
+  // flag switches a component, not a data path.
+  const cinematic = CINEMATIC_RENDERER;
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.appBackground }]} testID="game-screen">
