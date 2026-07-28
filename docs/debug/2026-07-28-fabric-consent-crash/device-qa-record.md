@@ -9,7 +9,9 @@ and no JDK, so nothing here can be verified locally and nothing is inferred from
 a general "it works". A scenario nobody ran stays open — an unticked box is
 information, a wrongly-ticked one is a lie that ships.
 
-Last updated 2026-07-28 against commit `2f2f03c`.
+Last updated 2026-07-28. Crash fix confirmed against `2f2f03c`; the rewarded
+test ad confirmed against the build the owner was running when Phase 6B work
+stopped, which is `2f2f03c` or later.
 
 ## Build under test
 
@@ -81,6 +83,21 @@ Google test unit `ca-app-pub-3940256099942544/5224354917` for all four
 placements. Development and preview builds resolve to it even when production
 variables are set, so a dev build cannot request live inventory by accident.
 
+**The end-to-end path works.** On 2026-07-28 the owner reported, of the build
+under test: "the current rewarded test ad works and grants its reward." That is
+the first device evidence that the whole chain — consent gate, SDK
+initialization, test-unit resolution, load, present, earned-reward event, reward
+application — functions on real hardware. Every unit test in the tree could have
+passed with that chain broken at the native seam; now it demonstrably is not.
+
+What that sentence does **not** say is which placement was used, or that the
+reward arrived exactly once. So it ticks one cell's worth of behaviour in a
+column nobody named. Recorded as its own row rather than spread across the
+table:
+
+- [x] **A rewarded test ad loads, opens, completes and grants its reward** —
+      placement not identified by the reporter.
+
 | Check                                      | Freeze | Defuse | Revive | Double Bolts |
 | ------------------------------------------ | ------ | ------ | ------ | ------------ |
 | Ad loads and opens                         | [ ]    | [ ]    | [ ]    | [ ]          |
@@ -91,10 +108,17 @@ variables are set, so a dev build cannot request live inventory by accident.
 | Next ad preloads safely                    | [ ]    | [ ]    | [ ]    | [ ]          |
 | No duplicate analytics, audio or haptics   | [ ]    | [ ]    | [ ]    | [ ]          |
 
+The table stays open because per-placement behaviour is what it measures, and
+one unattributed success does not fill a named column. The four placements share
+one service and one ad unit, so a second and third are cheap to run — but they
+differ in what they do with the reward, which is the half that is still untested.
+
 "Exactly one reward" is the row to be pedantic about. The service grants only
 from the earned-reward event, applies each reward once, blocks concurrent
 presentations, and keeps a grace window for an `earned` that arrives after
-`closed` — all covered by unit tests, none of it proven against a real ad.
+`closed` — all covered by unit tests, and now known to grant at least once
+against a real ad. Whether it can ever grant twice is a different question and
+is still open.
 
 ## 5. Lifecycle and offline
 
@@ -131,6 +155,7 @@ non-development build and are the fastest way to isolate a recurrence.
 ## Blocked on owner input
 
 Sections 2 and 3 cannot run without a published AdMob consent message and a UMP
-test-device hash. Section 4 can run today — test ads need no AdMob account.
-Production credentials are listed in `docs/MONETIZATION.md` §6 and none of them
-are required to finish this record.
+test-device hash. Section 4 is under way and needs nothing further — test ads
+need no AdMob account, and the path is now known to work end to end. Production
+credentials are listed in `docs/MONETIZATION.md` §6 and none of them are
+required to finish this record.

@@ -666,17 +666,25 @@ check could have caught:
 
 Both are fixed and the second is confirmed on the device that reproduced it.
 
-**Ad and consent behaviour remains unverified on hardware.** The app running is
-a precondition for that QA, not a substitute for it. No rewarded ad has been
-loaded or shown on a device, no consent form has been presented, and no reward
-has been granted outside jest. The live record is
+**A rewarded test ad has since loaded, opened, completed and granted its reward
+on the phone.** That is the first hardware evidence for the whole chain —
+consent gate, SDK initialization, test-unit resolution, load, present, the
+earned-reward event, and reward application. It is worth stating plainly why it
+matters more than its one line suggests: every unit test in the tree passes
+against a stubbed SDK, so the entire native seam could have been broken without
+a single red test. It is not.
+
+**The rest of the ad and consent behaviour remains unverified on hardware.** The
+reporter did not say which of the four placements was used, or that the reward
+arrived exactly once, so the per-placement table is still open. No consent form
+has been presented. The live record is
 `docs/debug/2026-07-28-fabric-consent-crash/device-qa-record.md`.
 
 What is and is not blocked:
 
-- **Rewarded test ads for all four placements can be run now.** Google's test
-  units need no AdMob account, and development builds resolve to them even when
-  production variables are set.
+- **Rewarded test ads for all four placements can be run now**, and one of them
+  already has been. Google's test units need no AdMob account, and development
+  builds resolve to them even when production variables are set.
 - **Consent and privacy-options QA cannot start** until a GDPR consent message
   is published in AdMob for this app. Until then `requestInfoUpdate` reports
   "not required" and no form appears, however correct the implementation is.
