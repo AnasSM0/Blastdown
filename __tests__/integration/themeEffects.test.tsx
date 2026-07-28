@@ -61,7 +61,7 @@ describe("theme-aware explosion effects", () => {
                   badges={[]}
                   boardSize={328}
                   explosionCount={1}
-                  effectKey={1}
+                  effectKey="e1"
                 />
                 <EffectsLayer plan={EXPLOSION_PLAN} cellSize={38} reducedMotion={false} />
               </ThemeProvider>

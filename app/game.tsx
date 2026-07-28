@@ -657,7 +657,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
                     interpolate into each other. */}
                 {!cinematic && animator.plan && cellSize > 0 ? (
                   <EffectsLayer
-                    key={animator.effectKey}
+                    key={animator.effectKey ?? "idle"}
                     plan={animator.plan}
                     cellSize={cellSize}
                     reducedMotion={reducedMotion}

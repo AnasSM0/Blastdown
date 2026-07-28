@@ -34,8 +34,11 @@ export type GameBoardProps = {
   /** Number of explosions in the turn currently being animated, paired with
    *  `effectKey` to retrigger the board's single shake. */
   explosionCount?: number;
-  /** Increments per sequence so the shake retriggers on a repeated explosion. */
-  effectKey?: number;
+  /** Identity of the effect sequence currently playing, so a repeated
+   *  explosion retriggers the board shake instead of being treated as the same
+   *  animation. A string since effects became individually identified — see
+   *  `src/ui/effects/effectQueue.ts`. */
+  effectKey?: string | null;
   /** Timed piece to ring as the rewarded-defuse target; its cells get a solid
    *  accent highlight while the confirm card is open. */
   highlightPieceId?: string | null;

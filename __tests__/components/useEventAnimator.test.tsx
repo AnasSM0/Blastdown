@@ -43,10 +43,14 @@ describe("useEventAnimator", () => {
     });
     expect(result.current.isAnimating).toBe(true);
     expect(result.current.plan?.clearedCells).toHaveLength(8);
-    expect(result.current.effectKey).toBe(1);
+    // Effects are individually identified now, so the key is an id rather than
+    // a counter -- see src/ui/effects/effectQueue.ts.
+    expect(typeof result.current.effectKey).toBe("string");
 
     await act(async () => {
-      jest.advanceTimersByTime(340);
+      // Nothing draws under jest, so the admission watchdog retires this rather
+      // than the precise renderer-reported timer: duration plus the grace.
+      jest.advanceTimersByTime(340 + 400);
     });
     expect(result.current.isAnimating).toBe(false);
     expect(result.current.plan).toBeNull();
@@ -103,12 +107,15 @@ describe("useEventAnimator", () => {
     expect(result.current.isAnimating).toBe(false);
 
     await act(async () => {
-      jest.advanceTimersByTime(400);
+      jest.advanceTimersByTime(400 + 400);
     });
     expect(result.current.plan).toBeNull();
   });
 
-  it("ignores a cue while a required sequence is playing, so it can't cut one short", async () => {
+  it("keeps a cue that arrives while a required sequence is playing", async () => {
+    // This test used to assert the opposite, and the opposite was the bug: a
+    // rewarded defuse or revive fired during a clear was dropped outright, so
+    // the player spent an ad and saw nothing. Both are live now.
     const { result, rerender } = await renderHook(
       (props: { turn: number; events: GameEvent[]; reducedMotion: boolean }) =>
         useEventAnimator({ ...props, grid: EMPTY_GRID }),
@@ -118,15 +125,34 @@ describe("useEventAnimator", () => {
       rerender({ turn: 1, events: CLEAR_TURN, reducedMotion: false });
     });
     expect(result.current.isAnimating).toBe(true);
-    const keyDuringSequence = result.current.effectKey;
 
     await act(async () => {
       result.current.playCue("revive", [{ row: 0, column: 0 }]);
     });
-    // The clear keeps the overlay and the input lock.
-    expect(result.current.effectKey).toBe(keyDuringSequence);
-    expect(result.current.plan?.cue).toBeNull();
+
+    expect(result.current.effects).toHaveLength(2);
+    expect(result.current.effects.some((effect) => effect.plan.cue === "revive")).toBe(true);
+    // The clear still holds the input lock; the cue never did.
     expect(result.current.isAnimating).toBe(true);
+    // A rewarded outcome outranks a clear, so the single-plan renderer shows it.
+    expect(result.current.plan?.cue).toBe("revive");
+  });
+
+  it("keeps both effects when a turn lands while a cue is playing", async () => {
+    const { result, rerender } = await renderHook(
+      (props: { turn: number; events: GameEvent[]; reducedMotion: boolean }) =>
+        useEventAnimator({ ...props, grid: EMPTY_GRID }),
+      { initialProps: { turn: 0, events: [] as GameEvent[], reducedMotion: false } },
+    );
+    await act(async () => {
+      result.current.playCue("revive", [{ row: 0, column: 0 }]);
+    });
+    await act(async () => {
+      rerender({ turn: 1, events: CLEAR_TURN, reducedMotion: false });
+    });
+
+    // The old hook called stop() here, wiping the cue mid-play.
+    expect(result.current.effects).toHaveLength(2);
   });
 
   it("ignores a cue with no cells (nothing was restored or defused)", async () => {
