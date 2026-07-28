@@ -1,0 +1,193 @@
+FABRIC ASSERTION CRASH — ANALYSIS AND ENVIRONMENT
+=================================================
+2026-07-28. Branch phase-6b-production-ads-consent, HEAD 40720af (five commits
+after c825540). Evidence: ./crash.txt.
+
+Analysis by Claude Code on a machine with no Android device, no Android SDK and
+no JDK. Every claim below is derived from the React Native 0.86 sources in
+node_modules and from this repository's own code. NOTHING here was observed on a
+device. The reproduction matrix at the end is unrun.
+
+
+1. VERSIONS
+-----------
+expo                            57.0.7      (SDK 57)
+react-native                    0.86.0
+react                           19.2.3
+react-native-reanimated         4.5.0       (transitive; ZERO imports in src/)
+react-native-screens            4.25.2
+expo-router                     57.0.7
+react-native-google-mobile-ads  16.3.4      (pinned exactly, see MONETIZATION 5.7)
+react-native-gesture-handler    2.32.0
+expo-dev-client                 57.0.7
+
+New Architecture: on. Expo SDK 57 / RN 0.86 are New-Architecture-only; Fabric
+is the sole renderer, which is consistent with the crash originating in
+`com.facebook.react.fabric.mounting.SurfaceMountingManager`.
+Build type: development client (EAS `development` profile).
+
+React Native was NOT changed, and must not be moved independently of Expo.
+
+
+2. WHAT THE ASSERTION ACTUALLY IS
+---------------------------------
+`overridePropsReadableMap` is a private method of `SurfaceMountingManager`.
+From node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/
+fabric/mounting/SurfaceMountingManager.kt:1324:
+
+    private fun overridePropsReadableMap(patchMap, outputReadableMap) {
+      for ((propKey, propValue) in patchMap) {
+        if (outputReadableMap.hasKey(propKey)) {
+          if (propKey == PROP_TRANSFORM) {
+            assert(outputReadableMap.getType(propKey) == ReadableType.Array
+                   && propValue is List<*>)
+            ...
+          } else if (propKey == PROP_OPACITY) {
+            assert(outputReadableMap.getType(propKey) == ReadableType.Number
+                   && propValue is Number)
+
+`java.lang.AssertionError: Assertion failed` with no message is precisely what a
+failing Kotlin `assert()` throws.
+
+This is NOT a stale prop update to a deleted view. A deleted view is handled:
+`updateProps` returns early when the surface `isStopped`, logs a soft exception
+when the ViewState is missing, and `tagToSynchronousMountProps.remove(reactTag)`
+runs on view deletion (line ~1053). Those paths do not assert.
+
+The call site, line 667:
+
+    if (ReactNativeFeatureFlags.overrideBySynchronousMountPropsAtMountingAndroid()
+        && !shouldSkipSynchronousMountPropsOverride
+        && tagToSynchronousMountProps.containsKey(reactTag)) {
+          ... overridePropsReadableMap(directPropsMap, modifiedProps)
+
+`overrideBySynchronousMountPropsAtMountingAndroid` defaults to TRUE in RN 0.86
+(ReactNativeFeatureFlagsDefaults.kt:154, and the JS mirror at
+src/private/featureflags/ReactNativeFeatureFlags.js:467). So the path is live.
+
+Its purpose: when a view has been updated synchronously by the native animation
+driver, a later React commit for that view must not clobber the in-flight
+animated value. RN re-applies the driver's `transform`/`opacity` over the
+committed props. `patchMap` comes from `getMapFromPropsReadableMap`, which only
+records `transform` when it is an Array and `opacity` when it is a Number — so
+the `propValue` half of each assert is always satisfied.
+
+That leaves exactly one way to fail:
+
+    the COMMITTED props contain the key, but not with the expected type.
+
+For `transform`, the committed value is present and is not an Array. That is
+what React emits when a style key that was previously set is removed — the prop
+is sent as null so the old value is reset. `hasKey` is true, the type is Null,
+the assert fails.
+
+Stated plainly: a view that is being animated by the native driver had its
+`transform` prop REMOVED by a subsequent React commit.
+
+
+3. WHY THIS APP DOES EXACTLY THAT, AT LAUNCH, ON THIS DEVICE
+------------------------------------------------------------
+Nine components toggle the PRESENCE of `transform` on `reducedMotion`:
+
+  src/components/ComboIndicator/ComboIndicator.tsx:58
+  src/components/DragGhost/DragGhost.tsx:127
+  src/components/effects/CellFlash.tsx:88
+  src/components/effects/PulseRing.tsx:57
+  src/components/GameBoard/GameBoard.tsx:222
+  src/components/GridCell/GridCell.tsx:200
+  src/components/PieceTray/PieceTray.tsx:190
+  src/components/ScoreHeader/ScoreHeader.tsx:88
+  src/components/TimerBadge/TimerBadge.tsx:99
+
+They omit the transform entirely — rather than animating to identity — because
+an identity transform promotes a rounded/elevated view to its own hardware
+layer, which is the Android black-render trap this project already hit and
+fixed once (DECISIONS, 2026-07-22). That guard is correct and is NOT being
+removed.
+
+The trigger is the timing of `reducedMotion`, in src/hooks/useReducedMotion.ts:
+
+    const [reduced, setReduced] = useState(false);      // <-- guess
+    useEffect(() => {
+      AccessibilityInfo.isReduceMotionEnabled().then((value) => setReduced(value));
+
+The initial value is a GUESS of `false`, corrected asynchronously once the OS
+answers. `useEffectiveReducedMotion` layers the persisted override on top, and
+that arrives asynchronously too (SettingsProvider loads from AsyncStorage and
+starts `loaded: false`).
+
+On a device with reduced motion ON — which this device is — the launch sequence
+is therefore deterministic:
+
+  1. First commit: reducedMotion === false. All nine components bind
+     `transform: [...]` to a native-driven Animated.Value.
+  2. The native driver updates those views synchronously; their tags are
+     recorded in `tagToSynchronousMountProps`.
+  3. `AccessibilityInfo.isReduceMotionEnabled()` resolves true, a few hundred
+     milliseconds later.
+  4. Re-render: those components now omit `transform` entirely.
+  5. Fabric commits. The tag is still in `tagToSynchronousMountProps`, the
+     committed `transform` is null rather than an Array, and the assert fails.
+
+This fits every reported symptom: the ~1s delay (an async accessibility query),
+the exact assertion, and the fact that it repeats on every reopen rather than
+behaving like a race.
+
+Note the asymmetry, which is what the fix exploits: ADDING a transform is safe
+(the key arrives as a proper Array, and nothing was registered for it before it
+existed). Only REMOVING one trips the assert.
+
+
+4. WHERE CONSENT FITS
+---------------------
+On this evidence the consent lifecycle is a correlated bystander, not the
+cause. `ConsentProvider` never gates or replaces its children, holds no
+animation, mounts once at the root, and guards its async callbacks with
+`mountedRef`. What it does do is resolve a promise and set state at roughly the
+same moment the accessibility query resolves, and load a WebView that occupies
+the main thread — which plausibly orders the two commits so the removal lands
+while the driver is mid-update.
+
+This is a hypothesis about ORDERING, not about fault, and it is the part of the
+analysis least supported by evidence. Matrix rows 5 and 6 exist to settle it: if
+the crash survives with the consent provider disabled entirely, consent is
+exonerated outright.
+
+
+5. DEV VERSUS RELEASE — A PREDICTION, NOT A FINDING
+---------------------------------------------------
+Kotlin's `assert()` compiles to a check guarded by the JVM's assertion status.
+On Android/ART, `Class.desiredAssertionStatus()` is normally false, so `assert`
+is inert unless assertions are explicitly enabled — which debuggable builds
+can do. That predicts the release/profile APK does NOT crash here.
+
+If that holds, it is NOT evidence the bug is fixed. With assertions inert the
+same code proceeds to `putArray`/`putDouble` using the mismatched value, so a
+release build would silently apply a wrong or stale transform instead of
+crashing. A release APK that "works" would be hiding this, not solving it.
+Producing that APK is still worth doing, as a data point only.
+
+
+6. REPRODUCTION MATRIX — UNRUN
+------------------------------
+One variable at a time. This machine cannot execute any row.
+
+   #  Variable                                   Predicted   Actual
+   1  fresh data, online                         crash       ______
+   2  fresh data, airplane mode                  crash       ______
+   3  consent debug geography enabled            crash       ______
+   4  consent debug geography disabled           crash       ______
+   5  consent provider on, form bypassed         crash       ______
+   6  consent provider disabled (dev flag)       crash       ______
+   7  Android screen animations enabled          crash       ______
+   8  Android screen animations disabled         crash       ______
+   9  OS reduced motion ON                       crash       ______
+   9b OS reduced motion OFF                      NO crash    ______
+  10  background/resume during consent launch    crash       ______
+
+Row 9b is the decisive one. If the crash disappears with reduced motion OFF and
+survives every consent permutation (rows 3-6), the analysis in section 3 is
+confirmed and consent is exonerated. If the crash persists with reduced motion
+OFF, section 3 is wrong and the next suspects are, in order: a transform
+removal driven by something other than reduced motion, then `PressableFeedback`
+animations outliving their view, then react-native-screens transitions.

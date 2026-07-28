@@ -1724,3 +1724,73 @@ Verified: 99 suites / 687 tests, typecheck, lint, format, `expo-doctor` 19/20
 `expo config --json` still carrying the mobile-ads plugin, the development
 AdMob app id, the UMP ProGuard rule and `delayAppMeasurementInit`. The build
 itself is the real verification and is the owner's to run.
+
+## 2026-07-28 — Reduced motion starts on, to keep a Fabric prop shape stable
+
+The Phase 6B development APK crashed on every launch on a physical Android
+device with `java.lang.AssertionError: Assertion failed` in
+`SurfaceMountingManager.overridePropsReadableMap`. Full analysis and the unrun
+device matrix: `docs/debug/2026-07-28-fabric-consent-crash/`.
+
+The assertion is RN 0.86 re-applying the native animation driver's
+`transform`/`opacity` over a React commit for a view the driver has touched:
+
+    assert(outputReadableMap.getType(PROP_TRANSFORM) == ReadableType.Array
+           && propValue is List<*>)
+
+It fails when the committed `transform` is present but is not an Array, which
+is what React sends when a previously-set style key is removed. Nine components
+omit `transform` entirely under reduced motion rather than animating to
+identity, because an identity transform promotes a rounded or elevated view to
+its own hardware layer — the black-render trap fixed on 2026-07-22. That guard
+is correct and stays.
+
+The trigger was `useReducedMotion` initialising to `false` and correcting
+asynchronously once `AccessibilityInfo.isReduceMotionEnabled()` resolved. On a
+device with reduced motion on, launch therefore bound native-driven transforms
+and removed them a few hundred milliseconds later — precisely the case the
+assert rejects, and precisely the reported timing.
+
+The hook now starts `true`. Motion is withheld until it is known to be wanted,
+which is the accessible default anyway, and it makes the only startup
+transition the safe direction: adding a transform, which registers a
+well-formed Array before anything animates it. Removal cannot happen at launch
+in either configuration.
+
+Rejected alternatives. Removing the reduced-motion transform guard would trade
+this crash for a device-confirmed rendering bug. Overriding
+`overrideBySynchronousMountPropsAtMountingAndroid` — the RN feature flag gating
+the whole path, default true — needs native code in a CNG-managed project and
+suppresses the symptom rather than the cause. Disabling the New Architecture is
+not available on Expo SDK 57 and was excluded by the brief.
+
+Two supporting changes. `PressableFeedback` now stops its native-driven
+animation on unmount; navigation happens on press, so an unmount mid-animation
+is the ordinary case and a running native animation outliving its view keeps
+pushing props at a dropped tag. And `ConsentProvider` holds the launch sequence
+back while the app is _known_ to be backgrounded.
+
+That last one is worth recording as a near miss. The gate was first written as
+"proceed when `AppState.currentState === 'active'`", which broke eighteen tests:
+`currentState` is null before the native module reports, under jest and early in
+Android startup, and no `change` event follows for an app that was already
+foregrounded. Waiting for "active" would have stranded the lifecycle forever and
+silently disabled consent, and therefore ads, for the whole session. The test is
+now "is it known to be backgrounded", which fails open.
+
+Not proven on a device. This build machine has no Android device, SDK or JDK,
+so the crash was never reproduced here and the fix is not confirmed. The
+reasoning is derived from the RN 0.86 sources in node_modules and this
+repository's own code. The device matrix is unrun and row 9b — reduced motion
+off — is the one that confirms or refutes the analysis outright.
+
+Note on release builds: Kotlin `assert()` is inert unless JVM assertions are
+enabled, which debuggable builds can do and release builds normally do not. A
+release APK that does not crash is therefore NOT evidence of a fix — with the
+assert inert the same code applies the mismatched value silently.
+
+Test hygiene consequence: several suites now emit React's "update was not
+wrapped in act" warning from this hook. The state transition true -> false is
+now real where false -> false previously bailed out without a render. Tests are
+green across two randomized seeds; the warnings are cosmetic and belong to the
+suites that do not flush the promise.

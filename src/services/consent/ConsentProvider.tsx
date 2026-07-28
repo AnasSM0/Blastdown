@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
+import { AppState, type AppStateStatus } from "react-native";
 
 import { CONSENT_DEBUG_ENABLED, CONSENT_REQUEST_OPTIONS } from "../../config/consent";
 import { reportCaught } from "../diagnostics/reportError";
@@ -175,7 +176,34 @@ export function ConsentProvider({
   }, [debugEnabled, port, refresh]);
 
   useEffect(() => {
-    void refresh();
+    // UMP presents a native form over the activity, so the launch sequence is
+    // held back while the app is demonstrably backgrounded — a cold start from a
+    // notification or a restore, where presenting into an activity that is not
+    // stable is the wrong moment to ask.
+    //
+    // The test is deliberately "is it known to be backgrounded", not "is it
+    // known to be active". `currentState` is null before the native module has
+    // reported, both early in Android startup and under jest, and no `change`
+    // event follows for an app that was already foregrounded. Waiting for
+    // "active" in that window would strand the lifecycle forever, which would
+    // silently disable consent and therefore ads for the whole session —
+    // considerably worse than the case being guarded.
+    const current = AppState.currentState;
+    if (current !== "background" && current !== "inactive") {
+      void refresh();
+      return;
+    }
+    let started = false;
+    const subscription = AppState.addEventListener("change", (next: AppStateStatus) => {
+      if (next !== "active" || started) {
+        return;
+      }
+      // Latched: a later background/resume cycle must not re-run the launch
+      // sequence, which is once per launch by contract.
+      started = true;
+      void refresh();
+    });
+    return () => subscription.remove();
     // Launch-once: `refresh` is stable for a given port/options pair, and the
     // provider is mounted once at the root.
   }, [refresh]);

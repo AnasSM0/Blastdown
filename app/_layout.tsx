@@ -3,8 +3,13 @@ import { StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 
+import {
+  DIAG_BYPASS_CONSENT_FORM,
+  DIAG_DISABLE_CONSENT,
+  resolveStackAnimation,
+} from "../src/config/diagnostics";
 import { AdsRuntimeProvider } from "../src/services/ads/AdsRuntimeProvider";
 import { initializeMobileAdsOnce } from "../src/services/ads/mobileAdsRuntime";
 import { AnalyticsServiceProvider } from "../src/services/analytics";
@@ -30,7 +35,20 @@ export default function RootLayout() {
   // The one place the UMP port is constructed. The consent seam itself never
   // imports the ad SDK, so every other consumer — and every test — stays free of
   // the native module.
-  const consentPort = useMemo(() => createUmpConsentPort(), []);
+  const consentPort = useMemo(
+    () => createUmpConsentPort({ skipFormPresentation: DIAG_BYPASS_CONSENT_FORM }),
+    [],
+  );
+  // A build-time constant, so this branch is fixed for the life of the process:
+  // the navigation tree is never swapped or remounted underneath a running app.
+  const consentTree = (children: ReactNode) =>
+    DIAG_DISABLE_CONSENT ? (
+      children
+    ) : (
+      <ConsentProvider port={consentPort} initializeAds={initializeMobileAdsOnce}>
+        {children}
+      </ConsentProvider>
+    );
 
   return (
     <GestureHandlerRootView style={styles.root}>
@@ -46,18 +64,19 @@ export default function RootLayout() {
                         {/* Consent runs above the ad service and never gates the
                             tree: the game is fully offline, so a pending or
                             failed consent request must leave it playable. */}
-                        <ConsentProvider port={consentPort} initializeAds={initializeMobileAdsOnce}>
+                        {consentTree(
                           <AdsRuntimeProvider>
                             <GameSessionProvider>
                               <AnalyticsSessionTracker />
                               <Stack
                                 screenOptions={{
                                   headerShown: false,
+                                  animation: resolveStackAnimation(),
                                 }}
                               />
                             </GameSessionProvider>
-                          </AdsRuntimeProvider>
-                        </ConsentProvider>
+                          </AdsRuntimeProvider>,
+                        )}
                       </AudioServiceProvider>
                     </ThemeProvider>
                   </ProfileProvider>

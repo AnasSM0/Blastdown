@@ -91,20 +91,31 @@ export function toAdsConsentOptions(
  *  demand and rejects with a clear message when it is absent; `ConsentProvider`
  *  treats that as a lifecycle failure, which means ads off and gameplay
  *  untouched. */
-export function createUmpConsentPort(): ConsentPort {
+export function createUmpConsentPort({
+  /** Development diagnostic only (`DIAG_BYPASS_CONSENT_FORM`): request consent
+   *  information but never present a form. UMP is still exercised end to end —
+   *  the debug-device message, the geography lookup — with form presentation
+   *  removed as a variable. Never true outside a development build. */
+  skipFormPresentation = false,
+}: { skipFormPresentation?: boolean } = {}): ConsentPort {
   return {
     async gather(options?: ConsentRequestOptions): Promise<ConsentInfo> {
       const sdk = loadAdsSdk();
       if (!sdk) {
         throw adsSdkUnavailableError();
       }
+      const request = (toAdsConsentOptions(options) ?? {}) as Parameters<
+        typeof sdk.AdsConsent.gatherConsent
+      >[0];
+      if (skipFormPresentation) {
+        const requested = await sdk.AdsConsent.requestInfoUpdate(request);
+        return toConsentInfo(requested as unknown as RawConsentInfo);
+      }
       // `gatherConsent` is UMP's own request-then-show-if-required helper: it
       // calls `requestInfoUpdate` and then `loadAndShowConsentFormIfRequired`,
       // so the launch path is a single native round trip and the form is never
       // shown when UMP says it is not needed.
-      const info = await sdk.AdsConsent.gatherConsent(
-        (toAdsConsentOptions(options) ?? {}) as Parameters<typeof sdk.AdsConsent.gatherConsent>[0],
-      );
+      const info = await sdk.AdsConsent.gatherConsent(request);
       return toConsentInfo(info as unknown as RawConsentInfo);
     },
     async showPrivacyOptionsForm(): Promise<ConsentInfo> {

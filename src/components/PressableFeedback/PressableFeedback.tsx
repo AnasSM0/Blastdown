@@ -1,4 +1,4 @@
-import { forwardRef, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Pressable,
@@ -57,24 +57,40 @@ export const PressableFeedback = forwardRef<View, PressableFeedbackProps>(
     const [value] = useState(() => new Animated.Value(1));
     const animates = !reducedMotion && !disabled;
 
+    // A press animation is short, but navigation away from a control happens on
+    // press — so an unmount mid-animation is the normal case, not the edge one.
+    // A native-driven animation left running past its view keeps pushing props
+    // to a tag React has already dropped, so it is stopped on unmount.
+    const runningRef = useRef<Animated.CompositeAnimation | null>(null);
+
+    useEffect(() => {
+      return () => {
+        runningRef.current?.stop();
+        runningRef.current = null;
+      };
+    }, []);
+
+    const animateTo = (toValue: number, duration: number) => {
+      runningRef.current?.stop();
+      const animation = Animated.timing(value, { toValue, duration, useNativeDriver: true });
+      runningRef.current = animation;
+      animation.start(() => {
+        if (runningRef.current === animation) {
+          runningRef.current = null;
+        }
+      });
+    };
+
     const handlePressIn = (event: GestureResponderEvent) => {
       if (animates) {
-        Animated.timing(value, {
-          toValue: pressStyle === "scale" ? PRESSED_SCALE : PRESSED_OPACITY,
-          duration: PRESS_IN_MS,
-          useNativeDriver: true,
-        }).start();
+        animateTo(pressStyle === "scale" ? PRESSED_SCALE : PRESSED_OPACITY, PRESS_IN_MS);
       }
       onPressIn?.(event);
     };
 
     const handlePressOut = (event: GestureResponderEvent) => {
       if (animates) {
-        Animated.timing(value, {
-          toValue: 1,
-          duration: PRESS_OUT_MS,
-          useNativeDriver: true,
-        }).start();
+        animateTo(1, PRESS_OUT_MS);
       }
       onPressOut?.(event);
     };

@@ -1,0 +1,40 @@
+TRANSCRIBED FROM THE OWNER'S CRASH REPORT, 2026-07-28.
+
+This is the authoritative log exactly as supplied. No `crash.txt` or
+`crash-context.txt` file was present in the repository, and this build machine
+has no Android device, no Android SDK and no adb, so no logcat capture was
+taken here. Nothing below is reconstructed or inferred — the analysis lives in
+`crash-context.txt` alongside, deliberately kept separate from the evidence.
+
+--- BEGIN OWNER-SUPPLIED LOG ---
+
+java.lang.AssertionError: Assertion failed
+at com.facebook.react.fabric.mounting.SurfaceMountingManager
+  .overridePropsReadableMap(...)
+  .updateProps(...)
+
+--- END OWNER-SUPPLIED LOG ---
+
+--- BEGIN OWNER-SUPPLIED TIMELINE ---
+
+- UMP emits its debug-device message
+- Google WebView sandbox process starts
+- about one second later Fabric crashes while updating props
+- reopening repeats the crash
+- Expo DevLauncherErrorActivity appears afterward
+
+--- END OWNER-SUPPLIED TIMELINE ---
+
+Build under test: Phase 6B development APK (development client, EAS
+`development` profile), physical Android device, reduced motion ON at the OS
+level (established from the `[Reanimated] Reduced motion setting is enabled on
+this device` warning in the owner's earlier report from the same device).
+
+WHAT IS STILL MISSING, and would sharpen this considerably:
+
+- Full `adb logcat` around the crash, not just the two frames. The frames above
+  are enough to identify the assertion (see `crash-context.txt`) but not enough
+  to name the React tag or component.
+- The value of `EXPO_PUBLIC_UMP_DEBUG_GEOGRAPHY` for the crashing build.
+- Whether the crash also occurs with the OS reduced-motion setting turned OFF.
+  This is the single highest-value data point and is row 9 of the matrix.
