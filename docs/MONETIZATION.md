@@ -649,3 +649,37 @@ module and asserts the app still renders and stays playable.
 development build that includes the ad SDK. They do not work in Expo Go, and a
 dev client built before Phase 6B needs rebuilding. Neither case breaks the game
 any more — it runs with ads switched off.
+
+## 9.11 Device status (2026-07-28)
+
+The Phase 6B development build runs on a physical Android phone as of commit
+`2f2f03c`. Getting there took two rounds of device-only faults that no local
+check could have caught:
+
+1. `react-native-google-mobile-ads@16.4.0` pulled a `play-services-ads` whose
+   Kotlin metadata the Expo SDK 57 toolchain cannot read, so the native build
+   failed outright (§5.7).
+2. Once it built, it crashed on every launch with a Fabric assertion — a
+   reduced-motion prop-shape change removing a `transform` from a view the
+   native animation driver was updating
+   (`docs/debug/2026-07-28-fabric-consent-crash/`).
+
+Both are fixed and the second is confirmed on the device that reproduced it.
+
+**Ad and consent behaviour remains unverified on hardware.** The app running is
+a precondition for that QA, not a substitute for it. No rewarded ad has been
+loaded or shown on a device, no consent form has been presented, and no reward
+has been granted outside jest. The live record is
+`docs/debug/2026-07-28-fabric-consent-crash/device-qa-record.md`.
+
+What is and is not blocked:
+
+- **Rewarded test ads for all four placements can be run now.** Google's test
+  units need no AdMob account, and development builds resolve to them even when
+  production variables are set.
+- **Consent and privacy-options QA cannot start** until a GDPR consent message
+  is published in AdMob for this app. Until then `requestInfoUpdate` reports
+  "not required" and no form appears, however correct the implementation is.
+
+No production credentials are in the tree, and none are needed to finish the
+test-ad QA. The §6 owner inputs remain outstanding.

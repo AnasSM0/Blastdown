@@ -3,10 +3,15 @@ FABRIC ASSERTION CRASH — ANALYSIS AND ENVIRONMENT
 2026-07-28. Branch phase-6b-production-ads-consent, HEAD 40720af (five commits
 after c825540). Evidence: ./crash.txt.
 
+STATUS: RESOLVED on device from commit 2f2f03c — see section 7. Sections 1-6
+are the original analysis, kept unedited as the reasoning that produced the fix.
+
 Analysis by Claude Code on a machine with no Android device, no Android SDK and
-no JDK. Every claim below is derived from the React Native 0.86 sources in
-node_modules and from this repository's own code. NOTHING here was observed on a
-device. The reproduction matrix at the end is unrun.
+no JDK. Every claim in sections 1-6 is derived from the React Native 0.86
+sources in node_modules and from this repository's own code; none of it was
+observed on a device. The reproduction matrix in section 6 was never run — the
+fix was applied and retested directly, so the matrix records predictions that
+were never checked one variable at a time.
 
 
 1. VERSIONS
@@ -191,3 +196,53 @@ confirmed and consent is exonerated. If the crash persists with reduced motion
 OFF, section 3 is wrong and the next suspects are, in order: a transform
 removal driven by something other than reduced motion, then `PressableFeedback`
 animations outliving their view, then react-native-screens transitions.
+
+
+7. OUTCOME — CRASH RESOLVED ON DEVICE (2026-07-28)
+--------------------------------------------------
+The owner rebuilt from `2f2f03c` and ran it on the physical Android phone that
+originally crashed. Reported result, verbatim in substance:
+
+    "The rebuilt app now runs correctly without recurring crashes."
+
+That closes the crash. The three commits that produced it:
+
+  47ab87c  useReducedMotion starts reduced, so the launch flip can only ADD a
+           transform, never remove one
+  150a9d3  motionKey remounts the eight elements whose transform is conditional,
+           so a LIVE reduced-motion change cannot remove one either
+  2f2f03c  the same treatment for PressableFeedback "scale" mode (the reward
+           dock) and useAppearAnimation (pause/defuse/game-over panels)
+
+WHAT THIS CONFIRMS, AND WHAT IT DOES NOT.
+
+Confirmed: the crash no longer reproduces on the device that reproduced it
+reliably before, after a clean rebuild.
+
+Not confirmed: the mechanism in section 3. This was a fix-and-retest, not a
+controlled experiment. The decisive row — 9b, reduced motion OFF — was not run
+as an isolated variable, and the diagnostic flags added for the matrix
+(DIAG_DISABLE_CONSENT, DIAG_BYPASS_CONSENT_FORM,
+DIAG_ANDROID_NAV_ANIMATION_NONE) were not exercised. The analysis is therefore
+consistent with the outcome and supported by it, but not proven by it.
+
+That distinction is worth keeping. The fix is correct either way — removing a
+transform from a driver-registered view is a genuine defect on RN 0.86
+regardless of whether it was THIS crash — but if a Fabric assertion resurfaces
+later, section 3 should be re-derived rather than assumed.
+
+NOT SUPPLIED BY THE OWNER, and still blank:
+
+  Device model .................. ______
+  Android version ............... ______
+  Build profile ................. ______  (development assumed, unconfirmed)
+  Crash-free test duration ...... ______
+  Reduced motion ON tested ...... ______
+  Reduced motion OFF tested ..... ______
+
+These were requested and are not in the report. They are left blank rather than
+inferred: "runs correctly" is the only device fact in evidence, and the brief's
+own confirmation list (fresh launch, both reduced-motion states, consent
+initialization, Home and gameplay, the three panels, background/resume,
+repeated gameplay, no black blocks, drag responsiveness) was not itemised in the
+result. Filling those in from a single sentence would be inventing test results.

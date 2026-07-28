@@ -142,9 +142,15 @@ ads without them.
 
 ## Verified
 
-- 99 suites / 687 tests green, including `consentLifecycle.test.tsx` and
+- 100 suites / 699 tests green, including `consentLifecycle.test.tsx` and
   `privacyOptions.test.tsx`, which cover every branch above against an injected
   consent port — no native module involved.
-- On-device confirmation of the real UMP form is the owner's, pending the
-  published consent message and a registered test device. It will be recorded,
-  never fabricated: this build machine has no Android device.
+- The app launches and runs on a physical Android device as of commit
+  `2f2f03c`, after the Fabric crash fix
+  (`docs/debug/2026-07-28-fabric-consent-crash/`). The consent provider mounts
+  in that build, which is a precondition for the rest, not a test of it.
+- On-device confirmation of the real UMP form is still outstanding and is the
+  owner's, pending the published consent message and a registered test device.
+  Nothing in this section has been observed against a live UMP form. Results
+  are recorded in `device-qa-record.md`, never fabricated: this build machine
+  has no Android device.

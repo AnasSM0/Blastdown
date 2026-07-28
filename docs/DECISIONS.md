@@ -1851,3 +1851,35 @@ guards were confirmed to fail with their keys removed.
 
 `DragGhost`, `BurstCell` and `FloatingText` were checked in that pass and need
 no key: each binds `transform` unconditionally.
+
+## 2026-07-28 — The Fabric crash is confirmed fixed on device
+
+The owner rebuilt from `2f2f03c` and ran it on the phone that had crashed on
+every launch. It runs. That closes the investigation opened the same day in
+`docs/debug/2026-07-28-fabric-consent-crash/`.
+
+Recording the shape of that confirmation honestly, because it affects how much
+weight the analysis can carry later. This was a fix-and-retest, not a bisect.
+The reproduction matrix was never run one variable at a time; the decisive row
+— reduced motion OFF, as an isolated variable — was not exercised, and neither
+were the three diagnostic flags added for it. So the mechanism in section 3 of
+`crash-context.txt` is _supported_ by the outcome and _consistent_ with it, but
+not proven by it.
+
+The fix stands on its own regardless: removing a `transform` from a view the
+native animation driver has registered is a genuine defect on RN 0.86 whatever
+crashed this particular build. But if a Fabric assertion resurfaces, that
+section should be re-derived rather than assumed.
+
+The device details requested with the confirmation — model, Android version,
+build profile, crash-free duration, and which reduced-motion states were
+exercised — were not supplied, and are left blank in the record rather than
+inferred. "It runs correctly" is one fact; the eleven-item confirmation list in
+the brief is eleven, and turning the first into the rest would be inventing test
+results.
+
+Ads and consent remain unverified on hardware. The app launching is a
+precondition for that QA, not a substitute for it: no ad has been loaded or
+shown on a device, no consent form presented, no reward granted outside jest.
+Rewarded test ads are runnable today; consent QA is blocked on a published
+AdMob consent message.

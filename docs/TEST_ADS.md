@@ -127,6 +127,16 @@ Any change to it needs a new native build.
 Run on a **physical Android device** with a development build. Record results;
 never infer them. Nothing here can be verified on the repository build machine.
 
+**Results live in `docs/debug/2026-07-28-fabric-consent-crash/device-qa-record.md`,
+not in this file.** This is the checklist; that is the record of what has
+actually been observed. As of 2026-07-28 exactly one line of it is ticked — the
+Fabric crash no longer reproduces on the device that reproduced it reliably
+(commit `2f2f03c`). Every ads and consent scenario below is still open.
+
+Sections 2 and 3 of that record are blocked on a published AdMob consent
+message. Section 4 — the four rewarded placements — is **not** blocked: Google
+test ads need no AdMob account and can be run today.
+
 **Consent**
 
 - [ ] First install with `EXPO_PUBLIC_UMP_DEBUG_GEOGRAPHY=eea` and the device
