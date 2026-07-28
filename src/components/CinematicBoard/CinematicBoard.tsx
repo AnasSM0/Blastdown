@@ -1,6 +1,6 @@
 import { JetBrainsMono_700Bold } from "@expo-google-fonts/jetbrains-mono";
 import { useFont } from "@shopify/react-native-skia";
-import { forwardRef, memo, useCallback, useEffect, useMemo, useState } from "react";
+import { forwardRef, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 import { Easing, cancelAnimation, useSharedValue, withTiming } from "react-native-reanimated";
 
@@ -96,6 +96,7 @@ function CinematicBoardImpl(
     placementHints,
     effectPlan,
     effectKey,
+    onEffectStarted,
   }: GameBoardProps,
   ref: React.ForwardedRef<View>,
 ) {
@@ -160,6 +161,32 @@ function CinematicBoardImpl(
   // plays ninety primitives still runs one animation rather than ninety - and no
   // React render happens while it plays.
   const elapsed = useSharedValue(0);
+
+  // Report the draw to the effect queue. Same reasoning as the React Native
+  // layer: without this call `startedDrawing` is never invoked in production,
+  // so no effect ever gets a real start time and the queue's late-admission
+  // guarantee is inert.
+  // Reported once per effect id, tracked in a ref rather than by effect
+  // dependencies. The callback and the scene both change identity across
+  // ordinary re-renders, so a dependency list would re-report the same effect
+  // repeatedly. The animator ignores a second start, but a renderer that keeps
+  // announcing the same draw is lying about what it did, and the next thing
+  // built on top of it would inherit that.
+  const startedRef = useRef<string | null>(null);
+  const onEffectStartedRef = useRef(onEffectStarted);
+  useEffect(() => {
+    onEffectStartedRef.current = onEffectStarted;
+  });
+  useEffect(() => {
+    if (effectKey == null || effects === null || cellSize <= 0) {
+      return;
+    }
+    if (startedRef.current === effectKey) {
+      return;
+    }
+    startedRef.current = effectKey;
+    onEffectStartedRef.current?.(effectKey, Date.now());
+  }, [effectKey, effects, cellSize]);
 
   useEffect(() => {
     if (!effects || effects.durationMs <= 0) {

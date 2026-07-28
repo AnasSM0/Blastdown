@@ -650,6 +650,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
                   // suppressed for it. Handing the plan to both renderers would
                   // play every beat twice.
                   effectPlan={cinematic ? animator.plan : undefined}
+                  onEffectStarted={animator.startedDrawing}
                 />
                 {/* Cosmetic overlay, a SIBLING of the board rather than a child:
                     a new effect plan re-renders only this layer, never the 64
@@ -661,6 +662,8 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
                     plan={animator.plan}
                     cellSize={cellSize}
                     reducedMotion={reducedMotion}
+                    effectId={animator.effectKey}
+                    onStarted={animator.startedDrawing}
                   />
                 ) : null}
               </View>

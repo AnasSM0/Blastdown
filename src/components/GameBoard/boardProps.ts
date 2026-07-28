@@ -52,6 +52,10 @@ export type GameBoardProps = {
    *  reads it: that renderer draws effects INSIDE its canvas, while the React
    *  Native renderer has them as a sibling overlay the screen mounts itself. */
   effectPlan?: import("../../ui/effects/eventEffects").EffectPlan | null;
+  /** Called by the renderer when it begins drawing the current effect, so the
+   *  effect queue can start that effect's clock from the moment it is actually
+   *  on screen rather than from when it was queued. */
+  onEffectStarted?: (id: string, now: number) => void;
   /** Per-empty-cell anchor validity for the currently selected piece, keyed
    *  "row,column", from the domain's placement preview. Null/absent when no
    *  piece is selected. Drives each empty cell's placement hint for assistive
