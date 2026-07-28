@@ -1,4 +1,4 @@
-import { BlurStyle, Group, Line, RoundedRect, Skia, vec } from "@shopify/react-native-skia";
+import { Group, Line, RoundedRect, Skia, TileMode, vec } from "@shopify/react-native-skia";
 import { memo, useMemo } from "react";
 
 import {
@@ -37,32 +37,39 @@ const HALO_BLUR = 6;
 /** A stable empty array, so the "no bloom" path allocates nothing per render. */
 const EMPTY_BLOCKS: readonly SceneBlock[] = [];
 
-/** A paint that blurs whatever is drawn INTO IT, applied once.
+/** A paint that blurs whatever is composited through it, once.
  *
- *  This is the distinction the first two attempts at this fix both missed, and
- *  it is worth stating exactly.
+ *  This is the third attempt at one bloom pass, and the two failures are worth
+ *  keeping because each looked correct.
  *
- *  `<Group><BlurMask/>{children}</Group>` does NOT blur the group. The mask
- *  filter goes into the group's paint, and every child then draws *with* that
- *  paint — so N children still cost N blurred draws. Grouping the elements
- *  changed how the source looked and nothing about what the GPU did. The
- *  original per-block blur and the "grouped" replacement were the same cost.
+ *  1. A `<BlurMask>` on every block. One offscreen pass per cell — up to 64 per
+ *     frame — under a comment claiming it was not a per-cell blur.
  *
- *  `<Group layer={paint}>` is different: it issues a `saveLayer`, draws the
- *  children into an offscreen surface, then applies the paint to that surface
- *  once on composite. One blur for the whole bloom, whatever the cell count.
+ *  2. A `<BlurMask>` moved into a shared parent `<Group>`. This reads as
+ *     grouping and is not: in React Native Skia a mask filter on a Group
+ *     becomes part of that Group's paint, and every child draws *with* it. The
+ *     cost was unchanged.
  *
- *  `BlurStyle.Normal` rather than `Outer`, because the halo layer is drawn
- *  beneath the block bodies — the block covers the middle regardless, and Outer
- *  on a composited layer would erase the overlap between adjacent halos that
- *  makes a multi-cell piece read as one shape. */
+ *  3. `<Group layer={paint}>` with a MASK filter on the paint. The `saveLayer`
+ *     happened, but Skia composites a layer using only the paint's alpha,
+ *     colour filter, IMAGE filter and blend mode. A mask filter operates on the
+ *     coverage of a geometry draw and is simply ignored at restore — so this
+ *     paid for an offscreen surface and produced crisp halos. Strictly worse
+ *     than doing nothing.
+ *
+ *  An image filter is the one of those four that blurs. `MakeBlur` with a null
+ *  input reads the dynamic source — the layer's own contents — so the children
+ *  are composited, blurred once, and drawn. Independent of cell count.
+ *
+ *  `TileMode.Decal` so the blur fades to transparent at the layer bounds rather
+ *  than smearing edge pixels outward across the board. */
 export function useBloomPaint(blur: number) {
   return useMemo(() => {
     if (blur <= 0) {
       return undefined;
     }
     const paint = Skia.Paint();
-    paint.setMaskFilter(Skia.MaskFilter.MakeBlur(BlurStyle.Normal, blur, true));
+    paint.setImageFilter(Skia.ImageFilter.MakeBlur(blur, blur, TileMode.Decal, null));
     return paint;
   }, [blur]);
 }
@@ -131,9 +138,11 @@ function BlocksLayerImpl({
           was not: a mask filter on a Group's paint is inherited by each child
           draw, so the GPU cost did not move at all.
 
-          `layer` is the difference. It issues a saveLayer, so the halos are
-          composited into one offscreen surface and the blur applies once to
-          that surface — genuinely independent of the cell count. */}
+          `layer` with an IMAGE filter is the difference. It issues a
+          saveLayer, and an image filter is one of the few things Skia actually
+          applies when compositing that layer back — so the halos are blurred
+          once, independent of the cell count. A mask filter there would be
+          ignored; see `useBloomPaint`. */}
       {glowing.length > 0 ? (
         <Group layer={bloomPaint}>
           {glowing.map((block) => (

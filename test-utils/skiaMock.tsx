@@ -77,18 +77,70 @@ const path = {
   }),
 };
 
-export const Skia = {
-  Path: path,
-  Paint: () => ({
+/** A paint that REMEMBERS what it was given.
+ *
+ *  Not gratuitous. Skia composites a `saveLayer` using only the paint's alpha,
+ *  colour filter, image filter and blend mode — a mask filter set on that paint
+ *  is silently ignored. The renderer shipped exactly that mistake once, paying
+ *  for an offscreen layer and getting no blur, and a source-scanning test
+ *  certified it because the code *looked* right.
+ *
+ *  Recording the setters lets a test ask what the paint actually carries, which
+ *  is the only question that distinguishes a working bloom from a wasted layer
+ *  without a device. */
+export type RecordedPaint = {
+  imageFilter: unknown;
+  maskFilter: unknown;
+  colorFilter: unknown;
+  setImageFilter: (value: unknown) => void;
+  setMaskFilter: (value: unknown) => void;
+  setColorFilter: (value: unknown) => void;
+  setColor: () => void;
+  setAlphaf: () => void;
+  setBlendMode: () => void;
+  setAntiAlias: () => void;
+  setStyle: () => void;
+  setStrokeWidth: () => void;
+};
+
+function makePaint(): RecordedPaint {
+  const paint: RecordedPaint = {
+    imageFilter: null,
+    maskFilter: null,
+    colorFilter: null,
+    setImageFilter(value) {
+      paint.imageFilter = value;
+    },
+    setMaskFilter(value) {
+      paint.maskFilter = value;
+    },
+    setColorFilter(value) {
+      paint.colorFilter = value;
+    },
     setColor() {},
     setAlphaf() {},
     setBlendMode() {},
-    setMaskFilter() {},
     setAntiAlias() {},
     setStyle() {},
     setStrokeWidth() {},
-  }),
-  MaskFilter: { MakeBlur: () => ({ __maskFilter: true }) },
+  };
+  return paint;
+}
+
+export const Skia = {
+  Path: path,
+  Paint: makePaint,
+  MaskFilter: {
+    MakeBlur: (style: unknown, sigma: unknown) => ({ __maskFilter: true, style, sigma }),
+  },
+  ImageFilter: {
+    MakeBlur: (sigmaX: unknown, sigmaY: unknown, mode: unknown) => ({
+      __imageFilter: true,
+      sigmaX,
+      sigmaY,
+      mode,
+    }),
+  },
   Color: (value: unknown) => value,
   Point: vec,
   XYWHRect: rect,

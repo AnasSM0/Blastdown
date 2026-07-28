@@ -1589,12 +1589,22 @@ the decision each one forced.
 more from the clear flashes, plus the sweeps. All halos now composite into one
 `saveLayer` and the blur applies once.
 
-The intermediate attempt is worth recording because it was wrong in an
-instructive way: moving the masks into a shared parent `<Group>` looks like
-grouping, and is not. A mask filter on a Group is inherited by each child draw,
-so the cost was identical — and the guard test, which counted `<BlurMask>`
-elements in the source, reported success. A test that measures the shape of the
-code rather than the behaviour it implies will confirm whatever the code says. The visual cost is that halos blend where blocks touch, which
+Two intermediate attempts are worth recording because both were wrong in
+instructive ways, and both were certified by a passing test.
+
+Moving the masks into a shared parent `<Group>` looks like grouping and is not:
+a mask filter on a Group is inherited by each child draw, so the cost was
+identical. Then putting a mask filter on the `saveLayer` paint looked like the
+real fix and was worse — Skia composites a layer using only alpha, colour
+filter, image filter and blend mode, so the mask was ignored and the renderer
+paid for an offscreen surface while drawing crisp halos.
+
+What ships is an **image** filter on the layer paint, which is one of the four
+things that survive the composite.
+
+The through-line: each attempt was confirmed by a guard that matched source
+patterns, and a test that checks the shape of the code will always agree with
+the code. The guard now constructs the paint and asks what it carries. The visual cost is that halos blend where blocks touch, which
 for a piece made of adjacent cells reads better than separate glows. The
 alternative — keeping per-cell softness — is not affordable on a mobile GPU at
 this count, and no amount of tuning changes that.

@@ -50,22 +50,31 @@ The comment above it claimed the halo was "a blurred copy of the block rather
 than a per-cell blur filter". That is not a distinction — it was a per-cell blur
 filter, and the comment made it read as a considered choice.
 
-**Fixed — on the second attempt.** The first fix moved all the halos into one
-`<Group>` with a single `<BlurMask>` child. That read as "one blur for all of
-them" and was not: in React Native Skia a mask filter on a Group becomes part of
-the group's **paint**, which every child then draws with, so N children still
-cost N blurred draws. The source changed and the GPU cost did not move at all.
+**Fixed on the third attempt.** The first two both looked right and did
+nothing, and the sequence is the most useful thing in this document:
 
-A single pass needs `saveLayer`, which in this API is the `layer` prop:
-`<Group layer={paint}>` composites the children into one offscreen surface and
-applies the paint to that surface once. That is what ships, via `useBloomPaint`.
-Badge halos use the same mechanism.
+1. **A `<BlurMask>` on every block.** One offscreen render pass per cell, under
+   a comment claiming it was not a per-cell blur.
 
-The guard test failed to catch the first attempt because it counted `<BlurMask>`
-elements per file — which measures how the code reads, not how many times the
-GPU applies it. It now bans the declarative element from the layers outright,
-since that form cannot express a single pass over many shapes, and separately
-asserts the `saveLayer` mechanism is present.
+2. **The same `<BlurMask>` moved into a shared parent `<Group>`.** This reads as
+   grouping and is not. In React Native Skia a mask filter on a Group becomes
+   part of that Group's paint, and every child draws _with_ it — so the cost was
+   completely unchanged. Only the source looked different.
+
+3. **`<Group layer={paint}>` with a MASK filter on the paint.** The `saveLayer`
+   really happened, but Skia composites a layer using only the paint's alpha,
+   colour filter, **image** filter and blend mode. A mask filter acts on the
+   coverage of a geometry draw and is ignored at restore. This paid for an
+   offscreen surface _and_ drew crisp halos — strictly worse than the bug it
+   replaced.
+
+What ships is `<Group layer={paint}>` with an **image** filter
+(`Skia.ImageFilter.MakeBlur`, `TileMode.Decal`), which is one of the four things
+that do survive the composite. One blur for the whole bloom, independent of cell
+count. `useBloomPaint` builds it; blocks and badges share it.
+
+Each of the first two attempts was certified by a guard test that scanned source
+text — see "Guards" for how that test was rewritten to ask the paint instead.
 
 ### 2. The "performance fix" that made it worse
 
@@ -155,26 +164,40 @@ and an explosion:
 
 Steady state, full board of glowing blocks: **1 blur pass** instead of 64.
 
-Both "after" figures depend entirely on `layer` doing what its type says. If the
-`saveLayer` never happens on device, the numbers revert to the "before" column —
-which is precisely what the first attempt at this fix looked like from here.
+Both "after" figures depend on the `saveLayer` and its image filter behaving on
+device as the API describes. That has now been got wrong twice from this
+machine, so it is worth stating bluntly: if the composite does not blur, the
+numbers revert to the "before" column and the board also loses its bloom
+entirely. This is the single most valuable thing for device QA to eyeball —
+**do the placed blocks still glow?**
 
 ## Guards
 
 `__tests__/rendering/cinematicGpuBudget.test.ts` enforces the invariants these
 fixes depend on, because every one of them regressed silently once:
 
-- No `BlurMask` inside a `.map(` callback — that is what a per-cell pass looks
-  like in source form.
-- At most one `BlurMask` per layer file; none at all in the effects layer.
+- **The bloom paint is built for real and inspected.** It must carry an image
+  filter and must not carry a mask filter — the distinction that decides whether
+  the bloom exists at all. The jest Skia mock records what each paint is given,
+  which is what makes this checkable without a device.
+- No declarative `<BlurMask>` anywhere in the canvas layers: that form cannot
+  express a single pass over many shapes, wherever it is placed.
+- No blur of any kind in the effects layer.
 - Sweeps, flashes and rings capped, tested with deliberately impossible plans
   (40 cleared rows on an 8×8 board, 80 defuses).
 - The debris budget stops the traversal, not just the emission — 12,800 cells
   offered against a 24 budget must finish fast.
 - A worst-case turn stays under 160 animated primitives.
 
-The guards strip comments before scanning. The first version fired on the
+The guards strip comments before scanning — an early version fired on the
 renderer's own documentation, which quotes the syntax it bans.
+
+The more important lesson is why the blur guard was rewritten twice. Both
+earlier versions matched source patterns, and both certified a bloom that did
+not exist: first `<BlurMask>` moved into a parent Group, then a mask filter on a
+`saveLayer` paint. A test that checks the shape of the code will agree with the
+code. Asking the constructed paint what it carries is the first version that
+could have caught either failure.
 
 ## Remaining bottlenecks
 

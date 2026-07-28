@@ -1,8 +1,12 @@
+import { renderHook } from "@testing-library/react-native";
+
 import { buildEffectScene } from "../../src/rendering/cinematic/effects/effectScene";
+import { useBloomPaint } from "../../src/rendering/cinematic/layers/BlocksLayer";
 import { sceneGeometry } from "../../src/rendering/cinematic/geometry";
 import { cinematicPalette } from "../../src/rendering/cinematic/palette";
 import { resolveTheme } from "../../src/ui/themes";
 import type { EffectPlan } from "../../src/ui/effects/eventEffects";
+import type { RecordedPaint } from "../../test-utils/skiaMock";
 
 /** GPU and UI-thread budget guards.
  *
@@ -36,6 +40,17 @@ function stripComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 }
 
+/** Run a hook and hand back its value.
+ *
+ *  `useBloomPaint` is a hook, so it needs a render to run — and running it for
+ *  real is the point: the paint under test is the one the renderer will build. */
+async function renderHookResult<T>(hook: () => T): Promise<T> {
+  // RNTL 14 is fully async — renderHook returns a promise wrapping its own
+  // act(). Awaiting it is not optional; a synchronous read gets undefined.
+  const { result } = await renderHook(hook);
+  return result.current;
+}
+
 function layerSources(): { file: string; source: string }[] {
   const walk = (dir: string): string[] =>
     readdirSync(dir).flatMap((entry) => {
@@ -49,65 +64,66 @@ function layerSources(): { file: string; source: string }[] {
 }
 
 describe("blur is applied once, not once per cell", () => {
-  /** The guard that already failed once, and why it failed.
+  /** This guard has now been wrong twice, and both failures were the same
+   *  mistake: it checked what the SOURCE looked like instead of what the paint
+   *  would do.
    *
-   *  The first version of this file counted `<BlurMask>` elements per file and
-   *  passed when a layer had one. That measured the wrong thing entirely. In
-   *  React Native Skia, a `<BlurMask>` inside a `<Group>` becomes part of the
-   *  GROUP'S PAINT, and every child then draws with that paint — so one element
-   *  in the source is still one blurred draw per child. Moving 64 per-block
-   *  masks into a shared parent changed how the code read and nothing about
-   *  what the GPU did, and this test said it was fixed.
+   *  Version one counted `<BlurMask>` elements per file and passed when a layer
+   *  had one. But a mask filter declared inside a `<Group>` becomes part of that
+   *  group's paint and every child draws with it, so one element in the source
+   *  was still one blurred draw per cell. The test certified a fix that had not
+   *  happened.
    *
-   *  A single pass requires `saveLayer`, which in this API is the `layer` prop:
-   *  children are composited into one offscreen surface and the paint applies
-   *  to that surface once. So the rule is not "at most one BlurMask element" —
-   *  it is "no BlurMask element at all in a layer", because the declarative
-   *  form cannot express a single pass over many shapes. */
+   *  Version two asserted the source contained `Skia.MaskFilter.MakeBlur` and
+   *  `<Group layer={...}>`. Both were present, and the combination does
+   *  nothing: Skia composites a `saveLayer` using only the paint's alpha,
+   *  colour filter, IMAGE filter and blend mode. A mask filter is ignored at
+   *  restore. That version paid for an offscreen surface and drew crisp halos —
+   *  worse than the bug it replaced — and the test said it was correct.
+   *
+   *  So this version asks the paint. `useBloomPaint` is called for real and the
+   *  resulting paint is inspected: it must carry an image filter, and it must
+   *  not carry a mask filter. That is the distinction that decides whether the
+   *  bloom exists at all, and it is checkable without a device. */
+
+  it("gives the bloom paint an image filter, which survives a layer composite", async () => {
+    const paint = (await renderHookResult(() => useBloomPaint(6))) as RecordedPaint | undefined;
+
+    expect(paint).toBeDefined();
+    expect(paint!.imageFilter).toMatchObject({ __imageFilter: true });
+  });
+
+  it("gives the bloom paint no mask filter, which would not", async () => {
+    // The whole failure of the previous attempt, in one assertion.
+    const paint = (await renderHookResult(() => useBloomPaint(6))) as RecordedPaint | undefined;
+
+    expect(paint!.maskFilter).toBeNull();
+  });
+
+  it("blurs both axes by the requested radius", async () => {
+    const paint = (await renderHookResult(() => useBloomPaint(9))) as RecordedPaint | undefined;
+
+    expect(paint!.imageFilter).toMatchObject({ sigmaX: 9, sigmaY: 9 });
+  });
+
+  it("builds no paint at all when the theme has no glow", async () => {
+    // A zero-glow theme should not pay for a saveLayer to blur nothing.
+    expect(await renderHookResult(() => useBloomPaint(0))).toBeUndefined();
+  });
 
   it("uses no declarative BlurMask anywhere in the canvas layers", () => {
+    // The declarative element cannot express a single pass over many shapes:
+    // wherever it sits, it ends up on a paint that each child draws with.
     const offenders = layerSources()
       .filter(({ source }) => /<BlurMask/.test(source))
       .map(({ file }) => file);
-
-    // If softness is needed for a group, build an SkPaint with a mask filter
-    // and pass it as `layer` — see `useBloomPaint`. If it is needed for exactly
-    // one shape that is drawn once, this rule is stricter than necessary, and
-    // relaxing it deliberately is fine; relaxing it by accident is what this
-    // catches.
-    expect(offenders).toEqual([]);
-  });
-
-  it("builds its bloom through a saveLayer paint", () => {
-    // The positive half: the mechanism that actually collapses the passes must
-    // be present, or a future edit could satisfy the rule above by deleting the
-    // bloom rather than by grouping it.
-    const source = readFileSync("src/rendering/cinematic/layers/BlocksLayer.tsx", "utf8");
-
-    expect(source).toMatch(/Skia\.MaskFilter\.MakeBlur/);
-    expect(source).toMatch(/<Group layer=\{bloomPaint\}>/);
-  });
-
-  it("wraps every bloom group in a layer rather than a bare Group", () => {
-    // Any Group whose children are a map of halos must carry `layer`. A bare
-    // Group with a mask filter is the exact shape of the original mistake.
-    const offenders: string[] = [];
-
-    for (const { file, source } of layerSources()) {
-      const lines = source.split("\n");
-      lines.forEach((line, index) => {
-        if (/bloomPaint/.test(line) && /<Group/.test(line) && !/layer=/.test(line)) {
-          offenders.push(`${file}:${index + 1}`);
-        }
-      });
-    }
 
     expect(offenders).toEqual([]);
   });
 
   it("draws effect primitives with no blur at all", () => {
     // Effects are the uncapped-in-principle ones: one flash per cleared cell,
-    // one ring per defused piece. Any mask on those scales with the turn.
+    // one ring per defused piece. Any blur on those scales with the turn.
     const source = stripComments(
       readFileSync("src/rendering/cinematic/layers/EffectsLayer.tsx", "utf8"),
     );
