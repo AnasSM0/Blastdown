@@ -122,6 +122,18 @@ const REDUCED_FLASH_MS = 140;
 
 const BURST_DISTANCE = 10;
 
+/** Renderer-side caps.
+ *
+ *  Authoritative gameplay already bounds these — an 8x8 board cannot clear more
+ *  than 8 rows, and the domain deduplicates its own event cells. But the
+ *  RENDERER should not depend on that: a duplicated or malformed event would
+ *  otherwise mount an unbounded number of components on the frame the app is
+ *  working hardest. These are backstops, set well above anything real play
+ *  produces, so they never truncate a legitimate turn. */
+const MAX_SWEEPS = 16;
+const MAX_FLASHES = 128;
+const MAX_RINGS = 16;
+
 function debrisAngle(row: number, column: number): number {
   // Deterministic, not random: the same cell throws debris the same way every
   // time, so a replayed explosion looks like the same explosion. Two odd
@@ -152,6 +164,9 @@ export function buildEffectScene(
   // waits for the slower of the two lanes.
   if (!reducedMotion) {
     for (const row of plan.rows) {
+      if (sweeps.length >= MAX_SWEEPS) {
+        break;
+      }
       sweeps.push({
         key: `sweep-row-${row}`,
         rect: laneRect(geometry, "row", row),
@@ -162,6 +177,9 @@ export function buildEffectScene(
       });
     }
     for (const column of plan.columns) {
+      if (sweeps.length >= MAX_SWEEPS) {
+        break;
+      }
       sweeps.push({
         key: `sweep-col-${column}`,
         rect: laneRect(geometry, "column", column),
@@ -202,6 +220,9 @@ export function buildEffectScene(
   // centroid. Never a board-wide effect — a defuse is local by definition.
   for (const defuse of plan.defuses) {
     for (const cell of defuse.cells) {
+      if (flashes.length >= MAX_FLASHES) {
+        break;
+      }
       flashes.push({
         key: `defuse-${defuse.pieceId}-${cell.row}-${cell.column}`,
         rect: cellRect(geometry, cell.row, cell.column),
@@ -211,7 +232,7 @@ export function buildEffectScene(
         settles: false,
       });
     }
-    if (defuse.cells.length > 0) {
+    if (defuse.cells.length > 0 && rings.length < MAX_RINGS) {
       const rects = defuse.cells.map((cell) => cellRect(geometry, cell.row, cell.column));
       const centers = rects.map(rectCenter);
       rings.push({
@@ -232,12 +253,15 @@ export function buildEffectScene(
   // is why it can be capped without lying: the rubble is drawn by the board
   // regardless, so a dropped burst costs a flourish, not information.
   let burstBudget = MAX_BURST_CELLS;
-  plan.explosions.forEach((explosion, index) => {
+  // Indexed loops rather than forEach, so an exhausted budget stops the whole
+  // traversal. `return` inside a forEach callback only skips one cell, so the
+  // previous version kept walking every remaining cell of every remaining
+  // explosion long after it could emit anything.
+  for (let index = 0; index < plan.explosions.length && burstBudget > 0; index++) {
+    const explosion = plan.explosions[index];
     const pieceDelay = Math.min(index * EXPLOSION_STAGGER_MS, EXPLOSION_STAGGER_CAP_MS);
-    explosion.cells.forEach((cell, cellIndex) => {
-      if (burstBudget <= 0) {
-        return;
-      }
+    for (let cellIndex = 0; cellIndex < explosion.cells.length && burstBudget > 0; cellIndex++) {
+      const cell = explosion.cells[cellIndex];
       burstBudget -= 1;
       bursts.push({
         key: `burst-${cell.row}-${cell.column}`,
@@ -253,8 +277,8 @@ export function buildEffectScene(
             ),
         durationMs: reducedMotion ? REDUCED_FLASH_MS : BURST_MS,
       });
-    });
-  });
+    }
+  }
 
   // Revive: a restoration wave down the rows the revive gave back, over a board
   // that is already interactive again.

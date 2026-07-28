@@ -2,15 +2,16 @@ import { contourMaskOf, type CellEdges } from "../../components/GridCell";
 import { getRubbleGeometry } from "../../components/RubbleSurface/rubbleGeometry";
 import { getBadgeVisual } from "../../components/TimerBadge/timerBadgeStyle";
 import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
+import type { PlacementPreview } from "../../domain/selectors";
 import { blockSurface, type BlockVariant } from "../../ui/blockSurface";
-import { blockColor } from "../../ui/themes";
+import { blockColor, type ThemePalette } from "../../ui/themes";
 import { getTimerVisualState } from "../../ui/timerStates";
 import { badgeRect, cellRect } from "./geometry";
 import type {
   BoardScene,
   BoardSceneInput,
   SceneBlock,
-  SceneEmptyCell,
+  SceneGeometry,
   SceneNumeral,
   ScenePreview,
   ScenePreviewState,
@@ -65,39 +66,17 @@ const PREVIEW_VARIANT: Record<ScenePreviewState, BlockVariant> = {
 };
 
 export function buildBoardScene(input: BoardSceneInput): BoardScene {
-  const {
-    grid,
-    badges,
-    preview,
-    theme,
-    geometry,
-    palette,
-    highlightPieceId,
-    frozen,
-    reducedMotion,
-  } = input;
+  const { grid, badges, theme, geometry, palette, highlightPieceId, frozen, reducedMotion } = input;
   const size = grid.length;
 
-  const empties: SceneEmptyCell[] = [];
   const blocks: SceneBlock[] = [];
   const rubble: SceneRubble[] = [];
   const numerals: SceneNumeral[] = [];
-  const previewCells: ScenePreview[] = [];
 
   // Nothing is measurable before layout. Returning an empty scene rather than a
   // half-built one keeps the "board not ready" case identical in both renderers.
   if (geometry.cellSize <= 0) {
-    return {
-      geometry,
-      palette,
-      empties,
-      blocks,
-      rubble,
-      preview: previewCells,
-      numerals,
-      frozen,
-      reducedMotion,
-    };
+    return { geometry, palette, blocks, rubble, numerals, frozen, reducedMotion };
   }
 
   // Pieces whose countdown is urgent get the "critical" block material. Derived
@@ -113,11 +92,14 @@ export function buildBoardScene(input: BoardSceneInput): BoardScene {
     const rowCells = grid[row];
     for (let column = 0; column < rowCells.length; column++) {
       const cell = rowCells[column];
+      // Empty cells are not described here: they are baked into the cached
+      // board picture, which is why they cost nothing per turn. Building scene
+      // objects for them was 128 allocations per rebuild that nothing drew.
+      if (cell.kind === "empty") {
+        continue;
+      }
       const rect = cellRect(geometry, row, column);
       switch (cell.kind) {
-        case "empty":
-          empties.push({ row, column, rect });
-          break;
         case "rubble":
           rubble.push({ row, column, rect, geometry: getRubbleGeometry(row, column) });
           break;
@@ -144,32 +126,6 @@ export function buildBoardScene(input: BoardSceneInput): BoardScene {
     }
   }
 
-  if (preview) {
-    // Conflicts are applied after the base ghost so an overlapping cell takes
-    // the stronger treatment, matching the React Native board's map ordering.
-    const states = new Map<string, ScenePreviewState>();
-    for (const cell of preview.cells) {
-      states.set(`${cell.row},${cell.column}`, preview.valid ? "valid" : "invalid");
-    }
-    for (const cell of preview.conflictCells) {
-      states.set(`${cell.row},${cell.column}`, "conflict");
-    }
-    for (const [key, state] of states) {
-      const [row, column] = key.split(",").map(Number);
-      // Valid ghosts take the theme accent; invalid and conflicting ones take
-      // the danger hue AND a dashed edge, so "can't place here" is never
-      // signalled by colour alone.
-      const accent = state === "valid" ? theme.accent : theme.timerCritical;
-      previewCells.push({
-        row,
-        column,
-        rect: cellRect(geometry, row, column),
-        state,
-        surface: blockSurface(theme, accent, PREVIEW_VARIANT[state]),
-      });
-    }
-  }
-
   for (const badge of badges) {
     const state = getTimerVisualState(badge.remainingTurns);
     const visual = getBadgeVisual(state, frozen, theme);
@@ -185,15 +141,54 @@ export function buildBoardScene(input: BoardSceneInput): BoardScene {
     });
   }
 
-  return {
-    geometry,
-    palette,
-    empties,
-    blocks,
-    rubble,
-    preview: previewCells,
-    numerals,
-    frozen,
-    reducedMotion,
-  };
+  return { geometry, palette, blocks, rubble, numerals, frozen, reducedMotion };
 }
+
+/** The placement ghost for the piece under the finger.
+ *
+ *  Separate from `buildBoardScene` because it is the only thing that changes
+ *  during a drag — see `PreviewScene` for why that matters. Pure, and cheap:
+ *  a shape covers at most four cells.
+ *
+ *  Conflicts are applied AFTER the base ghost so an overlapping cell takes the
+ *  stronger treatment. The domain reports a conflicting cell in both lists, so
+ *  the reverse order would silently downgrade an overlap to an ordinary invalid
+ *  ghost — and an overlap is the case a player most needs to see. */
+export function buildPreviewCells(
+  preview: PlacementPreview | null | undefined,
+  geometry: SceneGeometry,
+  theme: ThemePalette,
+): ScenePreview[] {
+  if (!preview || geometry.cellSize <= 0) {
+    return EMPTY_PREVIEW;
+  }
+
+  const states = new Map<string, ScenePreviewState>();
+  for (const cell of preview.cells) {
+    states.set(`${cell.row},${cell.column}`, preview.valid ? "valid" : "invalid");
+  }
+  for (const cell of preview.conflictCells) {
+    states.set(`${cell.row},${cell.column}`, "conflict");
+  }
+
+  const cells: ScenePreview[] = [];
+  for (const [key, state] of states) {
+    const [row, column] = key.split(",").map(Number);
+    // Valid ghosts take the theme accent; invalid and conflicting ones take the
+    // danger hue AND a dashed edge, so "can't place here" is never signalled by
+    // colour alone.
+    const accent = state === "valid" ? theme.accent : theme.timerCritical;
+    cells.push({
+      row,
+      column,
+      rect: cellRect(geometry, row, column),
+      state,
+      surface: blockSurface(theme, accent, PREVIEW_VARIANT[state]),
+    });
+  }
+  return cells;
+}
+
+/** Shared empty result, so "no piece held" — the common case — allocates
+ *  nothing and keeps a stable identity the memoized preview layer can skip. */
+const EMPTY_PREVIEW: ScenePreview[] = [];

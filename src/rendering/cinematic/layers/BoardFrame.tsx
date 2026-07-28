@@ -1,5 +1,5 @@
 import { Picture, Skia, createPicture, PaintStyle } from "@shopify/react-native-skia";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 
 import { boardDrawCommands } from "../boardPicture";
 import type { CinematicPalette, SceneGeometry } from "../types";
@@ -15,7 +15,7 @@ import type { CinematicPalette, SceneGeometry } from "../types";
  *  first. The loop below is the only part that cannot be tested off a device,
  *  and it is deliberately the dullest code in the renderer: no conditionals
  *  beyond the command kind, no geometry, no colour decisions. */
-export function BoardFrame({
+function BoardFrameImpl({
   geometry,
   palette,
 }: {
@@ -57,3 +57,12 @@ export function BoardFrame({
 
   return <Picture picture={picture} />;
 }
+
+/** Memoized. Every prop is either a primitive or an array whose identity the
+ *  scene adapter deliberately preserves, so a change that does not touch this
+ *  layer costs one shallow comparison instead of a re-render and a Skia
+ *  reconciliation of every node beneath it.
+ *
+ *  This is what makes the board/preview split pay off: dragging a piece rebuilds
+ *  only the preview array, and the block, rubble and numeral layers all skip. */
+export const BoardFrame = memo(BoardFrameImpl);

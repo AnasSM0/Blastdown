@@ -104,14 +104,6 @@ export type SceneNumeral = {
   visual: BadgeVisual;
 };
 
-/** Empty cells. Drawn as part of the cached board picture where possible — they
- *  only change when the board size or theme changes, not per turn. */
-export type SceneEmptyCell = {
-  row: number;
-  column: number;
-  rect: SceneRect;
-};
-
 /** Colours the canvas draws with, resolved once from the active theme. Kept
  *  separate from `ThemePalette` so the canvas never reaches into theme internals
  *  and so the derived cinematic tones (rim, bevel, scanline, vignette) have one
@@ -190,13 +182,22 @@ export type SceneGeometry = {
   cellRadius: number;
 };
 
+/** The placement ghost, built SEPARATELY from the board.
+ *
+ *  This split is a performance decision, not a tidiness one. The preview is the
+ *  only part of the board that changes while a finger is moving, and folding it
+ *  into `BoardScene` meant that crossing one cell boundary rebuilt all 64 cells,
+ *  every block's material and every badge's visual — then handed every layer
+ *  new array identities, so Skia reconciled the whole tree for a change to
+ *  about four cells. Keeping them apart lets the board's arrays keep their
+ *  identity across a drag, which the memoized layers then skip entirely. */
+export type PreviewScene = readonly ScenePreview[];
+
 export type BoardScene = {
   geometry: SceneGeometry;
   palette: CinematicPalette;
-  empties: readonly SceneEmptyCell[];
   blocks: readonly SceneBlock[];
   rubble: readonly SceneRubble[];
-  preview: readonly ScenePreview[];
   numerals: readonly SceneNumeral[];
   /** True while the run's rewarded freeze is active. */
   frozen: boolean;
@@ -212,7 +213,6 @@ export type BoardScene = {
 export type BoardSceneInput = {
   grid: readonly (readonly import("../../domain/gameTypes").GridCell[])[];
   badges: readonly import("../../domain/selectors").TimerBadgePlacement[];
-  preview: import("../../domain/selectors").PlacementPreview | null | undefined;
   theme: import("../../ui/themes").ThemePalette;
   /** Geometry and palette are supplied by the caller rather than derived here,
    *  and their IDENTITY is load-bearing. The cached board `Picture` is memoized

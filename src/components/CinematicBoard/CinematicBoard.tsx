@@ -9,7 +9,7 @@ import { CinematicBoardCanvas } from "../../rendering/cinematic/CinematicBoardCa
 import { buildEffectScene } from "../../rendering/cinematic/effects/effectScene";
 import { sceneGeometry } from "../../rendering/cinematic/geometry";
 import { cinematicPalette } from "../../rendering/cinematic/palette";
-import { buildBoardScene } from "../../rendering/cinematic/scene";
+import { buildBoardScene, buildPreviewCells } from "../../rendering/cinematic/scene";
 import { radius } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import { getTimerVisualState } from "../../ui/timerStates";
@@ -121,12 +121,16 @@ function CinematicBoardImpl(
   const geometry = useMemo(() => sceneGeometry(boardSide, grid.length), [boardSide, grid.length]);
   const palette = useMemo(() => cinematicPalette(theme), [theme]);
 
+  // The board, WITHOUT the preview. `preview` is deliberately absent from these
+  // dependencies: it changes every time a dragged piece crosses a cell
+  // boundary, and including it rebuilt all 64 cells, every block material and
+  // every badge visual for a change affecting about four cells — then handed
+  // each layer a new array identity, so Skia reconciled the whole tree too.
   const scene = useMemo(
     () =>
       buildBoardScene({
         grid,
         badges,
-        preview,
         theme,
         geometry,
         palette,
@@ -134,7 +138,14 @@ function CinematicBoardImpl(
         frozen,
         reducedMotion,
       }),
-    [grid, badges, preview, theme, geometry, palette, highlightPieceId, frozen, reducedMotion],
+    [grid, badges, theme, geometry, palette, highlightPieceId, frozen, reducedMotion],
+  );
+
+  // The ghost, rebuilt on its own. At most four cells, and the "nothing held"
+  // case returns a shared empty array so the memoized layer skips entirely.
+  const previewCells = useMemo(
+    () => buildPreviewCells(preview, geometry, theme),
+    [preview, geometry, theme],
   );
 
   const { cellSize, pitch, contentInset } = geometry;
@@ -210,6 +221,7 @@ function CinematicBoardImpl(
       {cellSize > 0 ? (
         <CinematicBoardCanvas
           scene={scene}
+          preview={previewCells}
           effects={effects}
           elapsed={elapsed}
           font={font}

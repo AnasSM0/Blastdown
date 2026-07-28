@@ -71,7 +71,6 @@ describe("geometry and palette are stable across turns", () => {
     const first = buildBoardScene({
       grid: grid(),
       badges: [],
-      preview: null,
       theme,
       geometry,
       palette,
@@ -82,7 +81,6 @@ describe("geometry and palette are stable across turns", () => {
     const second = buildBoardScene({
       grid: grid(),
       badges: [],
-      preview: null,
       theme,
       geometry,
       palette,
@@ -106,7 +104,6 @@ describe("geometry and palette are stable across turns", () => {
     const scene = buildBoardScene({
       grid: grid(),
       badges: [],
-      preview: null,
       theme,
       geometry,
       palette,

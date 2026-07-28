@@ -2,7 +2,7 @@ import type { GridCell as DomainGridCell } from "../../src/domain/gameTypes";
 import type { TimerBadgePlacement } from "../../src/domain/selectors";
 import { sceneGeometry } from "../../src/rendering/cinematic/geometry";
 import { cinematicPalette } from "../../src/rendering/cinematic/palette";
-import { buildBoardScene } from "../../src/rendering/cinematic/scene";
+import { buildBoardScene, buildPreviewCells } from "../../src/rendering/cinematic/scene";
 import type { BoardSceneInput } from "../../src/rendering/cinematic/types";
 import { blockSurface } from "../../src/ui/blockSurface";
 import { blockColor, resolveTheme, THEMES } from "../../src/ui/themes";
@@ -29,7 +29,6 @@ function sceneInput(
   return {
     grid: emptyGrid(),
     badges: [],
-    preview: null,
     theme: palette,
     // Geometry and palette are the caller's to own and memoize — see
     // `BoardSceneInput`. The tests build them the same way the component does.
@@ -51,19 +50,28 @@ describe("the scene describes every cell of the board", () => {
 
     const scene = buildBoardScene(sceneInput({ grid }));
 
-    // 64 cells, each described exactly once across the three lists. A cell that
-    // appeared twice would be drawn twice, and a cell that appeared in neither
-    // would be an invisible hole in the board.
+    // Every OCCUPIED cell described exactly once. Empty cells are deliberately
+    // absent: they are baked into the cached board picture, so describing them
+    // here would be 64 allocations per rebuild that nothing draws.
     const keys = [
-      ...scene.empties.map((c) => `${c.row},${c.column}`),
       ...scene.blocks.map((c) => `${c.row},${c.column}`),
       ...scene.rubble.map((c) => `${c.row},${c.column}`),
     ];
-    expect(keys).toHaveLength(64);
-    expect(new Set(keys).size).toBe(64);
+    expect(keys).toHaveLength(3);
+    expect(new Set(keys).size).toBe(3);
     expect(scene.blocks).toHaveLength(2);
     expect(scene.rubble).toHaveLength(1);
-    expect(scene.empties).toHaveLength(61);
+  });
+
+  it("describes no empty cells at all, because the cached picture draws them", () => {
+    // A regression guard with a performance reason: the first version built a
+    // rect and a scene object for all 64 cells on every rebuild, and the canvas
+    // never read them.
+    const scene = buildBoardScene(sceneInput());
+
+    expect(scene.blocks).toHaveLength(0);
+    expect(scene.rubble).toHaveLength(0);
+    expect("empties" in scene).toBe(false);
   });
 
   it("draws nothing at all before the board has been measured", () => {
@@ -73,7 +81,6 @@ describe("the scene describes every cell of the board", () => {
     const scene = buildBoardScene(sceneInput({ boardSide: 0 }));
 
     expect(scene.geometry.cellSize).toBe(0);
-    expect(scene.empties).toHaveLength(0);
     expect(scene.blocks).toHaveLength(0);
     expect(scene.numerals).toHaveLength(0);
   });
@@ -152,44 +159,76 @@ describe("block material comes from the shared surface helper", () => {
 });
 
 describe("the placement preview", () => {
+  const geometry = sceneGeometry(BOARD_SIDE, 8);
+
   it("marks a conflicting cell as a conflict even though it is also a ghost cell", () => {
     // The domain reports a conflicting cell in BOTH lists. Applying conflicts
     // last is what makes the stronger treatment win; the reverse order would
-    // silently downgrade an overlap to an ordinary invalid ghost.
-    const scene = buildBoardScene(
-      sceneInput({
-        preview: {
-          valid: false,
-          cells: [
-            { row: 1, column: 1 },
-            { row: 1, column: 2 },
-          ],
-          conflictCells: [{ row: 1, column: 2 }],
-        },
-      }),
+    // silently downgrade an overlap to an ordinary invalid ghost, and an
+    // overlap is the case a player most needs to see.
+    const cells = buildPreviewCells(
+      {
+        valid: false,
+        cells: [
+          { row: 1, column: 1 },
+          { row: 1, column: 2 },
+        ],
+        conflictCells: [{ row: 1, column: 2 }],
+      },
+      geometry,
+      theme,
     );
 
-    expect(scene.preview).toHaveLength(2);
-    expect(scene.preview.find((p) => p.column === 1)!.state).toBe("invalid");
-    expect(scene.preview.find((p) => p.column === 2)!.state).toBe("conflict");
+    expect(cells).toHaveLength(2);
+    expect(cells.find((p) => p.column === 1)!.state).toBe("invalid");
+    expect(cells.find((p) => p.column === 2)!.state).toBe("conflict");
   });
 
   it("gives an unplaceable ghost a dashed edge, not just a different colour", () => {
-    const invalid = buildBoardScene(
-      sceneInput({
-        preview: { valid: false, cells: [{ row: 0, column: 0 }], conflictCells: [] },
-      }),
-    ).preview[0];
-    const valid = buildBoardScene(
-      sceneInput({
-        preview: { valid: true, cells: [{ row: 0, column: 0 }], conflictCells: [] },
-      }),
-    ).preview[0];
+    const invalid = buildPreviewCells(
+      { valid: false, cells: [{ row: 0, column: 0 }], conflictCells: [] },
+      geometry,
+      theme,
+    )[0];
+    const valid = buildPreviewCells(
+      { valid: true, cells: [{ row: 0, column: 0 }], conflictCells: [] },
+      geometry,
+      theme,
+    )[0];
 
     // `docs/GAME_RULES.md` forbids signalling state by colour alone. The dash is
     // that second channel, and it is the half a colour-blind player relies on.
     expect(invalid.surface.dashed).toBe(true);
     expect(valid.surface.dashed).toBe(false);
+  });
+
+  it("returns one stable empty array when no piece is held", () => {
+    // The common case, and the one that runs on every render of an idle board.
+    // A fresh [] each time would give the memoized preview layer a new identity
+    // and defeat the split this function exists for.
+    const first = buildPreviewCells(null, geometry, theme);
+    const second = buildPreviewCells(undefined, geometry, theme);
+
+    expect(first).toHaveLength(0);
+    expect(second).toBe(first);
+  });
+
+  it("draws nothing before the board has been measured", () => {
+    const cells = buildPreviewCells(
+      { valid: true, cells: [{ row: 0, column: 0 }], conflictCells: [] },
+      sceneGeometry(0, 8),
+      theme,
+    );
+
+    expect(cells).toHaveLength(0);
+  });
+
+  it("is not part of the board scene, so a drag cannot invalidate the board", () => {
+    // The performance contract in one assertion: crossing a cell boundary must
+    // not be able to rebuild the 64-cell board.
+    const scene = buildBoardScene(sceneInput());
+
+    expect("preview" in scene).toBe(false);
   });
 });
 

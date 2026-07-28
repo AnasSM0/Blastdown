@@ -1,4 +1,5 @@
 import { DashPathEffect, Group, RoundedRect } from "@shopify/react-native-skia";
+import { memo } from "react";
 
 import type { ScenePreview, SceneGeometry } from "../types";
 
@@ -15,7 +16,7 @@ import type { ScenePreview, SceneGeometry } from "../types";
  *  an overlap with an occupied cell, so the ghost has to be visible on top of
  *  whatever it collides with — that is the whole information content of the
  *  state. */
-export function PreviewLayer({
+function PreviewLayerImpl({
   preview,
   geometry,
 }: {
@@ -57,3 +58,12 @@ export function PreviewLayer({
     </Group>
   );
 }
+
+/** Memoized. Every prop is either a primitive or an array whose identity the
+ *  scene adapter deliberately preserves, so a change that does not touch this
+ *  layer costs one shallow comparison instead of a re-render and a Skia
+ *  reconciliation of every node beneath it.
+ *
+ *  This is what makes the board/preview split pay off: dragging a piece rebuilds
+ *  only the preview array, and the block, rubble and numeral layers all skip. */
+export const PreviewLayer = memo(PreviewLayerImpl);

@@ -8,7 +8,7 @@ import { EffectsLayer } from "./layers/EffectsLayer";
 import { NumeralsLayer } from "./layers/NumeralsLayer";
 import { PreviewLayer } from "./layers/PreviewLayer";
 import { RubbleLayer } from "./layers/RubbleLayer";
-import type { BoardScene } from "./types";
+import type { BoardScene, PreviewScene } from "./types";
 
 /** The single canvas.
  *
@@ -34,12 +34,15 @@ import type { BoardScene } from "./types";
  *  `test-utils/skiaMock.tsx` for why that constraint exists and what it costs. */
 export function CinematicBoardCanvas({
   scene,
+  preview,
   effects,
   elapsed,
   font,
   style,
 }: {
   scene: BoardScene;
+  /** Separate from the scene so a drag does not invalidate the board. */
+  preview: PreviewScene;
   effects: EffectScene | null;
   /** Milliseconds since the current effect sequence started. */
   elapsed: SharedValue<number>;
@@ -68,11 +71,23 @@ export function CinematicBoardCanvas({
 
   return (
     <Canvas style={style ?? { width: geometry.boardSide, height: geometry.boardSide }}>
-      <Group transform={transform}>
+      {/* The transform is bound ONLY when a shake is actually playing.
+          Previously it was always bound, so every effect sequence — a line
+          clear, a defuse, a revive, none of which shake — drove an animated
+          transform on the group wrapping the ENTIRE board, including the cached
+          static picture. That forces the whole board to recomposite every frame
+          for the whole sequence, which is the most expensive thing this
+          renderer can do and it was happening on almost every turn.
+
+          The Group itself stays in the tree either way. Conditionally wrapping
+          would change the tree shape when a shake starts, remounting every
+          layer and rebuilding the cached picture — trading one problem for a
+          worse one. */}
+      <Group transform={shake > 0 ? transform : undefined}>
         <BoardFrame geometry={geometry} palette={palette} />
         <RubbleLayer rubble={scene.rubble} geometry={geometry} palette={palette} />
         <BlocksLayer blocks={scene.blocks} geometry={geometry} palette={palette} />
-        <PreviewLayer preview={scene.preview} geometry={geometry} />
+        <PreviewLayer preview={preview} geometry={geometry} />
         {effects ? <EffectsLayer scene={effects} elapsed={elapsed} font={font} /> : null}
         <NumeralsLayer numerals={scene.numerals} palette={palette} font={font} />
       </Group>

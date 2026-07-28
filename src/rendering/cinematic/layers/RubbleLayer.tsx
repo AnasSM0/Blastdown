@@ -1,4 +1,5 @@
 import { Group, Line, RoundedRect, vec } from "@shopify/react-native-skia";
+import { memo } from "react";
 
 import { alpha } from "../palette";
 import type { CinematicPalette, SceneGeometry, SceneRubble } from "../types";
@@ -16,7 +17,7 @@ import type { CinematicPalette, SceneGeometry, SceneRubble } from "../types";
  *  deterministic preset table the React Native renderer uses: a given cell
  *  cracks identically in both renderers, every frame, and across sessions. That
  *  determinism is what stops a board of rubble shimmering as it redraws. */
-export function RubbleLayer({
+function RubbleLayerImpl({
   rubble,
   geometry,
   palette,
@@ -95,3 +96,12 @@ export function RubbleLayer({
     </Group>
   );
 }
+
+/** Memoized. Every prop is either a primitive or an array whose identity the
+ *  scene adapter deliberately preserves, so a change that does not touch this
+ *  layer costs one shallow comparison instead of a re-render and a Skia
+ *  reconciliation of every node beneath it.
+ *
+ *  This is what makes the board/preview split pay off: dragging a piece rebuilds
+ *  only the preview array, and the block, rubble and numeral layers all skip. */
+export const RubbleLayer = memo(RubbleLayerImpl);

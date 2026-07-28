@@ -64,15 +64,44 @@ type DragState = {
   startY: number;
 };
 
-function shapeBoundsFor(shapeId: string): { maxRow: number; maxColumn: number } | null {
-  const shape = getShapeById(shapeId);
-  if (!shape) {
-    return null;
+type ShapeBounds = { maxRow: number; maxColumn: number };
+
+/** Cached shape bounds.
+ *
+ *  A shape's bounds never change — the catalogue is static — but this ran on
+ *  every pointer move of every drag, allocating two intermediate arrays (from
+ *  the two `map`s) plus the bounds object each time, and spreading them into
+ *  `Math.max`. That is roughly sixty allocations a second of values that were
+ *  identical every time, on the one code path that has to stay ahead of a
+ *  finger. There are about twelve shapes, so the cache is bounded by the
+ *  catalogue and never needs clearing.
+ *
+ *  A plain loop rather than `map` + spread: no intermediate arrays, and no
+ *  argument-count limit if a larger shape is ever added. */
+const shapeBoundsCache = new Map<string, ShapeBounds | null>();
+
+function shapeBoundsFor(shapeId: string): ShapeBounds | null {
+  const cached = shapeBoundsCache.get(shapeId);
+  if (cached !== undefined) {
+    return cached;
   }
-  return {
-    maxRow: Math.max(...shape.cells.map((cell) => cell.row)),
-    maxColumn: Math.max(...shape.cells.map((cell) => cell.column)),
-  };
+  const shape = getShapeById(shapeId);
+  let bounds: ShapeBounds | null = null;
+  if (shape) {
+    let maxRow = 0;
+    let maxColumn = 0;
+    for (const cell of shape.cells) {
+      if (cell.row > maxRow) {
+        maxRow = cell.row;
+      }
+      if (cell.column > maxColumn) {
+        maxColumn = cell.column;
+      }
+    }
+    bounds = { maxRow, maxColumn };
+  }
+  shapeBoundsCache.set(shapeId, bounds);
+  return bounds;
 }
 
 type GameViewProps = {
