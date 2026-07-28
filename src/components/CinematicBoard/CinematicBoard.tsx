@@ -1,12 +1,14 @@
 import { JetBrainsMono_700Bold } from "@expo-google-fonts/jetbrains-mono";
 import { useFont } from "@shopify/react-native-skia";
-import { forwardRef, memo, useEffect, useMemo, useState } from "react";
+import { forwardRef, memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 import { Easing, cancelAnimation, useSharedValue, withTiming } from "react-native-reanimated";
 
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import { CinematicBoardCanvas } from "../../rendering/cinematic/CinematicBoardCanvas";
 import { buildEffectScene } from "../../rendering/cinematic/effects/effectScene";
+import { sceneGeometry } from "../../rendering/cinematic/geometry";
+import { cinematicPalette } from "../../rendering/cinematic/palette";
 import { buildBoardScene } from "../../rendering/cinematic/scene";
 import { radius } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
@@ -39,6 +41,47 @@ import type { GameBoardProps } from "../GameBoard/boardProps";
 /** Numeral size, matching the React Native badge's own 13px digits. */
 const NUMERAL_SIZE = 13;
 
+/** One transparent touch and accessibility target over the canvas.
+ *
+ *  Memoized, and taking `onPress` as a position-reporting callback rather than a
+ *  bound closure, for the same reason `GridCell` does: the board hands one
+ *  stable handler to all sixty-four cells, so a re-render for an unrelated
+ *  reason does not give every cell a new prop and re-render all of them. */
+const TouchCell = memo(function TouchCell({
+  row,
+  column,
+  left,
+  top,
+  size,
+  label,
+  hint,
+  onPress,
+}: {
+  row: number;
+  column: number;
+  left: number;
+  top: number;
+  size: number;
+  label: string;
+  hint: string | undefined;
+  onPress: ((position: { row: number; column: number }) => void) | undefined;
+}) {
+  const handlePress = useCallback(() => onPress?.({ row, column }), [onPress, row, column]);
+
+  return (
+    <Pressable
+      style={[styles.touch, { left, top, width: size, height: size }]}
+      onPress={onPress ? handlePress : undefined}
+      disabled={onPress === undefined}
+      testID={`cell-${row}-${column}`}
+      accessibilityLabel={label}
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityHint={hint}
+      accessible
+    />
+  );
+});
+
 function CinematicBoardImpl(
   {
     grid,
@@ -69,6 +112,15 @@ function CinematicBoardImpl(
   // out here is what lets the fallback below exist.
   const font = useFont(JetBrainsMono_700Bold, NUMERAL_SIZE);
 
+  // Geometry and palette are memoized SEPARATELY from the scene, and their
+  // identity is the whole point. The cached board picture is memoized on them;
+  // building them inside the scene would mint fresh objects on every turn, the
+  // cache would miss every time, and the static board would be re-baked on each
+  // placement — losing exactly the win it exists for. They depend only on the
+  // board size and the theme, so they change on a resize or a theme switch.
+  const geometry = useMemo(() => sceneGeometry(boardSide, grid.length), [boardSide, grid.length]);
+  const palette = useMemo(() => cinematicPalette(theme), [theme]);
+
   const scene = useMemo(
     () =>
       buildBoardScene({
@@ -76,22 +128,20 @@ function CinematicBoardImpl(
         badges,
         preview,
         theme,
-        boardSide,
+        geometry,
+        palette,
         highlightPieceId,
         frozen,
         reducedMotion,
       }),
-    [grid, badges, preview, theme, boardSide, highlightPieceId, frozen, reducedMotion],
+    [grid, badges, preview, theme, geometry, palette, highlightPieceId, frozen, reducedMotion],
   );
 
-  const { cellSize, pitch, contentInset } = scene.geometry;
+  const { cellSize, pitch, contentInset } = geometry;
 
   const effects = useMemo(
-    () =>
-      effectPlan
-        ? buildEffectScene(effectPlan, scene.geometry, scene.palette, reducedMotion)
-        : null,
-    [effectPlan, scene.geometry, scene.palette, reducedMotion],
+    () => (effectPlan ? buildEffectScene(effectPlan, geometry, palette, reducedMotion) : null),
+    [effectPlan, geometry, palette, reducedMotion],
   );
 
   // One clock for the whole sequence. Every effect primitive reads it and
@@ -175,32 +225,24 @@ function CinematicBoardImpl(
               const timer =
                 cell.kind === "timed" ? timerByPiece.get(cell.pieceInstanceId) : undefined;
               return (
-                <Pressable
+                <TouchCell
                   key={`cell-${row}-${column}`}
-                  style={[
-                    styles.touch,
-                    {
-                      left: contentInset + column * pitch,
-                      top: contentInset + row * pitch,
-                      width: cellSize,
-                      height: cellSize,
-                    },
-                  ]}
-                  onPress={onCellPress ? () => onCellPress({ row, column }) : undefined}
-                  disabled={onCellPress === undefined}
-                  testID={`cell-${row}-${column}`}
-                  accessibilityLabel={cellLabel(cell, row, column, {
+                  row={row}
+                  column={column}
+                  left={contentInset + column * pitch}
+                  top={contentInset + row * pitch}
+                  size={cellSize}
+                  label={cellLabel(cell, row, column, {
                     remainingTurns: timer?.remainingTurns,
                     critical: timer?.critical,
                     frozen,
                   })}
-                  accessibilityRole={onCellPress ? "button" : undefined}
-                  accessibilityHint={placementHintFor(
+                  hint={placementHintFor(
                     cell,
                     onCellPress !== undefined,
                     placementHints?.get(`${row},${column}`),
                   )}
-                  accessible
+                  onPress={onCellPress}
                 />
               );
             }),

@@ -5,8 +5,7 @@ import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
 import { blockSurface, type BlockVariant } from "../../ui/blockSurface";
 import { blockColor } from "../../ui/themes";
 import { getTimerVisualState } from "../../ui/timerStates";
-import { badgeRect, cellRect, sceneGeometry } from "./geometry";
-import { cinematicPalette } from "./palette";
+import { badgeRect, cellRect } from "./geometry";
 import type {
   BoardScene,
   BoardSceneInput,
@@ -66,11 +65,18 @@ const PREVIEW_VARIANT: Record<ScenePreviewState, BlockVariant> = {
 };
 
 export function buildBoardScene(input: BoardSceneInput): BoardScene {
-  const { grid, badges, preview, theme, boardSide, highlightPieceId, frozen, reducedMotion } =
-    input;
+  const {
+    grid,
+    badges,
+    preview,
+    theme,
+    geometry,
+    palette,
+    highlightPieceId,
+    frozen,
+    reducedMotion,
+  } = input;
   const size = grid.length;
-  const geometry = sceneGeometry(boardSide, size);
-  const palette = cinematicPalette(theme);
 
   const empties: SceneEmptyCell[] = [];
   const blocks: SceneBlock[] = [];

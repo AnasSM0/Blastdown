@@ -214,7 +214,15 @@ export type BoardSceneInput = {
   badges: readonly import("../../domain/selectors").TimerBadgePlacement[];
   preview: import("../../domain/selectors").PlacementPreview | null | undefined;
   theme: import("../../ui/themes").ThemePalette;
-  boardSide: number;
+  /** Geometry and palette are supplied by the caller rather than derived here,
+   *  and their IDENTITY is load-bearing. The cached board `Picture` is memoized
+   *  on them; if the scene minted fresh objects each time it ran, that cache
+   *  would miss on every turn and the whole point of baking the static board
+   *  would be lost. The caller memoizes them on what they actually depend on —
+   *  the board size and the theme — so they change on a resize or a theme
+   *  switch and at no other time. */
+  geometry: SceneGeometry;
+  palette: CinematicPalette;
   highlightPieceId: string | null | undefined;
   frozen: boolean;
   reducedMotion: boolean;

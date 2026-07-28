@@ -1,5 +1,7 @@
 import type { GridCell as DomainGridCell } from "../../src/domain/gameTypes";
 import type { TimerBadgePlacement } from "../../src/domain/selectors";
+import { sceneGeometry } from "../../src/rendering/cinematic/geometry";
+import { cinematicPalette } from "../../src/rendering/cinematic/palette";
 import { buildBoardScene } from "../../src/rendering/cinematic/scene";
 import type { BoardSceneInput } from "../../src/rendering/cinematic/types";
 import { blockSurface } from "../../src/ui/blockSurface";
@@ -19,17 +21,24 @@ function emptyGrid(): DomainGridCell[][] {
   );
 }
 
-function sceneInput(overrides: Partial<BoardSceneInput> = {}): BoardSceneInput {
+function sceneInput(
+  overrides: Partial<BoardSceneInput> & { boardSide?: number } = {},
+): BoardSceneInput {
+  const { boardSide = BOARD_SIDE, ...rest } = overrides;
+  const palette = rest.theme ?? theme;
   return {
     grid: emptyGrid(),
     badges: [],
     preview: null,
-    theme,
-    boardSide: BOARD_SIDE,
+    theme: palette,
+    // Geometry and palette are the caller's to own and memoize — see
+    // `BoardSceneInput`. The tests build them the same way the component does.
+    geometry: sceneGeometry(boardSide, 8),
+    palette: cinematicPalette(palette),
     highlightPieceId: null,
     frozen: false,
     reducedMotion: false,
-    ...overrides,
+    ...rest,
   };
 }
 
