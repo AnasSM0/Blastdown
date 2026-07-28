@@ -155,6 +155,107 @@ describe("useEventAnimator", () => {
     expect(result.current.effects).toHaveLength(2);
   });
 
+  it("waits for a slow renderer instead of eating the effect", async () => {
+    // The bug the first watchdog reintroduced. It retired unconditionally after
+    // duration plus a grace window, so any renderer slower than that grace lost
+    // the effect entirely -- which is exactly the "intermittently missing under
+    // load" symptom, because a stalled frame is when the delay is longest.
+    //
+    // A renderer that has reported a draw before is participating, so an
+    // unstarted effect is waited for rather than cut short.
+    const { result, rerender } = await renderHook(
+      (props: { turn: number; events: GameEvent[]; reducedMotion: boolean }) =>
+        useEventAnimator({ ...props, grid: EMPTY_GRID }),
+      { initialProps: { turn: 0, events: [] as GameEvent[], reducedMotion: false } },
+    );
+
+    // Turn 1 draws normally, which latches "this renderer reports draws".
+    await act(async () => {
+      rerender({ turn: 1, events: CLEAR_TURN, reducedMotion: false });
+    });
+    await act(async () => {
+      result.current.startedDrawing(result.current.effects[0].id, 0);
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(340);
+    });
+    expect(result.current.effects).toHaveLength(0);
+
+    // Turn 2 arrives and the renderer stalls well past the grace window.
+    await act(async () => {
+      rerender({ turn: 2, events: CLEAR_TURN, reducedMotion: false });
+    });
+    const stalled = result.current.effects[0];
+    expect(stalled.startedAt).toBeNull();
+
+    await act(async () => {
+      jest.advanceTimersByTime(340 + 400 + 50);
+    });
+
+    // Still live: the renderer participates, so it gets waited for.
+    expect(result.current.effects.map((effect) => effect.id)).toContain(stalled.id);
+
+    // And when it finally draws, the effect plays its whole lifecycle.
+    await act(async () => {
+      result.current.startedDrawing(stalled.id, 1000);
+    });
+    expect(result.current.effects[0].startedAt).toBe(1000);
+  });
+
+  it("still retires for a renderer that never reports a draw", async () => {
+    // The other half, and why the watchdog exists at all. The React Native
+    // fallback never calls startedDrawing, so waiting forever would leave a
+    // required sequence holding the input lock and freeze the board.
+    const { result, rerender } = await renderHook(
+      (props: { turn: number; events: GameEvent[]; reducedMotion: boolean }) =>
+        useEventAnimator({ ...props, grid: EMPTY_GRID }),
+      { initialProps: { turn: 0, events: [] as GameEvent[], reducedMotion: false } },
+    );
+    await act(async () => {
+      rerender({ turn: 1, events: CLEAR_TURN, reducedMotion: false });
+    });
+    expect(result.current.isAnimating).toBe(true);
+
+    await act(async () => {
+      jest.advanceTimersByTime(340 + 400);
+    });
+
+    expect(result.current.effects).toHaveLength(0);
+    expect(result.current.isAnimating).toBe(false);
+  });
+
+  it("gives up on a participating renderer that stops drawing", async () => {
+    // A board unmounted mid-sequence must not hold the input lock forever, so
+    // the waiting is bounded rather than open-ended.
+    const { result, rerender } = await renderHook(
+      (props: { turn: number; events: GameEvent[]; reducedMotion: boolean }) =>
+        useEventAnimator({ ...props, grid: EMPTY_GRID }),
+      { initialProps: { turn: 0, events: [] as GameEvent[], reducedMotion: false } },
+    );
+    await act(async () => {
+      rerender({ turn: 1, events: CLEAR_TURN, reducedMotion: false });
+    });
+    await act(async () => {
+      result.current.startedDrawing(result.current.effects[0].id, 0);
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(340);
+    });
+
+    await act(async () => {
+      rerender({ turn: 2, events: CLEAR_TURN, reducedMotion: false });
+    });
+    expect(result.current.effects).toHaveLength(1);
+
+    // Never drawn. Four windows (the first plus three extensions) and it goes.
+    await act(async () => {
+      jest.advanceTimersByTime((340 + 400) * 5);
+    });
+
+    expect(result.current.effects).toHaveLength(0);
+    expect(result.current.isAnimating).toBe(false);
+  });
+
   it("ignores a cue with no cells (nothing was restored or defused)", async () => {
     const { result } = await renderHook(() =>
       useEventAnimator({ turn: 0, events: [], grid: EMPTY_GRID, reducedMotion: false }),

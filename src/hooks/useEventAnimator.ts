@@ -101,6 +101,10 @@ export function useEventAnimator({
   // single shared timer was why a cue and a turn cancelled each other's
   // cleanup, ending one early or leaving it on screen.
   const timersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  // Latched true the first time any renderer reports a draw. Distinguishes "the
+  // renderer is slow" from "this renderer does not report at all", which is the
+  // difference between waiting for an effect and eating it.
+  const rendererReportsRef = useRef(false);
   // Mirrors the queue for reads inside `startedDrawing`, which the renderer
   // calls from a draw — after commit — so the committed value is current.
   // Written in the effect below rather than during render.
@@ -126,18 +130,10 @@ export function useEventAnimator({
     timersRef.current.clear();
   }, []);
 
-  /** Schedule an effect's retirement `delayMs` from now, replacing any timer it
-   *  already has.
+  /** Retire an effect after `delayMs`, replacing any timer it already has.
    *
-   *  Called twice in an effect's life: once at ADMISSION as a watchdog, and
-   *  again on the first DRAW with the precise duration. The watchdog is not
-   *  redundant. A renderer that never reports a draw -- the React Native
-   *  fallback does not -- would otherwise leave the effect live forever, and
-   *  since a required sequence holds the input lock, the board would freeze.
-   *  Liveness must not depend on the renderer choosing to participate.
-   *
-   *  The watchdog is generous (duration plus a grace window) so that on a
-   *  renderer which does report, the precise timer always supersedes it. */
+   *  Used for the PRECISE timer only — scheduled on the first draw, for exactly
+   *  the effect's duration. See `scheduleWatchdog` for the other half. */
   const scheduleRetire = useCallback((id: string, sessionId: number, delayMs: number) => {
     const existing = timersRef.current.get(id);
     if (existing !== undefined) {
@@ -154,6 +150,21 @@ export function useEventAnimator({
     timersRef.current.set(id, timer);
   }, []);
 
+  const scheduleWatchdog = useCallback((id: string, sessionId: number, durationMs: number) => {
+    armWatchdog(
+      {
+        timers: timersRef.current,
+        readQueue: () => queueRef.current,
+        rendererReports: () => rendererReportsRef.current,
+        setQueue,
+      },
+      id,
+      sessionId,
+      durationMs,
+      0,
+    );
+  }, []);
+
   /** The renderer drew this effect for the first time. Stamp its clock and
    *  re-schedule its retirement from THAT moment, not from admission. */
   const startedDrawing = useCallback(
@@ -162,6 +173,9 @@ export function useEventAnimator({
       if (!live || live.startedAt !== null) {
         return;
       }
+      // The renderer reports draws, so unstarted effects may safely be waited
+      // for rather than cut short. Latched for the life of the hook.
+      rendererReportsRef.current = true;
       setQueue((current) => startEffect(current, id, now));
       scheduleRetire(id, queueRef.current.sessionId, live.durationMs);
     },
@@ -182,7 +196,7 @@ export function useEventAnimator({
       // even if a reset landed between the tap and this call.
       setQueue((current) => {
         const id = cueEffectId(current.sessionId, cueCount);
-        scheduleRetire(id, current.sessionId, cuePlan.durationMs + RETIRE_GRACE_MS);
+        scheduleWatchdog(id, current.sessionId, cuePlan.durationMs);
         return admitEffect(current, {
           id,
           sessionId: current.sessionId,
@@ -192,7 +206,7 @@ export function useEventAnimator({
         });
       });
     },
-    [scheduleRetire],
+    [scheduleWatchdog],
   );
 
   const reset = useCallback(() => {
@@ -229,7 +243,7 @@ export function useEventAnimator({
 
     setQueue((current) => {
       const id = turnEffectId(current.sessionId, turn);
-      scheduleRetire(id, current.sessionId, nextPlan.durationMs + RETIRE_GRACE_MS);
+      scheduleWatchdog(id, current.sessionId, nextPlan.durationMs);
       return admitEffect(current, {
         id,
         sessionId: current.sessionId,
@@ -238,7 +252,7 @@ export function useEventAnimator({
         durationMs: nextPlan.durationMs,
       });
     });
-  }, [turn, scheduleRetire]);
+  }, [turn, scheduleWatchdog]);
 
   // Cancel every pending retirement on unmount. Each timer is also session
   // guarded, so one that somehow survives cannot touch a later run.
@@ -268,11 +282,90 @@ export function useEventAnimator({
   };
 }
 
-/** Extra time the admission watchdog allows before retiring an effect the
- *  renderer never reported drawing. Long enough that a renderer which does
- *  report always supersedes it, short enough that a stuck effect clears within
- *  one beat rather than holding the input lock indefinitely. */
+type WatchdogContext = {
+  timers: Map<string, ReturnType<typeof setTimeout>>;
+  readQueue: () => EffectQueue;
+  rendererReports: () => boolean;
+  setQueue: (update: (current: EffectQueue) => EffectQueue) => void;
+};
+
+/** The safety net for an effect the renderer has not drawn yet.
+ *
+ *  Getting this wrong once already reintroduced the bug the queue exists to
+ *  fix, so the reasoning is worth spelling out.
+ *
+ *  A first version retired unconditionally after duration plus a grace window.
+ *  That silently ate any effect the renderer took longer than the grace to
+ *  draw — which is exactly the "intermittently missing under load" symptom,
+ *  since a stalled frame is when the delay is longest. It also contradicted
+ *  `effectQueue.ts`, which promises an unstarted effect is never retired
+ *  however long it waits.
+ *
+ *  Waiting forever is not available either: the React Native fallback renderer
+ *  never reports draws at all, and a required sequence holds the input lock, so
+ *  its effects would freeze the board.
+ *
+ *  The two cases are distinguishable. A renderer that has EVER reported a draw
+ *  is participating, so the watchdog waits again rather than cutting the effect
+ *  short. One that has never reported is not going to start, so its effects
+ *  retire on schedule.
+ *
+ *  Re-arming is bounded: a participating renderer whose board unmounts mid
+ *  sequence must not hold the input lock indefinitely.
+ *
+ *  Module level rather than a `useCallback` because it recurses, and a callback
+ *  cannot reference its own identity. */
+function armWatchdog(
+  context: WatchdogContext,
+  id: string,
+  sessionId: number,
+  durationMs: number,
+  extension: number,
+): void {
+  const existing = context.timers.get(id);
+  if (existing !== undefined) {
+    clearTimeout(existing);
+  }
+
+  const timer = setTimeout(() => {
+    context.timers.delete(id);
+    const queue = context.readQueue();
+    if (queue.sessionId !== sessionId) {
+      return;
+    }
+    const live = queue.effects.find((effect) => effect.id === id);
+    if (live === undefined) {
+      return;
+    }
+
+    if (
+      live.startedAt === null &&
+      context.rendererReports() &&
+      extension < MAX_WATCHDOG_EXTENSIONS
+    ) {
+      // A participating renderer simply has not got to it yet. Wait.
+      armWatchdog(context, id, sessionId, durationMs, extension + 1);
+      return;
+    }
+
+    context.setQueue((current) =>
+      current.sessionId === sessionId ? retireEffect(current, id) : current,
+    );
+  }, durationMs + RETIRE_GRACE_MS);
+
+  context.timers.set(id, timer);
+}
+
+/** Grace beyond an effect's own duration before the watchdog considers it
+ *  stuck. On a renderer that reports draws the precise timer always supersedes
+ *  this; on one that does not, it is the whole lifetime. */
 const RETIRE_GRACE_MS = 400;
+
+/** How many times the watchdog will wait again for a participating renderer
+ *  that has not yet drawn an effect. Bounded so a board unmounted mid-sequence
+ *  cannot hold the input lock forever; generous enough that an ordinary stall
+ *  never truncates an effect. */
+const MAX_WATCHDOG_EXTENSIONS = 3;
 
 const PRIORITY_ORDER = { critical: 3, high: 2, standard: 1 } as const;
 
