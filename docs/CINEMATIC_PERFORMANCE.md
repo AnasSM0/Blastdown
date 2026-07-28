@@ -50,9 +50,22 @@ The comment above it claimed the halo was "a blurred copy of the block rather
 than a per-cell blur filter". That is not a distinction — it was a per-cell blur
 filter, and the comment made it read as a considered choice.
 
-**Fixed:** all block halos are drawn inside one `<Group>` carrying a single
-`BlurMask`. Cost stops scaling with cell count. Badge halos got the same
-treatment.
+**Fixed — on the second attempt.** The first fix moved all the halos into one
+`<Group>` with a single `<BlurMask>` child. That read as "one blur for all of
+them" and was not: in React Native Skia a mask filter on a Group becomes part of
+the group's **paint**, which every child then draws with, so N children still
+cost N blurred draws. The source changed and the GPU cost did not move at all.
+
+A single pass needs `saveLayer`, which in this API is the `layer` prop:
+`<Group layer={paint}>` composites the children into one offscreen surface and
+applies the paint to that surface once. That is what ships, via `useBloomPaint`.
+Badge halos use the same mechanism.
+
+The guard test failed to catch the first attempt because it counted `<BlurMask>`
+elements per file — which measures how the code reads, not how many times the
+GPU applies it. It now bans the declarative element from the layers outright,
+since that form cannot express a single pass over many shapes, and separately
+asserts the `saveLayer` mechanism is present.
 
 ### 2. The "performance fix" that made it worse
 
@@ -141,6 +154,10 @@ and an explosion:
 | Allocations per pointer move                 |  ~5 objects, 2 arrays |            ~3 objects |
 
 Steady state, full board of glowing blocks: **1 blur pass** instead of 64.
+
+Both "after" figures depend entirely on `layer` doing what its type says. If the
+`saveLayer` never happens on device, the numbers revert to the "before" column —
+which is precisely what the first attempt at this fix looked like from here.
 
 ## Guards
 

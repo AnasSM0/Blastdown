@@ -48,21 +48,55 @@ function layerSources(): { file: string; source: string }[] {
   }));
 }
 
-describe("no blur mask is applied per cell", () => {
-  it("keeps every BlurMask out of a per-primitive map callback", () => {
-    // The rule, stated as code: a blur inside a `.map(` is a blur per element.
-    // Grouped blooms are fine — they put ONE mask on a group that contains many
-    // shapes — and those live outside the map that draws the shapes.
+describe("blur is applied once, not once per cell", () => {
+  /** The guard that already failed once, and why it failed.
+   *
+   *  The first version of this file counted `<BlurMask>` elements per file and
+   *  passed when a layer had one. That measured the wrong thing entirely. In
+   *  React Native Skia, a `<BlurMask>` inside a `<Group>` becomes part of the
+   *  GROUP'S PAINT, and every child then draws with that paint — so one element
+   *  in the source is still one blurred draw per child. Moving 64 per-block
+   *  masks into a shared parent changed how the code read and nothing about
+   *  what the GPU did, and this test said it was fixed.
+   *
+   *  A single pass requires `saveLayer`, which in this API is the `layer` prop:
+   *  children are composited into one offscreen surface and the paint applies
+   *  to that surface once. So the rule is not "at most one BlurMask element" —
+   *  it is "no BlurMask element at all in a layer", because the declarative
+   *  form cannot express a single pass over many shapes. */
+
+  it("uses no declarative BlurMask anywhere in the canvas layers", () => {
+    const offenders = layerSources()
+      .filter(({ source }) => /<BlurMask/.test(source))
+      .map(({ file }) => file);
+
+    // If softness is needed for a group, build an SkPaint with a mask filter
+    // and pass it as `layer` — see `useBloomPaint`. If it is needed for exactly
+    // one shape that is drawn once, this rule is stricter than necessary, and
+    // relaxing it deliberately is fine; relaxing it by accident is what this
+    // catches.
+    expect(offenders).toEqual([]);
+  });
+
+  it("builds its bloom through a saveLayer paint", () => {
+    // The positive half: the mechanism that actually collapses the passes must
+    // be present, or a future edit could satisfy the rule above by deleting the
+    // bloom rather than by grouping it.
+    const source = readFileSync("src/rendering/cinematic/layers/BlocksLayer.tsx", "utf8");
+
+    expect(source).toMatch(/Skia\.MaskFilter\.MakeBlur/);
+    expect(source).toMatch(/<Group layer=\{bloomPaint\}>/);
+  });
+
+  it("wraps every bloom group in a layer rather than a bare Group", () => {
+    // Any Group whose children are a map of halos must carry `layer`. A bare
+    // Group with a mask filter is the exact shape of the original mistake.
     const offenders: string[] = [];
 
     for (const { file, source } of layerSources()) {
       const lines = source.split("\n");
-      let mapDepth = -1;
       lines.forEach((line, index) => {
-        if (/\.map\(/.test(line)) {
-          mapDepth = index;
-        }
-        if (/<BlurMask/.test(line) && mapDepth >= 0 && index - mapDepth < 25) {
+        if (/bloomPaint/.test(line) && /<Group/.test(line) && !/layer=/.test(line)) {
           offenders.push(`${file}:${index + 1}`);
         }
       });
@@ -71,24 +105,15 @@ describe("no blur mask is applied per cell", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("uses at most one blur mask per layer file", () => {
-    // A second mask in a layer is the shape a per-element blur takes when it
-    // creeps back in. A grouped bloom needs exactly one.
-    const offenders = layerSources()
-      .map(({ file, source }) => ({ file, count: (source.match(/<BlurMask/g) ?? []).length }))
-      .filter(({ count }) => count > 1);
-
-    expect(offenders).toEqual([]);
-  });
-
   it("draws effect primitives with no blur at all", () => {
     // Effects are the uncapped-in-principle ones: one flash per cleared cell,
-    // one ring per defused piece. A mask on those scales with the turn.
+    // one ring per defused piece. Any mask on those scales with the turn.
     const source = stripComments(
       readFileSync("src/rendering/cinematic/layers/EffectsLayer.tsx", "utf8"),
     );
 
     expect(source).not.toMatch(/BlurMask/);
+    expect(source).not.toMatch(/MakeBlur/);
   });
 });
 

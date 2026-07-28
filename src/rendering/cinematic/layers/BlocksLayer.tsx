@@ -1,5 +1,5 @@
-import { BlurMask, Group, Line, RoundedRect, vec } from "@shopify/react-native-skia";
-import { memo } from "react";
+import { BlurStyle, Group, Line, RoundedRect, Skia, vec } from "@shopify/react-native-skia";
+import { memo, useMemo } from "react";
 
 import {
   CONTOUR_BOTTOM,
@@ -36,6 +36,36 @@ const HALO_BLUR = 6;
 
 /** A stable empty array, so the "no bloom" path allocates nothing per render. */
 const EMPTY_BLOCKS: readonly SceneBlock[] = [];
+
+/** A paint that blurs whatever is drawn INTO IT, applied once.
+ *
+ *  This is the distinction the first two attempts at this fix both missed, and
+ *  it is worth stating exactly.
+ *
+ *  `<Group><BlurMask/>{children}</Group>` does NOT blur the group. The mask
+ *  filter goes into the group's paint, and every child then draws *with* that
+ *  paint — so N children still cost N blurred draws. Grouping the elements
+ *  changed how the source looked and nothing about what the GPU did. The
+ *  original per-block blur and the "grouped" replacement were the same cost.
+ *
+ *  `<Group layer={paint}>` is different: it issues a `saveLayer`, draws the
+ *  children into an offscreen surface, then applies the paint to that surface
+ *  once on composite. One blur for the whole bloom, whatever the cell count.
+ *
+ *  `BlurStyle.Normal` rather than `Outer`, because the halo layer is drawn
+ *  beneath the block bodies — the block covers the middle regardless, and Outer
+ *  on a composited layer would erase the overlap between adjacent halos that
+ *  makes a multi-cell piece read as one shape. */
+export function useBloomPaint(blur: number) {
+  return useMemo(() => {
+    if (blur <= 0) {
+      return undefined;
+    }
+    const paint = Skia.Paint();
+    paint.setMaskFilter(Skia.MaskFilter.MakeBlur(BlurStyle.Normal, blur, true));
+    return paint;
+  }, [blur]);
+}
 
 /** The sheen, matching `BlockSurface`'s own band exactly (top 45%, 0.22
  *  opacity). Duplicated as constants rather than imported because the React
@@ -88,27 +118,24 @@ function BlocksLayerImpl({
   // halos back into separate paints and undo the point of grouping them.
   const halo = HALO_BLUR * palette.glow;
   const glowing = halo > 0 ? blocks.filter((block) => block.surface.glow) : EMPTY_BLOCKS;
+  const bloomPaint = useBloomPaint(halo);
 
   return (
     <Group>
-      {/* THE BLOOM LAYER, and the single most important line in this renderer's
-          performance story.
+      {/* THE BLOOM LAYER, and the part of this renderer that has been got wrong
+          twice.
 
-          Every block used to carry its own `<BlurMask>`. A blur mask is an
-          offscreen render pass, so a full board was up to sixty-four offscreen
-          passes per frame — on a mid-range Android GPU that is the difference
-          between a smooth board and a visibly laggy one. The comment that used
-          to sit here claimed the halo was "a blurred copy of the block rather
-          than a per-cell blur filter", which was not a distinction: it was a
-          per-cell blur filter.
+          Every block once carried its own blur mask — an offscreen render pass
+          each, up to sixty-four per frame. The first fix moved those masks into
+          a shared parent Group, which read as "one blur for all of them" and
+          was not: a mask filter on a Group's paint is inherited by each child
+          draw, so the GPU cost did not move at all.
 
-          Grouping the halos puts one blur on one paint covering all of them, so
-          the cost stops scaling with the number of blocks. The look is very
-          close — the halos bleed into each other slightly where blocks touch,
-          which if anything reads better for a piece made of adjacent cells. */}
+          `layer` is the difference. It issues a saveLayer, so the halos are
+          composited into one offscreen surface and the blur applies once to
+          that surface — genuinely independent of the cell count. */}
       {glowing.length > 0 ? (
-        <Group>
-          <BlurMask blur={halo} style="outer" />
+        <Group layer={bloomPaint}>
           {glowing.map((block) => (
             <RoundedRect
               key={`halo-${block.row},${block.column}`}

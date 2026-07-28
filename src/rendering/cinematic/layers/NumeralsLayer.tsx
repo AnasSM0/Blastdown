@@ -1,13 +1,7 @@
-import {
-  BlurMask,
-  Circle,
-  DashPathEffect,
-  Group,
-  Text,
-  type SkFont,
-} from "@shopify/react-native-skia";
+import { Circle, DashPathEffect, Group, Text, type SkFont } from "@shopify/react-native-skia";
 import { memo } from "react";
 
+import { useBloomPaint } from "./BlocksLayer";
 import { rectCenter } from "../geometry";
 import { alpha } from "../palette";
 import type { CinematicPalette, SceneNumeral } from "../types";
@@ -70,16 +64,15 @@ function NumeralsLayerImpl({
   palette: CinematicPalette;
   font: SkFont | null;
 }) {
-  // Grouped bloom, for the same reason the block layer groups its own: a blur
-  // per badge is a render pass per badge. There are fewer badges than blocks,
-  // but they are live on exactly the turns the board is busiest.
+  // Same single-pass bloom as the block layer — see `useBloomPaint` for why a
+  // shared parent Group is not enough on its own.
   const glowing = numerals.filter((numeral) => numeral.visual.glow);
+  const bloomPaint = useBloomPaint(BADGE_BLUR * palette.glow);
 
   return (
     <Group>
       {glowing.length > 0 ? (
-        <Group>
-          <BlurMask blur={BADGE_BLUR * palette.glow} style="outer" />
+        <Group layer={bloomPaint}>
           {glowing.map((numeral) => {
             const center = rectCenter(numeral.rect);
             return (

@@ -79,13 +79,23 @@ const path = {
 
 export const Skia = {
   Path: path,
-  Paint: () => ({ setColor() {}, setAlphaf() {}, setBlendMode() {} }),
+  Paint: () => ({
+    setColor() {},
+    setAlphaf() {},
+    setBlendMode() {},
+    setMaskFilter() {},
+    setAntiAlias() {},
+    setStyle() {},
+    setStrokeWidth() {},
+  }),
+  MaskFilter: { MakeBlur: () => ({ __maskFilter: true }) },
   Color: (value: unknown) => value,
   Point: vec,
   XYWHRect: rect,
   RRectXY: rrect,
 };
 
+export const BlurStyle = { Normal: 0, Solid: 1, Outer: 2, Inner: 3 } as const;
 export const BlendMode = { Plus: "plus", SrcOver: "srcOver", Screen: "screen" } as const;
 export const PaintStyle = { Fill: 0, Stroke: 1 } as const;
 export const StrokeCap = { Butt: 0, Round: 1, Square: 2 } as const;

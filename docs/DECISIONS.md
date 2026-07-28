@@ -1584,10 +1584,17 @@ Device testing reported the Skia board as visually correct but noticeably laggy.
 The causes are recorded in `docs/CINEMATIC_PERFORMANCE.md`; what belongs here is
 the decision each one forced.
 
-**Grouped bloom instead of per-cell blur.** Every block carried its own
+**Single-pass bloom instead of per-cell blur.** Every block carried its own
 `BlurMask`, which is an offscreen render pass each — up to 64 per frame, plus 64
-more from the clear flashes, plus the sweeps. All halos now sit inside one group
-under one mask. The visual cost is that halos blend where blocks touch, which
+more from the clear flashes, plus the sweeps. All halos now composite into one
+`saveLayer` and the blur applies once.
+
+The intermediate attempt is worth recording because it was wrong in an
+instructive way: moving the masks into a shared parent `<Group>` looks like
+grouping, and is not. A mask filter on a Group is inherited by each child draw,
+so the cost was identical — and the guard test, which counted `<BlurMask>`
+elements in the source, reported success. A test that measures the shape of the
+code rather than the behaviour it implies will confirm whatever the code says. The visual cost is that halos blend where blocks touch, which
 for a piece made of adjacent cells reads better than separate glows. The
 alternative — keeping per-cell softness — is not affordable on a mobile GPU at
 this count, and no amount of tuning changes that.
