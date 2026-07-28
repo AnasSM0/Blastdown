@@ -8,6 +8,7 @@ import {
 } from "react-native";
 
 import { useReducedMotion } from "../../hooks/useReducedMotion";
+import { motionKey } from "../../ui/motionKey";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -107,6 +108,13 @@ export const PressableFeedback = forwardRef<View, PressableFeedbackProps>(
 
     return (
       <AnimatedPressable
+        // "scale" mode binds `transform` only when motion is allowed, so a live
+        // reduced-motion change would remove the prop from a view the native
+        // driver has already touched (any control that has been pressed) — the
+        // Fabric assert in `src/ui/motionKey.ts`. Remount instead. "dim" mode
+        // binds `opacity` unconditionally, so its shape never changes and it
+        // needs no key.
+        key={pressStyle === "scale" ? motionKey(reducedMotion) : undefined}
         ref={ref}
         style={[animatedStyle, style as object]}
         onPressIn={handlePressIn}

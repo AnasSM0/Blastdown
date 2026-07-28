@@ -1822,4 +1822,32 @@ A structural test asserts each of those eight carries the key, and it was
 confirmed to fail when the key was removed from `TimerBadge`. It is a source
 check rather than a behavioural one because jest has no Fabric: the assertion
 lives in Kotlin and cannot be reproduced here. Its real value is catching a
-ninth component added later with the same conditional and no key.
+component added later with the same conditional and no key.
+
+**Two more sites, found on a third pass.** A second stop-time review found the
+rewarded-action buttons still exposed. The audit that produced the list of eight
+was a single-line grep for the conditional, and it missed two cases where the
+ternary is nested or indirect:
+
+- `PressableFeedback` in `"scale"` mode binds `transform` only when motion is
+  allowed. The value is native-driven, so any control that has been pressed is
+  registered with the driver — the reward dock is the one that uses this mode.
+  Its `"dim"` mode binds `opacity` unconditionally and needs no key.
+- `useAppearAnimation` returns `{opacity: 1}` under reduced motion and
+  `{opacity, transform: [...]}` otherwise: the same shape toggle, on the
+  pause, defuse and game-over panels.
+
+The hook now returns `{ style, key }` rather than a bare style, so the key comes
+from the code that resolves the effective reduced-motion value. A caller passing
+`undefined` falls back to the OS setting inside the hook, so a key computed at
+the call site could disagree with the style it is keying.
+
+The lesson is about the audit, not the fix: a grep for a formatting of the
+pattern is not a search for the pattern. The re-audit that found these two
+enumerated every file mentioning both `transform` and reduced motion and read
+each one. The structural guard now covers all eleven sites and its predicate is
+a regex, because `PressableFeedback`'s key is itself conditional. Both new
+guards were confirmed to fail with their keys removed.
+
+`DragGhost`, `BurstCell` and `FloatingText` were checked in that pass and need
+no key: each binds `transform` unconditionally.

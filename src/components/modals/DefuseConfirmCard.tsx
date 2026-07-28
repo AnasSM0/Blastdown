@@ -26,7 +26,7 @@ export function DefuseConfirmCard({
   const appear = useAppearAnimation(reducedMotion);
   return (
     <View style={styles.wrap} testID="defuse-confirm" accessible>
-      <Animated.View style={[styles.card, appear]}>
+      <Animated.View key={appear.key} style={[styles.card, appear.style]}>
         <Text style={styles.prompt}>Defuse this piece?</Text>
         <PressableFeedback
           onPress={busy ? undefined : onConfirm}

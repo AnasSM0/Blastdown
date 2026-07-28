@@ -118,12 +118,43 @@ describe("a live reduced-motion change remounts rather than removing a transform
       "src/components/GridCell/GridCell.tsx",
       "src/components/PieceTray/PieceTray.tsx",
       "src/components/GameBoard/GameBoard.tsx",
+      // Found by a second audit, not the first: this one's ternary is nested
+      // across lines, so a single-line grep for the pattern missed it. Its
+      // "scale" mode toggles the transform exactly like the others, and the
+      // value is native-driven, so any dock button that has been pressed is
+      // registered with the driver.
+      "src/components/PressableFeedback/PressableFeedback.tsx",
     ];
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { readFileSync } = require("fs") as { readFileSync: (p: string, e: string) => string };
     for (const file of gated) {
       const source = readFileSync(file, "utf8");
-      expect({ file, keyed: source.includes("key={motionKey(") }).toEqual({ file, keyed: true });
+      // A regex rather than a literal: PressableFeedback's key is conditional
+      // (only its "scale" mode toggles the transform), so the call is not the
+      // first thing inside the braces.
+      const keyed = /key=\{[^}]*motionKey\(/.test(source);
+      expect({ file, keyed }).toEqual({ file, keyed: true });
+    }
+  });
+
+  it("keys the modal appear transition, which also toggles a transform", () => {
+    // `useAppearAnimation` returns `{opacity: 1}` under reduced motion and
+    // `{opacity, transform: [...]}` otherwise — the same shape toggle, on a
+    // native-driven value, applied to pause/defuse/game-over panels.
+    //
+    // The key comes back FROM the hook rather than being computed by each
+    // panel, because the hook resolves the effective reduced-motion value
+    // itself: a caller passing `undefined` would key off the wrong input and
+    // the style and the key could disagree.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { readFileSync } = require("fs") as { readFileSync: (p: string, e: string) => string };
+    for (const file of [
+      "src/components/modals/DefuseConfirmCard.tsx",
+      "src/components/modals/GameOverOverlay.tsx",
+      "src/components/modals/PauseOverlay.tsx",
+    ]) {
+      const source = readFileSync(file, "utf8");
+      expect({ file, keyed: source.includes("key={appear.key}") }).toEqual({ file, keyed: true });
     }
   });
 });

@@ -35,7 +35,7 @@ export function PauseOverlay({
   const appear = useAppearAnimation(reducedMotion);
   return (
     <View style={styles.scrim} testID="pause-overlay" accessibilityLabel="Paused" accessible>
-      <Animated.View style={[styles.panel, appear]}>
+      <Animated.View key={appear.key} style={[styles.panel, appear.style]}>
         <Text style={styles.title}>PAUSED</Text>
 
         <PressableFeedback
