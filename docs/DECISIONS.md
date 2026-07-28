@@ -1794,3 +1794,32 @@ wrapped in act" warning from this hook. The state transition true -> false is
 now real where false -> false previously bailed out without a render. Tests are
 green across two randomized seeds; the warnings are cosmetic and belong to the
 suites that do not flush the promise.
+
+**The live-change path, closed the same day.** The above fixes only the FIRST
+flip. A stop-time review pointed out that the same crash stayed reachable
+through a live reduced-motion change — the Settings toggle, or the OS
+`reduceMotionChanged` event — which still moves the value while views are
+mounted. `TimerBadge` is the sharpest case: its pulse is an `Animated.loop`, so
+during any run with a timed piece that view is certainly registered with the
+native driver, and toggling the setting removes its transform.
+
+`src/ui/motionKey.ts` returns a React `key` that changes with the reduced-motion
+answer. It is applied to every element whose style conditionally includes
+`transform`, so a live change REMOUNTS that element rather than mutating its
+prop shape in place. Deleting the view clears its entry from
+`tagToSynchronousMountProps`, and the replacement is built with the correct
+shape from its first commit, so no removal is ever applied to a live tag. Every
+keyed element is purely presentational, so there is no state to lose and the
+setting still takes effect immediately.
+
+Eight components are keyed: `ComboIndicator`, `PulseRing`, `CellFlash`,
+`ScoreHeader`, `TimerBadge`, `GridCell`, `PieceTray`, `GameBoard`. `DragGhost`
+was examined and deliberately left alone — its `transform` is always an Array
+(reduced motion drops the `scale` entry, never the prop), so there is no removal
+to guard.
+
+A structural test asserts each of those eight carries the key, and it was
+confirmed to fail when the key was removed from `TimerBadge`. It is a source
+check rather than a behavioural one because jest has no Fabric: the assertion
+lives in Kotlin and cannot be reproduced here. Its real value is catching a
+ninth component added later with the same conditional and no key.

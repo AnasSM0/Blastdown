@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Animated, StyleSheet } from "react-native";
+import { motionKey } from "../../ui/motionKey";
 
 type PulseRingProps = {
   centerX: number;
@@ -41,6 +42,7 @@ export function PulseRing({ centerX, centerY, size, color, reducedMotion }: Puls
 
   return (
     <Animated.View
+      key={motionKey(reducedMotion)}
       pointerEvents="none"
       testID="pulse-ring"
       style={[

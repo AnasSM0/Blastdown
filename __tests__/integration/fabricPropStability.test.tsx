@@ -5,6 +5,7 @@ import { PressableFeedback } from "../../src/components/PressableFeedback";
 import { resolveStackAnimation } from "../../src/config/diagnostics";
 import { useReducedMotion } from "../../src/hooks/useReducedMotion";
 import { ConsentProvider } from "../../src/services/consent";
+import { motionKey } from "../../src/ui/motionKey";
 import { createMockConsentPort } from "../../src/services/consent/MockConsentPort";
 import { captureAppStateHandlers } from "../../test-utils/appState";
 
@@ -84,6 +85,46 @@ describe("reduced motion is never guessed as 'motion allowed'", () => {
     const { result } = await renderHook(() => useReducedMotion());
 
     await waitFor(() => expect(result.current).toBe(false));
+  });
+});
+
+describe("a live reduced-motion change remounts rather than removing a transform", () => {
+  it("gives the timer badge a different identity in each motion mode", () => {
+    // The launch fix only removes the FIRST flip. A user toggling the setting
+    // mid-run — or the OS emitting `reduceMotionChanged` — still moves
+    // true <-> false while views are mounted, and TimerBadge is the sharpest
+    // case: its pulse is an `Animated.loop`, so during any run with a timed
+    // piece the driver is certainly updating that view.
+    //
+    // The key makes the change a remount. Deleting the view clears its entry
+    // from `tagToSynchronousMountProps`, so the replacement is built with the
+    // correct prop shape from its first commit and no removal is ever applied
+    // to a live tag.
+    expect(motionKey(false)).not.toBe(motionKey(true));
+  });
+
+  it("keys every element whose transform is conditional on reduced motion", () => {
+    // A structural guard rather than a behavioural one: jest has no Fabric, so
+    // the assert cannot be reproduced here. What can be pinned is that each
+    // component which OMITS `transform` under reduced motion also carries the
+    // key that turns the change into a remount. A tenth component added later
+    // with the same conditional and no key would reintroduce the crash.
+    const gated = [
+      "src/components/ComboIndicator/ComboIndicator.tsx",
+      "src/components/effects/PulseRing.tsx",
+      "src/components/effects/CellFlash.tsx",
+      "src/components/ScoreHeader/ScoreHeader.tsx",
+      "src/components/TimerBadge/TimerBadge.tsx",
+      "src/components/GridCell/GridCell.tsx",
+      "src/components/PieceTray/PieceTray.tsx",
+      "src/components/GameBoard/GameBoard.tsx",
+    ];
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { readFileSync } = require("fs") as { readFileSync: (p: string, e: string) => string };
+    for (const file of gated) {
+      const source = readFileSync(file, "utf8");
+      expect({ file, keyed: source.includes("key={motionKey(") }).toEqual({ file, keyed: true });
+    }
   });
 });
 

@@ -9,6 +9,7 @@ import { blockColor } from "../../ui/themes";
 import { blockSurface, type BlockVariant } from "../../ui/blockSurface";
 import { BlockSurface } from "../BlockSurface";
 import { RubbleSurface } from "../RubbleSurface";
+import { motionKey } from "../../ui/motionKey";
 
 export type CellPreviewState = "valid" | "invalid" | "conflict";
 
@@ -215,6 +216,7 @@ function GridCellImpl({
 
   return (
     <AnimatedPressable
+      key={motionKey(reducedMotion)}
       style={[styles.cell, base, visual, cellTransform]}
       onPress={onPress ? handlePress : undefined}
       disabled={onPress === undefined}
