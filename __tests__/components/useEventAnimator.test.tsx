@@ -1,4 +1,5 @@
-import { act, renderHook } from "@testing-library/react-native";
+import { act, render, renderHook } from "@testing-library/react-native";
+import { useEffect } from "react";
 
 import { useEventAnimator } from "../../src/hooks/useEventAnimator";
 import type { GameEvent } from "../../src/domain/events";
@@ -254,6 +255,58 @@ describe("useEventAnimator", () => {
 
     expect(result.current.effects).toHaveLength(0);
     expect(result.current.isAnimating).toBe(false);
+  });
+
+  it("stamps the start even though the child reports before the parent syncs", async () => {
+    // The ordering bug that made the whole mechanism inert while looking wired.
+    //
+    // React runs CHILD effects before PARENT effects. The animator lives in the
+    // game screen and the effect layers are its descendants, so on the render
+    // where an effect first appears the layer reports the draw before the
+    // parent has synced its own view of the queue. An earlier version looked
+    // the effect up in that stale ref and returned early — and since a layer
+    // reports exactly once per effect id, the single report was always lost.
+    //
+    // renderHook could not see this: act() flushes every effect before the
+    // assertions run, so the ref was always current by then. This test mounts a
+    // real child whose mount effect reports, which reproduces the true order.
+    const seen: { startedAt: number | null; reports: boolean }[] = [];
+
+    function Child({ id, onStarted }: { id: string | null; onStarted: (id: string) => void }) {
+      useEffect(() => {
+        if (id != null) {
+          onStarted(id);
+        }
+      }, [id, onStarted]);
+      return null;
+    }
+
+    function Harness({ turn, events }: { turn: number; events: GameEvent[] }) {
+      const animator = useEventAnimator({
+        turn,
+        events,
+        grid: EMPTY_GRID,
+        reducedMotion: false,
+      });
+      seen.push({
+        startedAt: animator.effects[0]?.startedAt ?? null,
+        reports: animator.effects.length > 0,
+      });
+      return <Child id={animator.effectKey} onStarted={(id) => animator.startedDrawing(id, 500)} />;
+    }
+
+    const view = await render(<Harness turn={0} events={[]} />);
+    await act(async () => {
+      await view.rerender(<Harness turn={1} events={CLEAR_TURN} />);
+    });
+
+    // The stamp landed, which it did not before: the report is applied through
+    // the state updater rather than through a ref the child outran.
+    const stamped = seen.filter((entry) => entry.startedAt !== null);
+    expect(stamped.length).toBeGreaterThan(0);
+    expect(stamped[stamped.length - 1].startedAt).toBe(500);
+
+    await view.unmount();
   });
 
   it("ignores a cue with no cells (nothing was restored or defused)", async () => {

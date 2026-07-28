@@ -105,6 +105,9 @@ export function useEventAnimator({
   // renderer is slow" from "this renderer does not report at all", which is the
   // difference between waiting for an effect and eating it.
   const rendererReportsRef = useRef(false);
+  // Effect ids that already have a precise (post-draw) retirement timer, so the
+  // scheduling effect does not keep extending their lifetime on every render.
+  const precisedRef = useRef(new Set<string>());
   // Mirrors the queue for reads inside `startedDrawing`, which the renderer
   // calls from a draw — after commit — so the committed value is current.
   // Written in the effect below rather than during render.
@@ -128,6 +131,7 @@ export function useEventAnimator({
       clearTimeout(timer);
     }
     timersRef.current.clear();
+    precisedRef.current.clear();
   }, []);
 
   /** Retire an effect after `delayMs`, replacing any timer it already has.
@@ -165,22 +169,45 @@ export function useEventAnimator({
     );
   }, []);
 
-  /** The renderer drew this effect for the first time. Stamp its clock and
-   *  re-schedule its retirement from THAT moment, not from admission. */
-  const startedDrawing = useCallback(
-    (id: string, now: number) => {
-      const live = queueRef.current.effects.find((effect) => effect.id === id);
-      if (!live || live.startedAt !== null) {
-        return;
+  /** The renderer drew this effect for the first time.
+   *
+   *  Deliberately reads NOTHING from `queueRef`, and that is the whole point.
+   *
+   *  React runs child effects before parent effects. `useEventAnimator` lives
+   *  in the game screen; the effect layers are its descendants. So on the very
+   *  render where an effect first appears, the layer's mount effect fires
+   *  BEFORE the parent effect that syncs `queueRef` — meaning the ref still
+   *  holds the previous queue, without the new effect in it.
+   *
+   *  An earlier version looked the effect up in that ref and returned early
+   *  when it was missing. Since a layer reports exactly once per effect id,
+   *  that one report was always swallowed: `startedAt` was never set,
+   *  `rendererReports` never latched, and the entire mechanism stayed inert
+   *  while looking wired. The unit tests missed it because `act()` flushes all
+   *  effects before assertions, which hides the ordering the real app has.
+   *
+   *  The functional updater always sees current state, so the stamp goes there.
+   *  The precise retirement timer is scheduled by the effect below, from the
+   *  queue itself, once the stamp has actually landed. */
+  const startedDrawing = useCallback((id: string, now: number) => {
+    // Latched unconditionally: a renderer called this, which is what the flag
+    // means. Whether the queue has caught up yet is irrelevant to that fact.
+    rendererReportsRef.current = true;
+    setQueue((current) => startEffect(current, id, now));
+  }, []);
+
+  // Give every newly started effect its precise retirement, replacing the
+  // admission watchdog. Driven off the queue rather than off `startedDrawing`
+  // so it cannot run before the stamp exists.
+  useEffect(() => {
+    for (const effect of queue.effects) {
+      if (effect.startedAt === null || precisedRef.current.has(effect.id)) {
+        continue;
       }
-      // The renderer reports draws, so unstarted effects may safely be waited
-      // for rather than cut short. Latched for the life of the hook.
-      rendererReportsRef.current = true;
-      setQueue((current) => startEffect(current, id, now));
-      scheduleRetire(id, queueRef.current.sessionId, live.durationMs);
-    },
-    [scheduleRetire],
-  );
+      precisedRef.current.add(effect.id);
+      scheduleRetire(effect.id, queue.sessionId, effect.durationMs);
+    }
+  }, [queue, scheduleRetire]);
 
   const playCue = useCallback(
     (kind: EffectCueKind, cells: readonly CellPosition[]) => {
