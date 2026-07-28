@@ -1223,3 +1223,31 @@ before/after comparison approved. Then Phase 2 (motion polish), Phase 3
     board shake during an explosion both render correctly on hardware.
   - Merged to master and tagged `v0.9-ui-event-effects` on the strength of that
     pass. Phase 6B (production ads/consent) may now begin.
+
+## Cinematic board renderer (in progress, 2026-07-28)
+
+Branch `feature-cinematic-board-renderer`. One consolidated pass, not subphases.
+Full detail in `docs/CINEMATIC_RENDERER.md`.
+
+- **Foundation** — `@shopify/react-native-skia` 2.6.2 (the version
+  `npx expo install` pins for SDK 57; Reanimated 4.5.0 and worklets 0.10.0 were
+  already direct dependencies). Feature flag, scene contract, pure adapter,
+  geometry, palette, jest mock. DONE.
+- **Board and block materials** — recessed frame cached as one Skia `Picture`,
+  luminous beveled blocks, rubble, previews, timer numerals, and the React
+  Native touch/accessibility overlay. DONE.
+- **Gameplay effects** — pure `effectScene` model (sweeps, flashes, rings,
+  bursts, floating score; capped; reduced-motion aware) plus its Skia drawing
+  layer. DONE.
+- **Renderer parity and cleanup tests** — accessibility tree, press surface,
+  cell size, geometry round trip, effect budgets, mock drift. DONE.
+- **Device QA — NOT DONE, and blocking.** No Android device, SDK or JDK on this
+  build machine. Nothing visual has been verified: not the look, not the frame
+  rate, not drag responsiveness, not Skia's runtime behaviour on Android, not
+  the font path, not memory over a session. Needs a development build and a
+  release/profile build on a physical phone, both reduced-motion states, a
+  10-minute session with slow and fast dragging, a full board, multiple clears,
+  timers, expiry, rubble, defuse and revive.
+- **Merge — NOT DONE.** The flag stays off and the branch stays unmerged until
+  the device pass above is reported. Ads work is untouched and Phase 6B remains
+  on its own branch.

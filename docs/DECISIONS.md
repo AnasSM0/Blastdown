@@ -1473,3 +1473,64 @@ captured or fabricated here. The `RubbleSurface` clip change and the board shake
 during an explosion — the two hazards that only hardware could settle — are
 confirmed good. Phase 3 merged to master and tagged `v0.9-ui-event-effects`, and
 Phase 6B (production ads/consent) is unpaused as of this entry.
+
+## 2026-07-28 — a second board renderer, on a Skia canvas, behind a flag
+
+The board is being rebuilt to draw into one Skia canvas rather than into 64
+`GridCell` views and their children. Four decisions are worth recording because
+each of them could reasonably have gone the other way.
+
+**Two renderers, not a replacement.** `EXPO_PUBLIC_CINEMATIC_BOARD` selects
+between them and defaults to the React Native one. The canvas has never run on a
+phone, and this repository has now shipped two device-only faults that no local
+check could have caught — a Kotlin metadata mismatch that broke the native build
+outright, and a Fabric prop assertion that crashed every launch. A renderer is
+exactly the kind of change where a build machine's opinion is worth little.
+
+The flag is deliberately not "on in development, off in production". A renderer
+that differs between the build you test and the build you ship is how an
+unverified path reaches a player; device QA sets the variable and rebuilds, so it
+tests the same code a store build would run.
+
+**Interaction stays on React Native views.** A canvas is a single view to the
+platform: one accessibility node, one touch target. 64 transparent `Pressable`s
+sit over it carrying the same labels, hints, roles and testIDs `GridCell`
+exposes, plus one node per timer badge. This is not a compromise —
+`docs/GAME_RULES.md` makes tap-to-place the accessibility fallback for placement
+and `docs/ACCESSIBILITY.md` treats the per-cell hints as shipped behaviour, so
+dropping them for a better-looking board would be a straight regression, and an
+invisible one from here. The badge nodes were missed in the first implementation
+and found by the CIN-A audit, which is a fair illustration of how quietly this
+kind of thing goes wrong.
+
+**Parity is structural, not aspirational.** The scene adapter calls the same
+helpers `GameBoard` calls — `blockSurface`, `getBadgeVisual`,
+`getRubbleGeometry`, `contourMaskOf`, `getTimerVisualState` — so there is no
+second definition of a block material that could drift. Geometry is reproduced
+from `src/ui/boardGeometry.ts` rather than reinvented, because dragging maps
+finger coordinates to cells through those constants: a canvas on a different
+lattice would turn a rendering change into a gameplay bug. The tests assert the
+round trip rather than pixel values.
+
+**The drag ghost stays a React Native view, against the brief.** The brief lists
+it among the things to move into the canvas. It cannot go into the _board_
+canvas: the ghost travels from the tray, across the screen, to the board and
+back, and Skia cannot draw outside its own view bounds, so the ghost would be
+clipped the moment it left the board. Two workable alternatives exist — a second
+root-level canvas, or one viewport-sized canvas with the board translated into
+it — and choosing between them without a device measurement would be guessing.
+The existing `DragGhost` runs under both renderers meanwhile.
+
+**Deviation from the branching instruction.** The brief said to branch from
+master and also to maintain the structural guards from the Fabric crash fix.
+Master predates that fix; all five of its commits live only on
+`phase-6b-production-ads-consent`. The crash is a rendering defect, not an ads
+one, so its rendering half was ported to the renderer branch (`1b816ad`) with no
+ads or consent code. Both branches now carry byte-identical versions of every
+file involved and will merge without conflict.
+
+**Nothing visual is verified.** Skia draws nothing under jest, so no local test
+has seen a pixel of this renderer. "Faster than 64 views" is an argument from
+structure, not a benchmark. `docs/CINEMATIC_RENDERER.md` lists what remains
+unverified; the flag stays off and the branch does not merge until a physical
+Android phone has run both a development and a release/profile build.

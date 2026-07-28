@@ -229,3 +229,50 @@ responsiveness unchanged from Phase 2; no duplicate audio or haptics; no
 lingering effects after restart or Home. Both Android hazards above are settled
 on device. The finding is the user's, recorded here — the build machine has no
 Android device and captured nothing.
+
+## Cinematic renderer — motion on a canvas (implemented, not device-verified, 2026-07-28)
+
+A second board renderer draws the playfield into one Skia canvas
+(`docs/CINEMATIC_RENDERER.md`). It ships behind `EXPO_PUBLIC_CINEMATIC_BOARD`,
+default off, and nothing below has been seen on a phone.
+
+Every beat above is preserved in intent and in **duration**, so switching
+renderers does not change how long a turn takes to read. What changes is how
+motion is expressed: React Native `Animated` drives view props; the canvas
+advances one clock over a pure list of timed primitives
+(`src/rendering/cinematic/effects/effectScene.ts`).
+
+| Event          | Canvas beat                                                        | Reduced motion                        |
+| -------------- | ------------------------------------------------------------------ | ------------------------------------- |
+| Line clear     | directional gradient sweep along each lane, plus staggered flashes | flashes only, no stagger, no settle   |
+| Defuse         | the piece's own cells flash; one ring on their centroid            | brief fade, contained ring, no growth |
+| Timer expiry   | debris thrown from each authoritative rubble cell; one board shake | contained flash, no throw, no shake   |
+| Revive         | restoration wave down the restored rows                            | low-peak fade, no stagger             |
+| Score          | floating `+N` rising from the event's own anchor                   | static, no rise                       |
+| Board ambience | very subtle light breathing; no continuous motion while dragging   | omitted                               |
+
+**Stagger and cap parity.** Clear stagger is 14 ms per cell capped at 112 ms;
+explosion stagger is 30 ms per piece plus 12 ms per cell capped at 120 ms; revive
+is 18 ms per row capped at 140 ms. Debris shares one budget of `MAX_BURST_CELLS`
+across every explosion in the turn — capped globally rather than per explosion,
+because four pieces expiring at once is a legal turn and a per-explosion cap
+would let legal play multiply past the budget.
+
+**Intersections.** A cell in both a cleared row and a cleared column takes the
+EARLIER of the two delays and flashes once. Flashing twice would double its
+brightness; taking the later delay would make it lag its own row.
+
+**Determinism.** Debris direction is derived from the cell's coordinates, not
+randomised, so a repeated explosion looks like the same explosion and a board of
+rubble does not shimmer as it redraws.
+
+**Reduced motion removes movement, never meaning.** Travelling sweeps, staggers,
+debris throw, text rise and the board shake all go to zero, and each beat is
+shortened — a static emphasis that lingers reads as a stall rather than as
+feedback. The event itself always still plays. This is decided once, in the
+model, so the canvas has no second reduced-motion branch to get wrong.
+
+**Board-only shake.** The shake moves the board drawing, never the screen. It is
+the one beat with a real vestibular cost and no informational content the drawn
+rubble does not already carry, so it is also the first thing reduced motion
+drops.
