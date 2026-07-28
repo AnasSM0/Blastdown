@@ -3,6 +3,7 @@ import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
+import { CinematicBoard } from "../src/components/CinematicBoard";
 import { GameBoard, BOARD_CONTENT_INSET } from "../src/components/GameBoard";
 import { EffectsLayer } from "../src/components/effects/EffectsLayer";
 import { PieceTray } from "../src/components/PieceTray";
@@ -24,6 +25,7 @@ import {
   getRewardedDefuseTarget,
   getTimerBadgePlacements,
 } from "../src/domain/selectors";
+import { isCinematicRendererEnabled } from "../src/config/renderer";
 import { dragOriginFromFinger, type BoardLayout, type Point } from "../src/ui/boardGeometry";
 import { cellsOfPiece, rubbleCellsOf } from "../src/ui/effects/eventEffects";
 import {
@@ -569,6 +571,14 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
   const freezeActive = state.freezeTurnsRemaining > 0;
   const defuseTarget = defuseConfirmOpen ? getRewardedDefuseTarget(state) : null;
 
+  // Which board draws. Both accept the same props (see
+  // `src/components/GameBoard/boardProps.ts`), so the screen hands over one set
+  // of values and never learns which renderer it got — the flag switches a
+  // component, not a data path. Resolved per render rather than at module load
+  // so the choice is observable in a test; the branch is a constant within a
+  // build, so this costs one comparison and never remounts on its own.
+  const BoardRenderer = isCinematicRendererEnabled() ? CinematicBoard : GameBoard;
+
   return (
     <View style={[styles.screen, { backgroundColor: theme.appBackground }]} testID="game-screen">
       {/* Programmatic reactor-depth background (P1-2), full-bleed behind the
@@ -590,7 +600,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
           <View style={styles.boardZone}>
             {boardSide > 0 ? (
               <View style={[styles.boardWrapper, { width: boardSide, height: boardSide }]}>
-                <GameBoard
+                <BoardRenderer
                   ref={boardRef}
                   grid={state.grid}
                   badges={badges}
