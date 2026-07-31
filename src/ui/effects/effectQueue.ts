@@ -268,3 +268,57 @@ export function resetSession(queue: EffectQueue): EffectQueue {
 export function holdsInputLock(queue: EffectQueue): boolean {
   return queue.effects.some((effect) => effect.plan.hasRequiredSequence);
 }
+
+/** Give each live effect a stable clock slot.
+ *
+ *  The cinematic board holds a fixed pool of `MAX_LIVE_EFFECTS` animation clocks
+ *  because a hook cannot be called in a loop. Handing those out by position in
+ *  draw order looks equivalent and is not: draw order is a sort, so admitting a
+ *  critical effect or retiring a standard one MOVES every other effect. The
+ *  survivor then finds a different clock under it, its slot reads as "new id
+ *  here", and its animation restarts from zero — one effect completing resetting
+ *  another, which is the exact failure the per-effect clocks exist to prevent.
+ *
+ *  Slots are therefore leased by effect id: an effect keeps the clock it was
+ *  first given until it retires, whatever happens to its neighbours. Freed slots
+ *  are reused lowest-first so the assignment is deterministic and testable.
+ *
+ *  Mutates and returns `leases`; the caller owns that map across renders. An
+ *  effect that finds no free slot is omitted, which cannot happen while the
+ *  queue cap and the pool size agree but is not worth crashing over if they
+ *  ever drift. */
+export function assignClockSlots(
+  leases: Map<string, number>,
+  sequences: readonly EffectSequence[],
+  capacity: number,
+): { sequence: EffectSequence; slot: number }[] {
+  const live = new Set(sequences.map((sequence) => sequence.id));
+  for (const id of [...leases.keys()]) {
+    if (!live.has(id)) {
+      leases.delete(id);
+    }
+  }
+
+  const taken = new Set(leases.values());
+  const assigned: { sequence: EffectSequence; slot: number }[] = [];
+
+  for (const sequence of sequences) {
+    let slot = leases.get(sequence.id);
+    if (slot === undefined) {
+      for (let candidate = 0; candidate < capacity; candidate += 1) {
+        if (!taken.has(candidate)) {
+          slot = candidate;
+          break;
+        }
+      }
+      if (slot === undefined) {
+        continue;
+      }
+      leases.set(sequence.id, slot);
+      taken.add(slot);
+    }
+    assigned.push({ sequence, slot });
+  }
+
+  return assigned;
+}

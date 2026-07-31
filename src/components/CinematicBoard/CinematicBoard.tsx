@@ -12,13 +12,14 @@ import {
 
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import { CinematicBoardCanvas } from "../../rendering/cinematic/CinematicBoardCanvas";
-import { buildEffectScene } from "../../rendering/cinematic/effects/effectScene";
+import { buildEffectScene, type EffectScene } from "../../rendering/cinematic/effects/effectScene";
 import { sceneGeometry } from "../../rendering/cinematic/geometry";
 import { cinematicPalette } from "../../rendering/cinematic/palette";
 import { buildBoardScene, buildPreviewCells } from "../../rendering/cinematic/scene";
 import { radius } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import { getTimerVisualState } from "../../ui/timerStates";
+import { assignClockSlots } from "../../ui/effects/effectQueue";
 import { cellLabel, placementHintFor } from "../GridCell/cellLabel";
 import type { GameBoardProps } from "../GameBoard/boardProps";
 
@@ -190,14 +191,21 @@ function CinematicBoardImpl(
   // Rebuilt only when the effect list or the board geometry changes: a drag or a
   // placement re-renders this component without touching these, so nothing in
   // flight is rebuilt.
-  const sequences = useMemo(
-    () =>
-      (effectSequences ?? []).map((sequence) => ({
-        id: sequence.id,
-        scene: buildEffectScene(sequence.plan, geometry, palette, reducedMotion),
-      })),
-    [effectSequences, geometry, palette, reducedMotion],
-  );
+  // One scene per live effect. The board used to build exactly one, from the
+  // animator's single `plan`, so every effect the queue held beyond the top one
+  // was retained in state and never drawn.
+  //
+  // Rebuilt only when the effect list or the board geometry changes: a drag or a
+  // placement re-renders this component without touching these, so nothing in
+  // flight is rebuilt.
+  const sequences = useMemo(() => effectSequences ?? [], [effectSequences]);
+  const sceneById = useMemo(() => {
+    const scenes = new Map<string, EffectScene>();
+    for (const sequence of sequences) {
+      scenes.set(sequence.id, buildEffectScene(sequence.plan, geometry, palette, reducedMotion));
+    }
+    return scenes;
+  }, [sequences, geometry, palette, reducedMotion]);
 
   // One clock per effect slot.
   //
@@ -214,25 +222,54 @@ function CinematicBoardImpl(
   const clock3 = useSharedValue(0);
   const clock4 = useSharedValue(0);
   const clock5 = useSharedValue(0);
-  const clocks = useMemo(
-    () => [clock0, clock1, clock2, clock3, clock4, clock5],
-    [clock0, clock1, clock2, clock3, clock4, clock5],
-  );
+  // Frozen on first render, deliberately: the pool must have ONE identity for
+  // the life of the board.
+  //
+  // A shared value's identity is stable in production, but the Reanimated jest
+  // mock returns a fresh object from `useSharedValue` on every render. Listing
+  // the six as dependencies therefore rebuilt this array each render, which
+  // re-ran the effect below, which set state, which rendered again — an
+  // unbounded loop that exhausted the heap rather than failing an assertion.
+  // Empty dependencies pin the first-render values, which are the real shared
+  // values in production and a stable set under the mock.
+  //
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const clocks = useMemo(() => [clock0, clock1, clock2, clock3, clock4, clock5], []);
 
-  const timed = useMemo(
-    () =>
-      sequences
-        .slice(0, clocks.length)
-        .map((sequence, index) => ({ ...sequence, elapsed: clocks[index] })),
-    [sequences, clocks],
-  );
+  // Clock slots are leased by effect id, never by position in draw order.
+  //
+  // Draw order is a sort: admitting a critical effect, or retiring a standard
+  // one, moves every other effect along. Handing out clocks by index meant a
+  // survivor found a different clock under it, its slot read as "new id here",
+  // and its animation restarted from zero — one effect completing resetting
+  // another. A lease survives its neighbours coming and going.
+  //
+  // Held in state rather than derived during render because the lease map is
+  // memory: what a slot means depends on which effects held it before. Reading
+  // that during render is exactly the "cannot access refs during render" hazard,
+  // and it would tear under a concurrent re-render. The extra pass costs one
+  // render per CHANGE OF EFFECT SET — a turn boundary, never a frame.
+  const leasesRef = useRef(new Map<string, number>());
+  const [timed, setTimed] = useState<
+    { id: string; scene: EffectScene; elapsed: SharedValue<number> }[]
+  >([]);
+
+  useEffect(() => {
+    setTimed(
+      assignClockSlots(leasesRef.current, sequences, clocks.length).map(({ sequence, slot }) => ({
+        id: sequence.id,
+        scene: sceneById.get(sequence.id) as EffectScene,
+        elapsed: clocks[slot],
+      })),
+    );
+  }, [sequences, sceneById, clocks]);
 
   // Start each effect's own clock, and report its draw, exactly once.
   //
-  // Keyed by the id occupying each slot, so a re-render that leaves the effect
-  // list alone restarts nothing: an ordinary placement, a drag, or a theme change
-  // re-renders this board without disturbing an effect in flight.
-  const slotIdsRef = useRef<(string | null)[]>([]);
+  // Keyed by effect id, so a re-render that leaves the effect list alone starts
+  // nothing: an ordinary placement, a drag or a theme change re-renders this
+  // board without disturbing anything in flight.
+  const startedRef = useRef(new Map<string, SharedValue<number>>());
   const onEffectStartedRef = useRef(onEffectStarted);
   useEffect(() => {
     onEffectStartedRef.current = onEffectStarted;
@@ -241,32 +278,29 @@ function CinematicBoardImpl(
     if (cellSize <= 0) {
       return;
     }
-    const previous = slotIdsRef.current;
-    const current: (string | null)[] = [];
+    const started = startedRef.current;
+    const live = new Set(timed.map((sequence) => sequence.id));
 
-    for (let index = 0; index < clocks.length; index += 1) {
-      const sequence = timed[index] ?? null;
-      current.push(sequence?.id ?? null);
-      if (sequence === null) {
-        // Slot emptied: stop the clock so a retired effect's animation does not
-        // keep running against a value nothing reads.
-        if (previous[index] != null) {
-          stopClock(clocks[index]);
-        }
-        continue;
+    for (const [id, clock] of [...started.entries()]) {
+      if (!live.has(id)) {
+        // Retired: stop its clock so a finished effect does not keep animating
+        // a value nothing reads.
+        stopClock(clock);
+        started.delete(id);
       }
-      if (previous[index] === sequence.id) {
-        continue;
-      }
-
-      startClock(clocks[index], sequence.scene.durationMs);
-      // The draw report. Mount of the layer is when React has committed it, so
-      // the next frame paints it; reporting earlier would be a lie about drawing.
-      onEffectStartedRef.current?.(sequence.id, Date.now());
     }
 
-    slotIdsRef.current = current;
-  }, [timed, clocks, cellSize]);
+    for (const sequence of timed) {
+      if (started.has(sequence.id)) {
+        continue;
+      }
+      started.set(sequence.id, sequence.elapsed);
+      startClock(sequence.elapsed, sequence.scene.durationMs);
+      // The draw report. React has committed this layer, so the next frame
+      // paints it; reporting earlier would be a lie about drawing.
+      onEffectStartedRef.current?.(sequence.id, Date.now());
+    }
+  }, [timed, cellSize]);
 
   // Stopping the clocks on unmount matters more than it looks: a sequence
   // outliving its board would keep the UI thread animating values nothing reads,

@@ -183,6 +183,39 @@ describe("the cinematic renderer draws every queued effect", () => {
     await view.unmount();
   });
 
+  it("keeps the survivor when the effect BELOW it retires", async () => {
+    // The case the first version of this suite missed: it retired the LAST
+    // effect, so nothing moved. Draw order is a sort, so retiring the standard
+    // effect promotes the critical one from index 1 to index 0 — and under
+    // position-assigned clocks the survivor found a different clock, read as a
+    // new effect, and restarted from zero.
+    const started: string[] = [];
+    const both = [sequence("s1:t1", "standard"), sequence("s1:t2", "critical")];
+    const view = await render(
+      <CinematicBoard
+        grid={grid()}
+        badges={[]}
+        boardSize={BOARD_SIDE}
+        effectSequences={both}
+        onEffectStarted={(id) => started.push(id)}
+      />,
+    );
+    await view.rerender(
+      <CinematicBoard
+        grid={grid()}
+        badges={[]}
+        boardSize={BOARD_SIDE}
+        effectSequences={[both[1]]}
+        onEffectStarted={(id) => started.push(id)}
+      />,
+    );
+
+    // The survivor is not re-reported, which is what "did not restart" means
+    // from outside: a remounted or restarted effect announces a fresh draw.
+    expect(started).toEqual(["s1:t1", "s1:t2"]);
+    await view.unmount();
+  });
+
   it("does not restart effects when the board grid changes", async () => {
     const started: string[] = [];
     const sequences = [sequence("s1:t1", "high")];

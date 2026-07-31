@@ -1,5 +1,6 @@
 import {
   admitEffect,
+  assignClockSlots,
   createEffectQueue,
   cueEffectId,
   holdsInputLock,
@@ -337,5 +338,69 @@ describe("priority is derived from what actually happened", () => {
 
   it("treats bare score commentary as standard", () => {
     expect(priorityFor(plan({ scoreDelta: 12 }))).toBe("standard");
+  });
+});
+
+describe("clock slots are leased by effect id", () => {
+  const seq = (id: string, priority: "standard" | "high" | "critical") => ({
+    id,
+    priority,
+    plan: {} as never,
+  });
+
+  it("keeps a survivor's slot when a neighbour before it retires", () => {
+    // The regression that position-based slots caused. Draw order is a sort, so
+    // retiring the standard effect moves the critical one from index 1 to index
+    // 0. Under index-assigned clocks it would find a different clock, read as a
+    // new effect, and restart from zero mid-flight.
+    const leases = new Map<string, number>();
+    const both = [seq("a", "standard"), seq("b", "critical")];
+    const first = assignClockSlots(leases, both, MAX_LIVE_EFFECTS);
+    const bSlot = first.find((entry) => entry.sequence.id === "b")?.slot;
+
+    const after = assignClockSlots(leases, [both[1]], MAX_LIVE_EFFECTS);
+
+    expect(after).toHaveLength(1);
+    expect(after[0].slot).toBe(bSlot);
+  });
+
+  it("keeps existing slots when a higher-priority effect is admitted", () => {
+    // Admitting a critical effect re-sorts the list, pushing the standard one
+    // down. Its clock must not move with it.
+    const leases = new Map<string, number>();
+    const before = assignClockSlots(leases, [seq("a", "standard")], MAX_LIVE_EFFECTS);
+    const after = assignClockSlots(
+      leases,
+      [seq("a", "standard"), seq("b", "critical")],
+      MAX_LIVE_EFFECTS,
+    );
+
+    expect(after.find((entry) => entry.sequence.id === "a")?.slot).toBe(before[0].slot);
+  });
+
+  it("reuses a freed slot rather than running out", () => {
+    const leases = new Map<string, number>();
+    const filled = Array.from({ length: MAX_LIVE_EFFECTS }, (_, index) => seq(`e${index}`, "high"));
+    assignClockSlots(leases, filled, MAX_LIVE_EFFECTS);
+    const freed = leases.get("e0");
+
+    const next = assignClockSlots(
+      leases,
+      [...filled.slice(1), seq("new", "high")],
+      MAX_LIVE_EFFECTS,
+    );
+
+    expect(next).toHaveLength(MAX_LIVE_EFFECTS);
+    expect(next.find((entry) => entry.sequence.id === "new")?.slot).toBe(freed);
+  });
+
+  it("gives every live effect a distinct slot", () => {
+    const leases = new Map<string, number>();
+    const assigned = assignClockSlots(
+      leases,
+      Array.from({ length: MAX_LIVE_EFFECTS }, (_, index) => seq(`e${index}`, "high")),
+      MAX_LIVE_EFFECTS,
+    );
+    expect(new Set(assigned.map((entry) => entry.slot)).size).toBe(MAX_LIVE_EFFECTS);
   });
 });
