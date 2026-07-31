@@ -5,6 +5,16 @@ web-build
 coverage
 package-lock.json
 
+# Generated knowledge graph (graphify). Machine-written JSON and reports that are
+# rebuilt from source on every commit and branch switch; reformatting them breaks
+# `npm run format:check` on output nobody edits by hand.
+graphify-out/
+
+# Vendored agent skill files, written by `graphify install` and overwritten on
+# every reinstall. Reformatting them would diverge from upstream for one release
+# and then be silently reverted.
+.claude/skills/
+
 # Authoritative external spec document; must not be reformatted.
 BUILD_SPEC.md
 

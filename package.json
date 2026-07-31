@@ -54,7 +54,9 @@
     "format:check": "prettier --check .",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "doctor": "expo-doctor"
+    "doctor": "expo-doctor",
+    "prepare": "node scripts/patch-graphify-hooks.cjs",
+    "graphify:hooks": "node scripts/patch-graphify-hooks.cjs"
   },
   "private": true
 }
