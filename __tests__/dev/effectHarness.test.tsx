@@ -391,6 +391,81 @@ describe("the harness is absent outside development", () => {
   });
 });
 
+describe("the harness leaves the production bundle", () => {
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const babel = require("@babel/core") as {
+    transformSync: (code: string, options: Record<string, unknown>) => { code: string } | null;
+  };
+  const { inlinePlugin, constantFoldingPlugin } = require("metro-transform-plugins") as {
+    inlinePlugin: unknown;
+    constantFoldingPlugin: unknown;
+  };
+  const { readFileSync } = require("fs") as {
+    readFileSync: (path: string, encoding: string) => string;
+  };
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  // Named rather than resolved: the repo has no `@types/node`, so
+  // `require.resolve` is not typed. Babel resolves it from the project root.
+  const typescriptPreset = "@babel/preset-typescript";
+
+  /** Run the two Metro passes that decide whether a `require` survives.
+   *
+   *  Deliberately NOT a source-pattern match. `docs/DECISIONS.md` already
+   *  records a guard that scanned source text certifying two separate broken
+   *  blur implementations — a test that checks the shape of the code will always
+   *  agree with the code. This one applies the actual transform and asks what
+   *  came out, so it is testing the mechanism rather than the spelling. */
+  function afterMetroPasses(source: string, dev: boolean): string {
+    return (
+      babel.transformSync(source, {
+        filename: "effectHarnessEntry.ts",
+        babelrc: false,
+        configFile: false,
+        presets: [typescriptPreset],
+        plugins: [
+          [inlinePlugin, { dev, inlinePlatform: true, isWrapped: false, platform: "android" }],
+          constantFoldingPlugin,
+        ],
+      })?.code ?? ""
+    );
+  }
+
+  it("drops the harness require from a production transform", () => {
+    const source = readFileSync("src/dev/effectHarnessEntry.ts", "utf8");
+
+    // Under a development build the require is reachable, so the harness exists.
+    expect(afterMetroPasses(source, true)).toContain("EffectHarnessScreen");
+    // Under a production build it is gone, so `collectDependencies` never sees
+    // it and the screen — with the catalogue, the runner and the diagnostics
+    // overlay behind it — leaves the graph entirely.
+    expect(afterMetroPasses(source, false)).not.toContain("EffectHarnessScreen");
+  });
+
+  it("can tell the two gates that look right and ship anyway", () => {
+    // This is the test's own proof that it means something. Both of these return
+    // null correctly in production and pass every behavioural test above; both
+    // were written here, and both put the harness in the bundle.
+
+    // A runtime read of `globalThis.__DEV__` is not a constant, so nothing folds.
+    const runtimeGate = `
+      import { isDevelopmentBuild } from "../config/environment";
+      export function resolveEffectHarness() {
+        if (!isDevelopmentBuild()) { return null; }
+        return require("./EffectHarnessScreen").EffectHarnessScreen;
+      }`;
+    expect(afterMetroPasses(runtimeGate, false)).toContain("EffectHarnessScreen");
+
+    // The trap: `__DEV__` IS inlined and the `if` DOES fold — to its consequent,
+    // leaving the require sitting in the body underneath, still collected.
+    const invertedGate = `
+      export function resolveEffectHarness() {
+        if (!__DEV__) { return null; }
+        return require("./EffectHarnessScreen").EffectHarnessScreen;
+      }`;
+    expect(afterMetroPasses(invertedGate, false)).toContain("EffectHarnessScreen");
+  });
+});
+
 describe("the harness screen", () => {
   it("plays a scenario end to end from its own button", async () => {
     // The screen itself, not the wiring extracted from it: a harness whose

@@ -1291,6 +1291,12 @@ Full detail in `docs/CINEMATIC_PERFORMANCE.md`.
   reachable from Settings in a development build only. Thirteen fixed scenarios
   driven through the same event pipeline gameplay uses; a test forbids the
   harness from naming any queue or renderer internal. DONE.
+- **Harness excluded from production bundles** — the require sits inside
+  `if (__DEV__)` so Metro removes it. Two earlier gates returned `null` correctly
+  and shipped the harness anyway; caught by a stop-time review, then confirmed by
+  grepping the exported Android bundle (4.437 MB → 4.422 MB, every harness marker
+  gone). Guarded by a test that runs Metro's own inline and constant-folding
+  passes, not a source-pattern match. DONE.
 - **Development-only diagnostics overlay** — queue depth, drawn, accepted,
   started, completed, evicted, dropped, session generation, renderer flag,
   oldest waiting age, enqueue-to-first-draw latency, and per-effect id, type,

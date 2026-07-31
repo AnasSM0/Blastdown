@@ -1,23 +1,41 @@
 import type { ComponentType } from "react";
 
-import { isDevelopmentBuild } from "../config/environment";
-
 /** The only way into the effect harness.
  *
- *  Returns `null` outside a development build, and the `require` below is the
- *  reason that means something. A static import would evaluate the harness
- *  screen — and everything it pulls in — on every bundle, and "renders a message
- *  instead" is not the same as absent: the screen would still be shipped, still
- *  be reachable by anyone who found the route, and still be a surface nobody
- *  tests in a release build.
+ *  ## Why the require sits inside `if (__DEV__)`, in this exact shape
  *
- *  The pattern deliberately mirrors `src/rendering/boardRenderer.ts`, which
- *  gates the cinematic renderer the same way and for the same reason: the
- *  bundler can see a constant branch and drop the untaken side. */
+ *  Two earlier versions of this function both looked like they excluded the
+ *  harness from a release build, and both shipped it. The shape matters, and it
+ *  is only checkable by grepping the exported bundle — which is what settled it.
+ *
+ *  1. `if (!isDevelopmentBuild()) return null;` then the require.
+ *     `isDevelopmentBuild()` reads `globalThis.__DEV__` at runtime so a test can
+ *     flip it. A runtime read is not a constant, so Metro folds nothing, the
+ *     require stays reachable, and `collectDependencies` pulls in the harness
+ *     screen and everything behind it.
+ *
+ *  2. `if (!__DEV__) return null;` then the require. The bare identifier IS
+ *     inlined, so the test folds to `true` — and Metro replaces the `if` with
+ *     its consequent, leaving the require sitting in the function body
+ *     underneath. Still collected. This one is the trap: the constant is real,
+ *     the folding happens, and the dependency survives anyway.
+ *
+ *  What works is the require being INSIDE the branch that folds away:
+ *  `if (false) { require(...) }` is removed whole, and the module leaves the
+ *  graph with it. Under jest nothing inlines `__DEV__`, so it is still the
+ *  global a test can set, which keeps the production branch observable.
+ *
+ *  `__tests__/dev/effectHarness.test.tsx` pins the shape, because both wrong
+ *  versions above pass every behavioural test — they return `null` correctly.
+ *  Only the bundle knows the difference.
+ *
+ *  Returning `null` rather than a component that renders a message is the other
+ *  half. A screen that shipped and said "not available" would still be a surface
+ *  nobody tests in a release build. */
 export function resolveEffectHarness(): ComponentType | null {
-  if (!isDevelopmentBuild()) {
-    return null;
+  if (__DEV__) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require("./EffectHarnessScreen").EffectHarnessScreen as ComponentType;
   }
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  return require("./EffectHarnessScreen").EffectHarnessScreen as ComponentType;
+  return null;
 }

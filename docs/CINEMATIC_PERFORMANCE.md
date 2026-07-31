@@ -265,9 +265,13 @@ development-only.
 
 Outside a development build the harness is **absent**, not disabled:
 `resolveEffectHarness()` returns `null`, the settings row is not rendered
-because the route never supplies its callback, and the screen module is behind a
-require the bundler drops. `/dev-effects` renders an empty screen backed by no
-code.
+because the route never supplies its callback, and Metro removes the screen's
+require so the module leaves the graph. `/dev-effects` renders an empty screen
+backed by no code.
+
+Verified by grepping the exported Android bundle rather than asserted — the
+first two versions of that gate both returned `null` correctly in production and
+shipped the harness anyway. `docs/CINEMATIC_RENDERER.md` has the mechanism.
 
 ### The scenarios, and what each proves
 

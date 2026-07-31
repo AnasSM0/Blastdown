@@ -1709,17 +1709,52 @@ a snapshot never logs — a log per read is a log per refresh, which on a device
 is a log per frame in everything but name.
 
 **Development-only means absent, not disabled.** `resolveEffectHarness()`
-returns `null` outside a development build and the screen is behind a require
-the bundler drops — the same shape as `boardRenderer.ts`, and for the same
-reason. A screen that shipped and rendered "not available" would still be a
-surface nobody tests in a release build. The settings entry is an optional
+returns `null` outside a development build, and the screen is behind a require
+Metro removes. A screen that shipped and rendered "not available" would still be
+a surface nobody tests in a release build. The settings entry is an optional
 callback the route supplies only in development, so the row does not exist
 rather than existing and refusing to work.
 
-**`__DEV__` is read through `globalThis`.** A bare `__DEV__` is substituted by
-the bundler, which folds the branch away and makes the production path
-untestable. Reading the global keeps it observable; a release bundle still gets
-the literal `false` the bundler installed.
+**The exclusion was claimed before it was true, twice.** Recorded because both
+wrong versions returned `null` correctly in production and passed every
+behavioural test, and because the claim was written into four documents and a
+commit message on the strength of reasoning rather than a check.
+
+1. `if (!isDevelopmentBuild()) return null;` then the require.
+   `isDevelopmentBuild()` reads `globalThis.__DEV__` at runtime so a test can
+   flip it — deliberately, so the production branch stays observable. A runtime
+   read is not a constant, so Metro folds nothing and `collectDependencies`
+   pulls in the harness screen and everything behind it.
+2. `if (!__DEV__) return null;` then the require. The bare identifier is inlined
+   and the `if` does fold — to its consequent, leaving the require in the body
+   underneath. Still collected. The trap is that the constant is real and the
+   folding happens, so the reasoning that produced version 2 was sound right up
+   to the part that mattered.
+
+What ships puts the require **inside** `if (__DEV__)`, so the branch folds away
+whole. The exported Android bundle went from 4.437 MB to 4.422 MB and every
+harness marker string disappeared from it.
+
+**The guard runs Metro's transform rather than matching source text.** A
+source-pattern guard is what certified two broken blur implementations earlier
+on this branch — "a test that checks the shape of the code will always agree
+with the code", already recorded above. So the test applies `inlinePlugin` and
+`constantFoldingPlugin` to the module and asserts the require is gone at
+`dev: false`, and in the same suite asserts both wrong gates still retain it.
+A guard that cannot demonstrate it distinguishes the failure is not a guard.
+
+**`isDevelopmentBuild()` survives for the two places that are not module
+gates**: the settings row callback and the diagnostics recorder's no-op. Both
+are runtime decisions where a `globalThis` read is correct and testable, and
+neither controls whether a module enters the graph.
+
+**Pre-existing and unfixed: `boardRenderer.ts` has the version-1 shape.** Its
+require is gated on `isCinematicRendererEnabled()`, a function call, and its
+comment claims the bundler can see both sides. By the reasoning above it cannot.
+Skia is still not _initialised_ with the flag off — the require never runs, and
+that was the actual defect the flag was built to fix — but the module is in the
+graph and the comment overstates it. Left alone rather than changed quietly in a
+commit about the harness.
 
 **The recorder no-ops outside a development build.** It is cheap — a few map
 operations per turn boundary, never per frame — but it is a diagnostic, and a

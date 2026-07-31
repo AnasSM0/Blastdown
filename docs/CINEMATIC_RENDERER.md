@@ -386,8 +386,41 @@ default and, when installed, emits only six kinds: `enqueue`, `accepted`,
 never logs.
 
 Neither reaches a player. `resolveEffectHarness()` returns `null` outside a
-development build and the screen sits behind a require the bundler drops — the
-same shape as the renderer flag, and for the same reason: "renders a message
-instead" is not the same as absent.
+development build, and the screen sits behind a require that Metro removes —
+"renders a message instead" is not the same as absent.
+
+**That last claim was wrong twice before it was true**, and the sequence is
+worth recording because both wrong versions looked correct and passed every
+behavioural test:
+
+1. `if (!isDevelopmentBuild()) return null;` then the require.
+   `isDevelopmentBuild()` reads `globalThis.__DEV__` at runtime so a test can
+   flip it. A runtime read is not a constant, so nothing folds and
+   `collectDependencies` pulls in the harness screen, the catalogue, the runner
+   and the overlay.
+2. `if (!__DEV__) return null;` then the require. The bare identifier _is_
+   inlined and the `if` _does_ fold — to its consequent, leaving the require in
+   the function body underneath. Still collected. The constant is real, the
+   folding happens, and the dependency survives anyway.
+
+What works is the require sitting **inside** the branch that folds away, so
+`if (false) { require(...) }` is removed whole. Verified by grepping the
+exported Android bundle: `harness-scenario-`, `EffectHarnessScreen`,
+`useEffectHarnessRunner` and `effect-diagnostics-oldest-waiting` are present
+with either wrong gate and absent with the right one, and the bundle drops from
+4.437 MB to 4.422 MB.
+
+`effectHarness.test.tsx` guards it by running Metro's own `inlinePlugin` and
+`constantFoldingPlugin` over the module and asserting the require is gone at
+`dev: false` — and, in the same suite, that both wrong gates above still retain
+it. A source-pattern guard was not used on purpose: this document already
+records one certifying two broken blur implementations, because a test that
+checks the shape of the code will always agree with the code.
+
+One caveat, unfixed and pre-existing: `src/rendering/boardRenderer.ts` gates its
+cinematic require on `isCinematicRendererEnabled()`, a function call, and its
+comment claims the bundler can see both sides. By the reasoning above it cannot.
+That does not put Skia into a flag-off _runtime_ — the require never executes —
+but the module is in the graph, and the comment overstates what the flag buys.
 
 The device procedure is in `docs/CINEMATIC_PERFORMANCE.md`.
