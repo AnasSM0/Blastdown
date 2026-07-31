@@ -27,7 +27,11 @@ const patcher = require("../../scripts/patch-graphify-hooks.cjs") as {
     source: string,
     marker: string,
     endMarker: string,
-  ) => { status: "patched" | "already" | "no-anchor"; source: string };
+  ) => {
+    status: "patched" | "already" | "no-anchor";
+    source: string;
+    unbounded: number;
+  };
   HOOKS: { name: string; marker: string; endMarker: string }[];
   ANCHOR: string;
   SENTINEL: string;
@@ -193,6 +197,46 @@ describe("inserting the force default", () => {
     expect(patchSource(both.source, MARKER, END_MARKER).status).toBe("already");
   });
 
+  it("never rewrites a foreign script when the end marker is missing", () => {
+    // Falling back to end-of-file when the close is absent re-creates the very
+    // bug the end marker exists to prevent: a truncated hook, or a graphify
+    // version that renames its markers, would put every following line inside
+    // "graphify's block" and rewrite an ANCHOR belonging to somebody else.
+    const truncated = `#!/bin/sh\n${MARKER}\n${ANCHOR}\n`;
+    const foreignBelow = `\n# another tool's hook\n${ANCHOR}\nnpm test\n`;
+    const result = patchSource(truncated + foreignBelow, MARKER, END_MARKER);
+
+    expect(result.status).toBe("no-anchor");
+    expect(result.unbounded).toBe(1);
+    expect(result.source).toBe(truncated + foreignBelow);
+  });
+
+  it("still patches a well-formed block when an earlier one is unterminated", () => {
+    // One malformed block must not cost the others their flag.
+    const truncated = `#!/bin/sh\n${MARKER}\n${ANCHOR}\n\n`;
+    const result = patchSource(truncated + graphifyBlock(), MARKER, END_MARKER);
+
+    expect(result.status).toBe("patched");
+    expect(result.unbounded).toBe(1);
+    // Exactly one flag: the closed block got it, the unterminated one did not.
+    expect(result.source.split(SENTINEL).length - 1).toBe(1);
+    expect(result.source.startsWith(truncated)).toBe(true);
+  });
+
+  it("does not let a later block's end marker close an earlier one", () => {
+    // An end marker that appears only after the NEXT start marker belongs to
+    // that later block. Treating it as this block's close would swallow the
+    // block between them.
+    const truncated = `#!/bin/sh\n${MARKER}\n${ANCHOR}\n\n`;
+    const result = patchSource(truncated + graphifyBlock(), MARKER, END_MARKER);
+
+    const firstBlock = result.source.slice(
+      result.source.indexOf(MARKER),
+      result.source.indexOf(MARKER, MARKER.length + 1),
+    );
+    expect(firstBlock).not.toContain(SENTINEL);
+  });
+
   it("reports rather than guesses when the anchor is gone", () => {
     // If graphify changes its hook format, silently doing nothing would leave
     // the stale-graph bug in place with no signal.
@@ -222,7 +266,7 @@ describe("the hook table", () => {
 
   it("patches a post-checkout block through its own marker", () => {
     const checkout = HOOKS[1];
-    const source = `#!/bin/sh\n${checkout.marker}\n\n${ANCHOR}\n`;
+    const source = `#!/bin/sh\n${checkout.marker}\n\n${ANCHOR}\n${checkout.endMarker}\n`;
     const result = patchSource(source, checkout.marker, checkout.endMarker);
     expect(result.status).toBe("patched");
     expect(result.source).toContain(SENTINEL);

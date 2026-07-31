@@ -123,8 +123,19 @@ function classify(path, marker) {
  *
  * So each block is delimited by its own start/end pair, everything between
  * blocks is copied through untouched, and every unpatched block gets the flag.
+ *
+ * A block whose end marker is missing is NOT treated as running to end-of-file.
+ * That fallback re-creates the bug it was meant to fix: a truncated hook, or a
+ * graphify version that changes its markers, would put every following line
+ * inside "graphify's block", and an ANCHOR in somebody else's script below it
+ * would be rewritten. The block is skipped and counted instead, so the run
+ * reports rather than edits code it cannot prove it owns. An end marker that
+ * appears only after the NEXT start marker is treated the same way: it closes a
+ * later block, not this one.
+ *
  * Status is aggregated: "patched" if any block was changed, "already" if they
- * all had it, "no-anchor" if none could be patched.
+ * all had it, "no-anchor" if none could be patched. `unbounded` counts the
+ * blocks that were skipped for want of a trustworthy end.
  */
 function patchSource(source, marker, endMarker) {
   let out = "";
@@ -132,14 +143,28 @@ function patchSource(source, marker, endMarker) {
   let blocks = 0;
   let patched = 0;
   let anchorless = 0;
+  let unbounded = 0;
 
   for (;;) {
     const at = source.indexOf(marker, cursor);
     if (at === -1) break;
     blocks += 1;
 
+    const nextStart = source.indexOf(marker, at + marker.length);
     const closes = source.indexOf(endMarker, at);
-    const end = closes === -1 ? source.length : closes + endMarker.length;
+    const bounded = closes !== -1 && (nextStart === -1 || closes < nextStart);
+
+    if (!bounded) {
+      // Copy through verbatim and resume at the next block, so one malformed
+      // block does not cost the well-formed ones their flag.
+      unbounded += 1;
+      const stop = nextStart === -1 ? source.length : nextStart;
+      out += source.slice(cursor, stop);
+      cursor = stop;
+      continue;
+    }
+
+    const end = closes + endMarker.length;
     const own = source.slice(at, end);
 
     out += source.slice(cursor, at);
@@ -155,12 +180,14 @@ function patchSource(source, marker, endMarker) {
     cursor = end;
   }
 
-  if (blocks === 0) return { status: "no-anchor", source };
+  if (blocks === 0) return { status: "no-anchor", source, unbounded };
   out += source.slice(cursor);
 
-  if (patched > 0) return { status: "patched", source: out };
-  if (anchorless > 0) return { status: "no-anchor", source };
-  return { status: "already", source };
+  if (patched > 0) return { status: "patched", source: out, unbounded };
+  if (anchorless > 0 || unbounded > 0) {
+    return { status: "no-anchor", source, unbounded };
+  }
+  return { status: "already", source, unbounded };
 }
 
 function hooksDir() {
@@ -264,12 +291,24 @@ function main() {
     }
 
     const result = patchSource(readFileSync(path, "utf8"), marker, endMarker);
+
+    if (result.unbounded > 0) {
+      console.warn(
+        `[graphify hooks] ${name}: ${result.unbounded} graphify block(s) have ` +
+          `no closing "${endMarker}", so their extent cannot be established ` +
+          `and they were left alone rather than risk rewriting a hook that is ` +
+          `not ours. Check the file by hand.`,
+      );
+    }
+
     if (result.status === "already") continue;
     if (result.status === "no-anchor") {
-      console.warn(
-        `[graphify hooks] ${name}: anchor "${ANCHOR}" not found; skipped. ` +
-          `The hook format changed — re-check the force flag by hand.`,
-      );
+      if (result.unbounded === 0) {
+        console.warn(
+          `[graphify hooks] ${name}: anchor "${ANCHOR}" not found; skipped. ` +
+            `The hook format changed — re-check the force flag by hand.`,
+        );
+      }
       continue;
     }
 
