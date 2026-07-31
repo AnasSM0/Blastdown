@@ -2,7 +2,13 @@ import { JetBrainsMono_700Bold } from "@expo-google-fonts/jetbrains-mono";
 import { useFont } from "@shopify/react-native-skia";
 import { forwardRef, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
-import { Easing, cancelAnimation, useSharedValue, withTiming } from "react-native-reanimated";
+import {
+  Easing,
+  cancelAnimation,
+  useSharedValue,
+  withTiming,
+  type SharedValue,
+} from "react-native-reanimated";
 
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import { CinematicBoardCanvas } from "../../rendering/cinematic/CinematicBoardCanvas";
@@ -82,6 +88,32 @@ const TouchCell = memo(function TouchCell({
   );
 });
 
+/** Start one effect's clock from zero.
+ *
+ *  Module level rather than inline in the board: assigning to a shared value
+ *  held in a memoized array reads, to the react-hooks lint rule, as mutating a
+ *  local after render. The assignment is to a Reanimated shared value, which is
+ *  exactly the escape hatch that rule exists to protect, so the work moves out
+ *  here where the intent is unambiguous. */
+function startClock(clock: SharedValue<number>, durationMs: number): void {
+  clock.value = 0;
+  if (durationMs <= 0) {
+    return;
+  }
+  clock.value = withTiming(durationMs, {
+    // Linear, because this value IS elapsed time. Easing it would make every
+    // delay in the sequence land at the wrong moment.
+    duration: durationMs,
+    easing: Easing.linear,
+  });
+}
+
+/** Stop a clock and park it at zero, for a slot whose effect has retired. */
+function stopClock(clock: SharedValue<number>): void {
+  cancelAnimation(clock);
+  clock.value = 0;
+}
+
 function CinematicBoardImpl(
   {
     grid,
@@ -94,7 +126,7 @@ function CinematicBoardImpl(
     reducedMotion: reducedMotionProp,
     frozen = false,
     placementHints,
-    effectPlan,
+    effectSequences,
     effectKey,
     onEffectStarted,
   }: GameBoardProps,
@@ -151,61 +183,110 @@ function CinematicBoardImpl(
 
   const { cellSize, pitch, contentInset } = geometry;
 
-  const effects = useMemo(
-    () => (effectPlan ? buildEffectScene(effectPlan, geometry, palette, reducedMotion) : null),
-    [effectPlan, geometry, palette, reducedMotion],
+  // One scene per live effect. The board used to build exactly one, from the
+  // animator's single `plan`, so every effect the queue held beyond the top one
+  // was retained in state and never drawn.
+  //
+  // Rebuilt only when the effect list or the board geometry changes: a drag or a
+  // placement re-renders this component without touching these, so nothing in
+  // flight is rebuilt.
+  const sequences = useMemo(
+    () =>
+      (effectSequences ?? []).map((sequence) => ({
+        id: sequence.id,
+        scene: buildEffectScene(sequence.plan, geometry, palette, reducedMotion),
+      })),
+    [effectSequences, geometry, palette, reducedMotion],
   );
 
-  // One clock for the whole sequence. Every effect primitive reads it and
-  // derives its own progress from its own delay and duration, so a turn that
-  // plays ninety primitives still runs one animation rather than ninety - and no
-  // React render happens while it plays.
-  const elapsed = useSharedValue(0);
+  // One clock per effect slot.
+  //
+  // Every effect needs its own progress, and a hook cannot be called in a loop.
+  // The queue caps live effects at MAX_LIVE_EFFECTS, so a fixed pool of that many
+  // shared values covers every case the queue can produce, allocated once and
+  // assigned by draw-order position. A component-per-effect owning its own hook
+  // was the obvious alternative and is not available here: it would have to live
+  // inside the Canvas, and `test-utils/skiaMock.tsx` renders Canvas as null
+  // precisely so that no logic hides in there.
+  const clock0 = useSharedValue(0);
+  const clock1 = useSharedValue(0);
+  const clock2 = useSharedValue(0);
+  const clock3 = useSharedValue(0);
+  const clock4 = useSharedValue(0);
+  const clock5 = useSharedValue(0);
+  const clocks = useMemo(
+    () => [clock0, clock1, clock2, clock3, clock4, clock5],
+    [clock0, clock1, clock2, clock3, clock4, clock5],
+  );
 
-  // Report the draw to the effect queue. Same reasoning as the React Native
-  // layer: without this call `startedDrawing` is never invoked in production,
-  // so no effect ever gets a real start time and the queue's late-admission
-  // guarantee is inert.
-  // Reported once per effect id, tracked in a ref rather than by effect
-  // dependencies. The callback and the scene both change identity across
-  // ordinary re-renders, so a dependency list would re-report the same effect
-  // repeatedly. The animator ignores a second start, but a renderer that keeps
-  // announcing the same draw is lying about what it did, and the next thing
-  // built on top of it would inherit that.
-  const startedRef = useRef<string | null>(null);
+  const timed = useMemo(
+    () =>
+      sequences
+        .slice(0, clocks.length)
+        .map((sequence, index) => ({ ...sequence, elapsed: clocks[index] })),
+    [sequences, clocks],
+  );
+
+  // Start each effect's own clock, and report its draw, exactly once.
+  //
+  // Keyed by the id occupying each slot, so a re-render that leaves the effect
+  // list alone restarts nothing: an ordinary placement, a drag, or a theme change
+  // re-renders this board without disturbing an effect in flight.
+  const slotIdsRef = useRef<(string | null)[]>([]);
   const onEffectStartedRef = useRef(onEffectStarted);
   useEffect(() => {
     onEffectStartedRef.current = onEffectStarted;
   });
   useEffect(() => {
-    if (effectKey == null || effects === null || cellSize <= 0) {
+    if (cellSize <= 0) {
       return;
     }
-    if (startedRef.current === effectKey) {
-      return;
-    }
-    startedRef.current = effectKey;
-    onEffectStartedRef.current?.(effectKey, Date.now());
-  }, [effectKey, effects, cellSize]);
+    const previous = slotIdsRef.current;
+    const current: (string | null)[] = [];
 
-  useEffect(() => {
-    if (!effects || effects.durationMs <= 0) {
-      elapsed.value = 0;
-      return;
+    for (let index = 0; index < clocks.length; index += 1) {
+      const sequence = timed[index] ?? null;
+      current.push(sequence?.id ?? null);
+      if (sequence === null) {
+        // Slot emptied: stop the clock so a retired effect's animation does not
+        // keep running against a value nothing reads.
+        if (previous[index] != null) {
+          stopClock(clocks[index]);
+        }
+        continue;
+      }
+      if (previous[index] === sequence.id) {
+        continue;
+      }
+
+      startClock(clocks[index], sequence.scene.durationMs);
+      // The draw report. Mount of the layer is when React has committed it, so
+      // the next frame paints it; reporting earlier would be a lie about drawing.
+      onEffectStartedRef.current?.(sequence.id, Date.now());
     }
-    elapsed.value = 0;
-    elapsed.value = withTiming(effects.durationMs, {
-      duration: effects.durationMs,
-      // Linear, because this value IS elapsed time. Easing it would make every
-      // delay in the sequence land at the wrong moment.
-      easing: Easing.linear,
-    });
-    // Stopping the clock on unmount matters more than it looks: a sequence
-    // outliving its board would keep the UI thread animating a value nothing
-    // reads, and this board unmounts on restart, Home and game over - three of
-    // the moments most likely to happen mid-effect.
-    return () => cancelAnimation(elapsed);
-  }, [effectKey, effects, elapsed]);
+
+    slotIdsRef.current = current;
+  }, [timed, clocks, cellSize]);
+
+  // Stopping the clocks on unmount matters more than it looks: a sequence
+  // outliving its board would keep the UI thread animating values nothing reads,
+  // and this board unmounts on restart, Home and game over — three of the moments
+  // most likely to happen mid-effect.
+  useEffect(
+    () => () => {
+      for (const clock of clocks) {
+        cancelAnimation(clock);
+      }
+    },
+    [clocks],
+  );
+
+  // Shake belongs to the board, not to an effect, so it cannot be per-effect:
+  // several effects each driving the same transform would fight over it. The
+  // last sequence in draw order is the most important one live, and it wins.
+  const shakeIndex = timed.length - 1;
+  const shakeScene = shakeIndex >= 0 ? timed[shakeIndex].scene : null;
+  const shakeClock = shakeIndex >= 0 ? timed[shakeIndex].elapsed : clock0;
 
   useEffect(() => {
     if (cellSize > 0) {
@@ -249,8 +330,9 @@ function CinematicBoardImpl(
         <CinematicBoardCanvas
           scene={scene}
           preview={previewCells}
-          effects={effects}
-          elapsed={elapsed}
+          sequences={timed}
+          shakeScene={shakeScene}
+          elapsed={shakeClock}
           font={font}
           style={{ width: boardSide, height: boardSide }}
         />

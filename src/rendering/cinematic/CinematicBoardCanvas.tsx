@@ -35,7 +35,8 @@ import type { BoardScene, PreviewScene } from "./types";
 export function CinematicBoardCanvas({
   scene,
   preview,
-  effects,
+  sequences,
+  shakeScene,
   elapsed,
   font,
   style,
@@ -43,15 +44,22 @@ export function CinematicBoardCanvas({
   scene: BoardScene;
   /** Separate from the scene so a drag does not invalidate the board. */
   preview: PreviewScene;
-  effects: EffectScene | null;
-  /** Milliseconds since the current effect sequence started. */
+  /** Every live effect, bottom-first. Each draws through its own child, which
+   *  owns its own clock — a hook cannot be called in a loop, so per-effect
+   *  independence has to come from a component per effect. */
+  sequences: readonly { id: string; scene: EffectScene; elapsed: SharedValue<number> }[];
+  /** The one effect that drives the board shake, if any. Shake is a property of
+   *  the board rather than of an effect, so several effects cannot each shake it
+   *  — the most important one wins and the rest just draw. */
+  shakeScene: EffectScene | null;
+  /** Milliseconds since the shake-driving sequence started. */
   elapsed: SharedValue<number>;
   font: SkFont | null;
   style?: { width: number; height: number };
 }) {
   const { geometry, palette } = scene;
-  const shake = effects?.shake ?? 0;
-  const shakeDuration = effects?.durationMs ?? 0;
+  const shake = shakeScene?.shake ?? 0;
+  const shakeDuration = shakeScene?.durationMs ?? 0;
 
   // The explosion shake, applied to the BOARD drawing rather than to the screen
   // — `docs/ANIMATION_SPEC.md` is explicit that it must stay board-only. Four
@@ -88,7 +96,18 @@ export function CinematicBoardCanvas({
         <RubbleLayer rubble={scene.rubble} geometry={geometry} palette={palette} />
         <BlocksLayer blocks={scene.blocks} geometry={geometry} palette={palette} />
         <PreviewLayer preview={preview} geometry={geometry} />
-        {effects ? <EffectsLayer scene={effects} elapsed={elapsed} font={font} /> : null}
+        {/* One child per live effect, keyed by the effect's own id. Keying by
+            id is what makes them independent: a retiring effect unmounts only
+            its own child, and a board state change re-renders this canvas
+            without remounting any of them, so nothing in flight restarts. */}
+        {sequences.map((sequence) => (
+          <EffectsLayer
+            key={sequence.id}
+            scene={sequence.scene}
+            elapsed={sequence.elapsed}
+            font={font}
+          />
+        ))}
         <NumeralsLayer numerals={scene.numerals} palette={palette} font={font} />
       </Group>
     </Canvas>

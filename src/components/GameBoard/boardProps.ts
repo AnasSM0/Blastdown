@@ -48,10 +48,14 @@ export type GameBoardProps = {
   /** True while the run's rewarded freeze is active — pauses the countdown and
    *  puts every timer badge into its frozen (icy, static) cue. */
   frozen?: boolean;
-  /** The effect plan for the turn being animated. Only the cinematic renderer
-   *  reads it: that renderer draws effects INSIDE its canvas, while the React
-   *  Native renderer has them as a sibling overlay the screen mounts itself. */
-  effectPlan?: import("../../ui/effects/eventEffects").EffectPlan | null;
+  /** Every live effect, bottom-first. Only the cinematic renderer reads it: that
+   *  renderer draws effects INSIDE its canvas, while the React Native renderer
+   *  has them as a sibling overlay the screen mounts itself.
+   *
+   *  A list rather than a single plan because the queue holds up to six and all
+   *  of them must draw. Passing one collapsed `plan` is what made every effect
+   *  after the highest-priority one invisible. */
+  effectSequences?: readonly import("../../ui/effects/effectQueue").EffectSequence[];
   /** Called by the renderer when it begins drawing the current effect, so the
    *  effect queue can start that effect's clock from the moment it is actually
    *  on screen rather than from when it was queued. */

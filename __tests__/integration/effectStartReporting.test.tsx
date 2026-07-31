@@ -118,8 +118,7 @@ describe("the cinematic board reports that it drew", () => {
         grid={grid()}
         badges={[]}
         boardSize={BOARD_SIDE}
-        effectPlan={clearPlan()}
-        effectKey="s1:t7"
+        effectSequences={[{ id: "s1:t7", priority: "high", plan: clearPlan() }]}
         onEffectStarted={(id) => started.push(id)}
       />,
     );
@@ -135,8 +134,7 @@ describe("the cinematic board reports that it drew", () => {
         grid={grid()}
         badges={[]}
         boardSize={BOARD_SIDE}
-        effectPlan={null}
-        effectKey={null}
+        effectSequences={[]}
         onEffectStarted={(id) => started.push(id)}
       />,
     );
@@ -168,8 +166,7 @@ describe("both renderers report, so the queue behaves the same either way", () =
         grid={grid()}
         badges={[]}
         boardSize={BOARD_SIDE}
-        effectPlan={clearPlan()}
-        effectKey="same"
+        effectSequences={[{ id: "same", priority: "high", plan: clearPlan() }]}
         onEffectStarted={(id) => skia.push(id)}
       />,
     );

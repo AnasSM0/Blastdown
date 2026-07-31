@@ -5,6 +5,7 @@ import type { GridCell } from "../domain/gameTypes";
 import type { CellPosition } from "../domain/placement";
 import {
   admitEffect,
+  drawOrder,
   createEffectQueue,
   cueEffectId,
   holdsInputLock,
@@ -14,6 +15,7 @@ import {
   startEffect,
   turnEffectId,
   type EffectQueue,
+  type EffectSequence,
   type LiveEffect,
 } from "../ui/effects/effectQueue";
 import {
@@ -42,8 +44,11 @@ export type EventAnimator = {
   /** Every live effect, each with its own identity, priority and start time.
    *  A renderer may draw all of them concurrently. */
   effects: readonly LiveEffect[];
-  /** The highest-priority live plan, for the React Native renderer, which draws
-   *  one sequence at a time. */
+  /** Every live effect in drawing order (standard lowest, critical highest).
+   *  This is what both renderers draw; all of it, concurrently. */
+  sequences: readonly EffectSequence[];
+  /** The highest-priority live plan. Drives the board-level explosion shake,
+   *  which belongs to the board rather than to any one effect. */
   plan: EffectPlan | null;
   /** Identity of whatever `plan` currently is, so the single-plan renderer can
    *  remount cleanly between sequences. */
@@ -298,9 +303,20 @@ export function useEventAnimator({
     return best;
   }, [queue.effects]);
 
+  // What the renderers actually draw: every live effect, bottom-first. Memoized
+  // because both renderers key children off this array, and a fresh identity on
+  // every screen render would defeat their memoization even though the contents
+  // are unchanged.
+  const sequences = useMemo(() => drawOrder(queue), [queue]);
+
   return {
     isAnimating: holdsInputLock(queue),
     effects: queue.effects,
+    /** Every live effect in drawing order. Both renderers consume this. */
+    sequences,
+    // The collapsed view. Kept for the board's own explosion shake, which is a
+    // property of the board rather than of an effect, and NOT a description of
+    // what is on screen — the renderers draw `sequences`, all of it.
     plan: primary?.plan ?? null,
     effectKey: primary?.id ?? null,
     startedDrawing,

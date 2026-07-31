@@ -89,6 +89,39 @@ export type LiveEffect = {
   startedAt: number | null;
 };
 
+/** What a renderer needs to draw one effect, and nothing more.
+ *
+ *  Deliberately narrower than `LiveEffect`: a renderer has no business seeing
+ *  `startedAt`, `sequence` or `sessionId`, all of which are queue bookkeeping.
+ *  Both renderers take a list of these, which is what makes the two paths
+ *  testable against a single contract. */
+export type EffectSequence = {
+  id: string;
+  priority: EffectPriority;
+  plan: EffectPlan;
+};
+
+/** Drawing order: standard underneath, then high, critical on top.
+ *
+ *  Admission order is not drawing order. A score comment admitted after an
+ *  explosion is still the less important of the two and must not cover it. */
+const DRAW_ORDER: Record<EffectPriority, number> = {
+  standard: 1,
+  high: 2,
+  critical: 3,
+};
+
+/** The live effects as a renderer should stack them, bottom first.
+ *
+ *  Ties fall back to admission order, so the sort is total and two effects of
+ *  equal priority never swap places between renders — a swap would remount both
+ *  and restart their animations. */
+export function drawOrder(queue: EffectQueue): EffectSequence[] {
+  return [...queue.effects]
+    .sort((a, b) => DRAW_ORDER[a.priority] - DRAW_ORDER[b.priority] || a.sequence - b.sequence)
+    .map(({ id, priority, plan }) => ({ id, priority, plan }));
+}
+
 export type EffectQueue = {
   effects: readonly LiveEffect[];
   sessionId: number;

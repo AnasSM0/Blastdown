@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
 import { BOARD_CONTENT_INSET } from "../src/components/GameBoard";
-import { EffectsLayer } from "../src/components/effects/EffectsLayer";
+import { EffectStack } from "../src/components/effects/EffectStack";
 import { PieceTray } from "../src/components/PieceTray";
 import { ReactorBackground } from "../src/components/ReactorBackground";
 import { ScoreHeader } from "../src/components/ScoreHeader";
@@ -647,22 +647,20 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
                   placementHints={placementHints}
                   // Only the cinematic renderer reads this: it draws effects
                   // inside its own canvas, so the sibling overlay below is
-                  // suppressed for it. Handing the plan to both renderers would
-                  // play every beat twice.
-                  effectPlan={cinematic ? animator.plan : undefined}
+                  // suppressed for it. Handing the sequences to both renderers
+                  // would play every beat twice.
+                  effectSequences={cinematic ? animator.sequences : undefined}
                   onEffectStarted={animator.startedDrawing}
                 />
                 {/* Cosmetic overlay, a SIBLING of the board rather than a child:
-                    a new effect plan re-renders only this layer, never the 64
-                    cells. Remounted per sequence so two turns' effects never
-                    interpolate into each other. */}
-                {!cinematic && animator.plan && cellSize > 0 ? (
-                  <EffectsLayer
-                    key={animator.effectKey ?? "idle"}
-                    plan={animator.plan}
+                    a new effect re-renders only this stack, never the 64 cells.
+                    One layer per live effect, each keyed by its own id, so
+                    effects animate and retire independently of each other. */}
+                {!cinematic ? (
+                  <EffectStack
+                    sequences={animator.sequences}
                     cellSize={cellSize}
                     reducedMotion={reducedMotion}
-                    effectId={animator.effectKey}
                     onStarted={animator.startedDrawing}
                   />
                 ) : null}
