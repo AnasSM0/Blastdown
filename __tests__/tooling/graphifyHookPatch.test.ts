@@ -26,8 +26,9 @@ const patcher = require("../../scripts/patch-graphify-hooks.cjs") as {
   patchSource: (
     source: string,
     marker: string,
+    endMarker: string,
   ) => { status: "patched" | "already" | "no-anchor"; source: string };
-  HOOKS: { name: string; marker: string }[];
+  HOOKS: { name: string; marker: string; endMarker: string }[];
   ANCHOR: string;
   SENTINEL: string;
 };
@@ -35,6 +36,7 @@ const patcher = require("../../scripts/patch-graphify-hooks.cjs") as {
 const { classifySource, patchSource, HOOKS, ANCHOR, SENTINEL } = patcher;
 
 const MARKER = "# graphify-hook-start";
+const END_MARKER = "# graphify-hook-end";
 
 /** A minimal stand-in for what `graphify hook install` writes. */
 function graphifyBlock(): string {
@@ -104,7 +106,7 @@ describe("classifying an existing hook", () => {
 
 describe("inserting the force default", () => {
   it("adds the flag inside graphify's block", () => {
-    const result = patchSource(graphifyBlock(), MARKER);
+    const result = patchSource(graphifyBlock(), MARKER, END_MARKER);
     expect(result.status).toBe("patched");
     expect(result.source).toContain(SENTINEL);
   });
@@ -112,13 +114,13 @@ describe("inserting the force default", () => {
   it("puts the flag after the anchor, not before it", () => {
     // Order is the whole point: the flag must be exported before the block that
     // reads it runs.
-    const { source } = patchSource(graphifyBlock(), MARKER);
+    const { source } = patchSource(graphifyBlock(), MARKER, END_MARKER);
     expect(source.indexOf(ANCHOR)).toBeLessThan(source.indexOf(SENTINEL));
   });
 
   it("is idempotent", () => {
-    const once = patchSource(graphifyBlock(), MARKER);
-    const twice = patchSource(once.source, MARKER);
+    const once = patchSource(graphifyBlock(), MARKER, END_MARKER);
+    const twice = patchSource(once.source, MARKER, END_MARKER);
     expect(twice.status).toBe("already");
     expect(twice.source).toBe(once.source);
   });
@@ -128,7 +130,7 @@ describe("inserting the force default", () => {
     // sets the same variable, so a first-match replace lands above graphify's
     // block and the flag never reaches the rebuild.
     const foreign = `#!/bin/sh\n${ANCHOR}\nnpm test\n\n`;
-    const { status, source } = patchSource(foreign + graphifyBlock(), MARKER);
+    const { status, source } = patchSource(foreign + graphifyBlock(), MARKER, END_MARKER);
 
     expect(status).toBe("patched");
     expect(source.indexOf(SENTINEL)).toBeGreaterThan(source.indexOf(MARKER));
@@ -136,7 +138,7 @@ describe("inserting the force default", () => {
 
   it("leaves the foreign script above the block byte-for-byte intact", () => {
     const foreign = `#!/bin/sh\n# somebody else's hook\nnpm test\n\n`;
-    const { source } = patchSource(foreign + graphifyBlock(), MARKER);
+    const { source } = patchSource(foreign + graphifyBlock(), MARKER, END_MARKER);
     expect(source.startsWith(foreign)).toBe(true);
   });
 
@@ -147,7 +149,7 @@ describe("inserting the force default", () => {
     // block still lacks it, so the block that reads the flag never gets it and
     // every later run agrees there is nothing to do.
     const foreign = `#!/bin/sh\nexport GRAPHIFY_FORCE="\${GRAPHIFY_FORCE:-1}"\nnpm test\n\n`;
-    const { status, source } = patchSource(foreign + graphifyBlock(), MARKER);
+    const { status, source } = patchSource(foreign + graphifyBlock(), MARKER, END_MARKER);
 
     expect(status).toBe("patched");
     expect(source.slice(source.indexOf(MARKER))).toContain(SENTINEL);
@@ -155,25 +157,57 @@ describe("inserting the force default", () => {
 
   it("reports already when the flag is inside the block", () => {
     const foreign = `#!/bin/sh\nnpm test\n\n`;
-    const once = patchSource(foreign + graphifyBlock(), MARKER);
-    expect(patchSource(once.source, MARKER).status).toBe("already");
+    const once = patchSource(foreign + graphifyBlock(), MARKER, END_MARKER);
+    expect(patchSource(once.source, MARKER, END_MARKER).status).toBe("already");
+  });
+
+  it("ignores a sentinel in a foreign script appended BELOW the block", () => {
+    // Slicing from the start marker to end-of-file is only half a scope. A hook
+    // that runs after graphify's block — appended later by another tool, or a
+    // hand-rolled workaround — pulls its sentinel into the slice, and the block
+    // reports "already" while having no flag of its own.
+    const trailing = `\n#!/bin/sh\nexport GRAPHIFY_FORCE="\${GRAPHIFY_FORCE:-1}"\nnpm test\n`;
+    const { status, source } = patchSource(graphifyBlock() + trailing, MARKER, END_MARKER);
+
+    expect(status).toBe("patched");
+    const block = source.slice(source.indexOf(MARKER), source.indexOf(END_MARKER));
+    expect(block).toContain(SENTINEL);
+    expect(source.endsWith(trailing)).toBe(true);
+  });
+
+  it("patches a second block when only the first one has the flag", () => {
+    // `graphify hook install` appends, so a file can end up with two blocks.
+    // Bounding only at the start marker finds the first, sees the flag, and
+    // reports the whole file done — leaving the second block unforced.
+    const once = patchSource(graphifyBlock(), MARKER, END_MARKER);
+    const twoBlocks = `${once.source}\n\n${graphifyBlock()}`;
+
+    const result = patchSource(twoBlocks, MARKER, END_MARKER);
+    expect(result.status).toBe("patched");
+    expect(result.source.split(SENTINEL).length - 1).toBe(2);
+  });
+
+  it("reports already only when every block has the flag", () => {
+    const once = patchSource(graphifyBlock(), MARKER, END_MARKER);
+    const both = patchSource(`${once.source}\n\n${graphifyBlock()}`, MARKER, END_MARKER);
+    expect(patchSource(both.source, MARKER, END_MARKER).status).toBe("already");
   });
 
   it("reports rather than guesses when the anchor is gone", () => {
     // If graphify changes its hook format, silently doing nothing would leave
     // the stale-graph bug in place with no signal.
     const withoutAnchor = graphifyBlock().replace(ANCHOR, "export OTHER=1");
-    expect(patchSource(withoutAnchor, MARKER).status).toBe("no-anchor");
+    expect(patchSource(withoutAnchor, MARKER, END_MARKER).status).toBe("no-anchor");
   });
 
   it("reports when the marker is absent entirely", () => {
-    expect(patchSource("#!/bin/sh\nnpm test\n", MARKER).status).toBe("no-anchor");
+    expect(patchSource("#!/bin/sh\nnpm test\n", MARKER, END_MARKER).status).toBe("no-anchor");
   });
 
   it("emits shell that sets the flag only when it is unset", () => {
     // `${VAR:-1}` rather than a bare assignment, so an explicit
     // GRAPHIFY_FORCE=0 in the environment still wins.
-    const { source } = patchSource(graphifyBlock(), MARKER);
+    const { source } = patchSource(graphifyBlock(), MARKER, END_MARKER);
     expect(source).toContain('export GRAPHIFY_FORCE="${GRAPHIFY_FORCE:-1}"');
   });
 });
@@ -189,7 +223,7 @@ describe("the hook table", () => {
   it("patches a post-checkout block through its own marker", () => {
     const checkout = HOOKS[1];
     const source = `#!/bin/sh\n${checkout.marker}\n\n${ANCHOR}\n`;
-    const result = patchSource(source, checkout.marker);
+    const result = patchSource(source, checkout.marker, checkout.endMarker);
     expect(result.status).toBe("patched");
     expect(result.source).toContain(SENTINEL);
   });

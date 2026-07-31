@@ -36,10 +36,22 @@ const { execFileSync } = require("node:child_process");
 const { existsSync, readFileSync, writeFileSync } = require("node:fs");
 const { join } = require("node:path");
 
-/** Hooks graphify installs, with the marker proving graphify owns the file. */
+/** Hooks graphify installs, with the markers delimiting the block it owns.
+ *
+ *  Both ends matter. Graphify writes `-start` and `-end` around its block, and
+ *  anything outside that pair belongs to somebody else — a hook that was there
+ *  first, or one appended afterwards. */
 const HOOKS = [
-  { name: "post-commit", marker: "# graphify-hook-start" },
-  { name: "post-checkout", marker: "# graphify-checkout-hook-start" },
+  {
+    name: "post-commit",
+    marker: "# graphify-hook-start",
+    endMarker: "# graphify-hook-end",
+  },
+  {
+    name: "post-checkout",
+    marker: "# graphify-checkout-hook-start",
+    endMarker: "# graphify-checkout-hook-end",
+  },
 ];
 
 /** Anchor present in both hooks, immediately after the shebang block. */
@@ -98,36 +110,57 @@ function classify(path, marker) {
 }
 
 /**
- * Insert the force default into graphify's own block.
+ * Insert the force default into every graphify block, and nothing else.
  *
- * Splitting at the marker matters: when graphify appends to a pre-existing hook
- * the file holds foreign script above its block, and a bare replace on the first
- * ANCHOR match could land there instead — putting the flag outside the block
- * that reads it, in a hook that still looks patched.
+ * "Scoped to graphify's block" means bounded at BOTH ends. Slicing from the
+ * start marker to end-of-file is only half a scope, and it fails in the same
+ * two ways a whole-file match does, just further down the file:
  *
- * The "already patched" test is scoped to that block too. A whole-file test
- * reports a mixed hook as done: the sentinel can sit in the foreign script above
- * graphify's block — a hand-rolled `GRAPHIFY_FORCE` workaround, or a leftover
- * from a hook that was reorganised — while graphify's own block still lacks it.
- * The file then looks patched to every later run and the block that actually
- * reads the flag never gets it.
+ *   - A foreign script appended BELOW graphify's block that happens to contain
+ *     the sentinel makes this block report "already" while it has no flag.
+ *   - A file with two graphify blocks (install appended a second time) reports
+ *     "already" off the first block and leaves the second one unpatched.
  *
- * Returns `{ status, source }`. `status` is "patched", "already", or
- * "no-anchor" when graphify's block no longer contains the anchor line.
+ * So each block is delimited by its own start/end pair, everything between
+ * blocks is copied through untouched, and every unpatched block gets the flag.
+ * Status is aggregated: "patched" if any block was changed, "already" if they
+ * all had it, "no-anchor" if none could be patched.
  */
-function patchSource(source, marker) {
-  const at = source.indexOf(marker);
-  if (at === -1) return { status: "no-anchor", source };
+function patchSource(source, marker, endMarker) {
+  let out = "";
+  let cursor = 0;
+  let blocks = 0;
+  let patched = 0;
+  let anchorless = 0;
 
-  const head = source.slice(0, at);
-  const own = source.slice(at);
-  if (own.includes(SENTINEL)) return { status: "already", source };
-  if (!own.includes(ANCHOR)) return { status: "no-anchor", source };
+  for (;;) {
+    const at = source.indexOf(marker, cursor);
+    if (at === -1) break;
+    blocks += 1;
 
-  return {
-    status: "patched",
-    source: head + own.replace(ANCHOR, ANCHOR + "\n" + PATCH),
-  };
+    const closes = source.indexOf(endMarker, at);
+    const end = closes === -1 ? source.length : closes + endMarker.length;
+    const own = source.slice(at, end);
+
+    out += source.slice(cursor, at);
+    if (own.includes(SENTINEL)) {
+      out += own;
+    } else if (!own.includes(ANCHOR)) {
+      anchorless += 1;
+      out += own;
+    } else {
+      patched += 1;
+      out += own.replace(ANCHOR, ANCHOR + "\n" + PATCH);
+    }
+    cursor = end;
+  }
+
+  if (blocks === 0) return { status: "no-anchor", source };
+  out += source.slice(cursor);
+
+  if (patched > 0) return { status: "patched", source: out };
+  if (anchorless > 0) return { status: "no-anchor", source };
+  return { status: "already", source };
 }
 
 function hooksDir() {
@@ -214,7 +247,7 @@ function main() {
   );
   ensureHooksInstalled(dir, before);
 
-  for (const { name, marker } of HOOKS) {
+  for (const { name, marker, endMarker } of HOOKS) {
     const path = join(dir, name);
     // Re-classify: install may have just created the file, or appended its
     // block to a foreign hook that was there first.
@@ -230,7 +263,7 @@ function main() {
       continue;
     }
 
-    const result = patchSource(readFileSync(path, "utf8"), marker);
+    const result = patchSource(readFileSync(path, "utf8"), marker, endMarker);
     if (result.status === "already") continue;
     if (result.status === "no-anchor") {
       console.warn(
