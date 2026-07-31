@@ -238,3 +238,95 @@ None of the above is confirmed. The acceptance list, unchanged from the brief:
 Two visual deltas are deliberate and should be sanity-checked rather than
 reported as bugs: block halos now blend where blocks touch, and clear flashes
 have hard rather than soft edges.
+
+## The device procedure (2026-07-31)
+
+The acceptance list above was, until now, a list of things to look for while
+playing. That is not a procedure. Half the claims the effect queue makes cannot
+be reached by playing at all without waiting for the board to produce a double
+clear plus two expiring timers on the same turn, and the other half — "the
+survivor did not restart", "the seventh effect evicted the first" — cannot be
+judged by an unaided eye even when they do happen.
+
+So there is now a scripted harness and a diagnostics readout, both
+development-only.
+
+### Reaching the harness
+
+1. Build or start a **development** build (`npx expo start`, or an
+   `eas build --profile development` install). `__DEV__` must be true; a preview
+   or store build has no harness in it — see below.
+2. Settings → **EFFECT HARNESS (DEV)**. The route is `/dev-effects`, reachable
+   directly if you prefer.
+3. Run the same procedure twice: once on a build with
+   `EXPO_PUBLIC_CINEMATIC_BOARD` unset (the React Native renderer) and once with
+   `EXPO_PUBLIC_CINEMATIC_BOARD=1` (the cinematic renderer). The harness mounts
+   whichever board the flag resolved, so both runs exercise the shipped path.
+
+Outside a development build the harness is **absent**, not disabled:
+`resolveEffectHarness()` returns `null`, the settings row is not rendered
+because the route never supplies its callback, and the screen module is behind a
+require the bundler drops. `/dev-effects` renders an empty screen backed by no
+code.
+
+### The scenarios, and what each proves
+
+Each button plays a fixed script through the same pipeline gameplay uses — a
+turn counter plus that turn's `GameEvent[]` into `useEventAnimator`, plus
+`playCue` and `reset`. Steps land one frame apart. The harness cannot fabricate
+an effect, stamp a start time or touch a renderer, so anything it shows is
+something delivery genuinely produced.
+
+| Scenario                    | What must happen                                                                                          |
+| --------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Placement only              | The board snaps. **Nothing is queued** — a plain placement has no required sequence. Queue depth stays 0. |
+| One line clear              | Row 3 sweeps left to right, once. Input unlocks when it ends.                                             |
+| Row + column together       | Row 3 sweeps across while column 5 sweeps down, as one effect. The intersection lights once.              |
+| Two clears, back to back    | Two clears run side by side. Neither restarts the other; the first is not cut short.                      |
+| Clear + defuse              | Row 2 sweeps and the defused piece flashes on **its own footprint**, not the line's midpoint.             |
+| Clear + explosion           | Both play, then the board shakes. The clear is not replaced by the burst. Priority reads `critical`.      |
+| Two explosions at once      | Two bursts, in event order, each over its own rubble. One shake.                                          |
+| Six rapid effects           | Six clears visible at once. Queue depth 6, drawn 6. This is the cap.                                      |
+| Seventh effect (eviction)   | Seven arrive, six remain, and the **first** is the one that goes. Evicted 1, dropped 0.                   |
+| Rewarded cue under pressure | The cue is admitted first and still survives six clears. A `critical` effect outranks ordinary churn.     |
+| Lower effect retires first  | The 340ms clear ends while the 400ms cue runs. The cue must **not** jump back to its start.               |
+| Restart mid-effect          | Everything vanishes at once; the board is usable immediately. Generation increments, nothing lingers.     |
+| Session change mid-effect   | The clear after the restart plays normally under the new generation.                                      |
+
+### Reading the diagnostics overlay
+
+The panel sits above the scenario buttons and refreshes four times a second — it
+polls a plain-JavaScript ledger rather than re-rendering per effect, so it does
+not distort the frames it is measuring.
+
+| Field           | Meaning                                                                                                                                   |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `queue`         | Live effects right now. Never above 6.                                                                                                    |
+| `drawn`         | How many of those a renderer has reported drawing.                                                                                        |
+| `accept`        | Admissions the queue took.                                                                                                                |
+| `started`       | First-draw reports received. Must equal `accept` once everything has drawn — a **larger** number means an effect restarted.               |
+| `done`          | Effects that finished their lifetime.                                                                                                     |
+| `evict`         | Effects dropped to stay under the cap.                                                                                                    |
+| `drop`          | Admissions **refused** — a duplicate id, or one aimed at a generation the player had left.                                                |
+| `gen`           | The current run generation, and how many times a session has been cleared.                                                                |
+| `renderer`      | `skia` or `views`. Confirms which build you are actually testing.                                                                         |
+| `waiting`       | Age of the oldest effect not yet drawn. Settling means a slow frame; **climbing** means the renderer is not reporting at all.             |
+| `latency`       | Last / worst enqueue-to-first-draw, in ms.                                                                                                |
+| per-effect rows | `id · type · priority · slot · latency`. `slot` is the leased cinematic clock; `-` on the React Native renderer, which has no clock pool. |
+
+Three readings and what each means:
+
+- **`accept` climbs, `started` does not.** The queue is admitting and the
+  renderer is not drawing. `waiting` will be climbing with it.
+- **`started` exceeds `accept`.** An effect is being re-reported, which means it
+  remounted — the exact fault the leased clock slots exist to prevent. Check
+  whether two rows share a `slot`.
+- **`drop` climbs.** Admissions are being refused. Almost always a duplicate id
+  or a stale generation; neither is a rendering problem.
+
+### The measurement that is still missing
+
+Still no frame time, before or after. The harness proves delivery — that six
+effects exist, draw once each, and retire independently. It says nothing about
+what they cost. A trace remains the only way to answer that, and the branch does
+not merge on this evidence alone.

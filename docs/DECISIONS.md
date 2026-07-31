@@ -1645,3 +1645,86 @@ magnitude is unverified, and the branch does not merge until a phone says so.
 **No bug inventory was produced.** The brief asked for one and also said not to
 claim a bug without reproduction evidence. "Several bugs remain" is not a bug
 report, so the inventory is empty rather than invented.
+
+## Effect delivery harness and diagnostics (2026-07-31)
+
+**A harness, because the acceptance list was not a procedure.** The
+multi-effect contract's claims — six live effects, deterministic eviction, a
+survivor that does not restart when the effect beneath it retires — were each
+covered by a test that hands a renderer a hand-built `EffectSequence[]`. None of
+them could be reached on a phone without waiting for the board to produce a
+double clear plus two expiring timers on the same turn, and two of them cannot
+be judged by eye even when it does. `src/dev/` now scripts thirteen fixed
+scenarios through the real pipeline.
+
+**The harness gets no privileged access, and that is enforced.** It drives
+`useEventAnimator` with a turn counter and a `GameEvent[]`, `playCue`, and
+`reset` — nothing else. A test forbids the harness sources from naming
+`admitEffect`, `startEffect`, `retireEffect`, `assignClockSlots`,
+`EffectsLayer` or the canvas. A harness that could fabricate a live effect would
+prove only that the harness works.
+
+**Steps are scheduled a frame apart rather than looped or drained per commit.**
+A loop is batched into one commit, so six turn steps become one turn and one
+effect. Draining one per commit fixes that and introduces a subtler fault: the
+runner's effect and the animator's turn effect land in the same flush, and which
+runs first is decided by the order the two hooks happen to be called in — a cue
+scripted to follow a clear was admitted before it. One step per timer gives each
+step a whole task, and one frame is an honest reading of "rapid".
+
+**Diagnostics are derived from committed queue transitions, never from inside
+the state updater.** The updater is where admission and eviction happen and is
+the obvious place to count them. It is also re-invoked on a rebase and twice
+under StrictMode, so every counter would inflate under re-render — and an
+inflated counter lies in the direction of "everything is fine", which is the
+most expensive way for a diagnostic to be wrong. Observing a committed
+before/after pair is idempotent, and a test pins that by observing the same pair
+twice.
+
+**`dropped` is counted at the call site because a refused admission leaves no
+trace.** Nothing is added to the queue, so the transition is empty. Attempts are
+counted in `useEventAnimator` outside the updater and `dropped` is the
+difference between attempts and acceptances — no duplication of `admitEffect`'s
+refusal logic.
+
+**Eviction is distinguished from retirement by replaying the queue's own rule.**
+The count is arithmetic (whatever the cap could not hold); which effect went is
+`evict()`'s ordering — lowest priority, then oldest — applied to the removals
+rather than guessed from `startedAt`. Guessing would misreport a watchdog
+retirement as an eviction, and the two have different fixes.
+
+**Clock leases are published by the board, not derived by the overlay.**
+Deriving a slot from draw order is exactly the positional assignment the leases
+replaced. A diagnostic built that way would report the arrangement that caused
+the bug instead of the one in force.
+
+**The overlay polls at 250 ms and never subscribes per effect.** It exists to
+diagnose dropped frames; an overlay driven by an animation frame, or one that
+re-rendered on every recorded transition, would add React work to precisely the
+frames it is measuring and report a problem it was partly causing.
+
+**Structured logging is off by default and limited to six kinds.** `enqueue`,
+`accepted`, `startedDrawing`, `completed`, `evicted`, `sessionCleared`. Reading
+a snapshot never logs — a log per read is a log per refresh, which on a device
+is a log per frame in everything but name.
+
+**Development-only means absent, not disabled.** `resolveEffectHarness()`
+returns `null` outside a development build and the screen is behind a require
+the bundler drops — the same shape as `boardRenderer.ts`, and for the same
+reason. A screen that shipped and rendered "not available" would still be a
+surface nobody tests in a release build. The settings entry is an optional
+callback the route supplies only in development, so the row does not exist
+rather than existing and refusing to work.
+
+**`__DEV__` is read through `globalThis`.** A bare `__DEV__` is substituted by
+the bundler, which folds the branch away and makes the production path
+untestable. Reading the global keeps it observable; a release bundle still gets
+the literal `false` the bundler installed.
+
+**The recorder no-ops outside a development build.** It is cheap — a few map
+operations per turn boundary, never per frame — but it is a diagnostic, and a
+diagnostic that runs in a store build is a cost users pay for nothing.
+
+**Still no frame time.** The harness proves delivery: that six effects exist,
+draw once each, and retire independently. It says nothing about what they cost.
+The branch does not merge on this evidence alone.

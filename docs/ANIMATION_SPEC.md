@@ -276,3 +276,33 @@ model, so the canvas has no second reduced-motion branch to get wrong.
 the one beat with a real vestibular cost and no informational content the drawn
 rubble does not already carry, so it is also the first thing reduced motion
 drops.
+
+## Exercising these beats on a phone (2026-07-31)
+
+Every timing above is decided in the pure model and covered by unit tests, which
+answers "is the plan right" and not "did the plan reach the screen". The second
+question needs a device, and most of the interesting cases cannot be produced by
+playing on demand: a row and a column clearing together, a clear plus a defuse
+plus two explosions on one turn, seven effects arriving faster than any of them
+can finish.
+
+`src/dev/effectHarness.ts` holds a fixed catalogue of thirteen scenarios that
+produce exactly those cases, played through the same event pipeline gameplay
+uses. The catalogue is data, not behaviour: the same button produces the same
+events in the same order on every device and every run, so a tester comparing
+two phones is comparing the phones.
+
+Durations the scenarios lean on, all from this document:
+
+- a clear or defuse sequence is **340 ms** (120 ms reduced),
+- an explosion adds **440 ms** on top,
+- a rewarded cue is **400 ms** (140 ms reduced) and holds **no** input lock.
+
+The "lower effect retires first" scenario exists because of the first and third:
+a 340 ms clear and a 400 ms cue overlap, the clear ends first, and the cue must
+not restart when it does. That is the visible symptom of clock slots assigned by
+draw position instead of leased by effect id, and it is not something an unaided
+eye catches during ordinary play.
+
+Development builds only, and absent rather than disabled elsewhere. Access and
+the diagnostics readout are documented in `docs/CINEMATIC_PERFORMANCE.md`.

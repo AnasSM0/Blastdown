@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 
 import { SettingsView } from "../src/components/SettingsScreen";
+import { isDevelopmentBuild } from "../src/config/environment";
 import { useAnalytics } from "../src/services/analytics";
 import { useSettings } from "../src/state/SettingsProvider";
 import { resolveTheme } from "../src/ui/themes";
@@ -42,6 +43,10 @@ export default function SettingsScreen() {
         onToggle={handleToggle}
         onThemes={() => router.push("/themes")}
         onReplayTutorial={() => router.push("/tutorial")}
+        // Undefined outside a development build, so the row is absent rather
+        // than present and inert. The route itself renders nothing there too —
+        // see `app/dev-effects.tsx`.
+        onEffectHarness={isDevelopmentBuild() ? () => router.push("/dev-effects") : undefined}
         onBack={handleBack}
       />
       <StatusBar style="light" />

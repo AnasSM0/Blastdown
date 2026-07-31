@@ -329,3 +329,65 @@ hard rather than soft edges.
 
 The "What is unverified" section above still stands in full, and now has a
 companion: no frame time has been measured before or after.
+
+## Effect delivery harness and diagnostics (2026-07-31)
+
+The multi-effect contract — six live effects, independent clocks, deterministic
+eviction, leased clock slots — was proved by tests that hand the renderers a
+hand-built `EffectSequence[]`. That is a renderer test. It says nothing about
+whether the app's own event stream ever produces six live effects, and it cannot
+be run on a phone.
+
+Two development-only additions close that gap.
+
+**The harness** (`src/dev/`, route `/dev-effects`) plays thirteen fixed
+scenarios through the same entry points gameplay uses: a turn counter plus that
+turn's `GameEvent[]` into `useEventAnimator`, `playCue` for the two rewarded
+cues, and `reset` for a restart. It mounts the board the **renderer flag**
+resolved, so the same procedure exercises both paths. It reaches nothing else —
+a test asserts the harness sources never name `admitEffect`, `startEffect`,
+`assignClockSlots`, `EffectsLayer` or the canvas — so an effect it shows is one
+delivery genuinely produced.
+
+Steps are scheduled one frame apart rather than looped. React batches, so six
+"turn" steps in a loop become one commit with the turn counter jumping from 0 to
+6 and a single effect admitted; draining one per commit instead puts the
+runner's effect and the animator's turn effect in the same flush, where hook
+declaration order decides which runs first (a cue scripted to follow a clear was
+admitted before it). One step per timer gives each a whole task.
+
+**The diagnostics ledger** (`src/ui/effects/effectDiagnostics.ts`) is a plain
+JavaScript record with no React in it, derived from **committed queue
+transitions** rather than from inside the state updater. The updater is where
+admission and eviction happen and is the wrong place to count them: it is
+re-invoked on a rebase and twice under StrictMode, so every counter would
+inflate under re-render — and an inflated counter lies in the direction of
+"everything is fine". Observing a committed before/after pair is idempotent.
+
+The one thing a committed pair cannot show is an admission that was _refused_ —
+nothing is added, so the transition is empty. Attempts are counted separately in
+`useEventAnimator`, outside the updater, and `dropped` is the difference.
+
+Eviction is told from retirement arithmetically: the queue evicts only to get
+back under the cap, so the count is whatever the cap could not hold, and _which_
+effect went is the queue's own rule (lowest priority, then oldest) replayed
+rather than guessed — so the two cannot drift apart silently.
+
+**Clock leases are published, not derived.** `CinematicBoard` reports its lease
+map to the ledger. Deriving the slot from draw order in the overlay would be
+exactly the positional assignment the leases replaced, and the diagnostic would
+report the arrangement that caused the bug instead of the one in force.
+
+The overlay refreshes on a 250ms interval. An overlay driven by an animation
+frame, or one that re-rendered on every recorded transition, would add React
+work to precisely the frames it exists to measure. Structured logging is off by
+default and, when installed, emits only six kinds: `enqueue`, `accepted`,
+`startedDrawing`, `completed`, `evicted`, `sessionCleared`. Reading a snapshot
+never logs.
+
+Neither reaches a player. `resolveEffectHarness()` returns `null` outside a
+development build and the screen sits behind a require the bundler drops — the
+same shape as the renderer flag, and for the same reason: "renders a message
+instead" is not the same as absent.
+
+The device procedure is in `docs/CINEMATIC_PERFORMANCE.md`.

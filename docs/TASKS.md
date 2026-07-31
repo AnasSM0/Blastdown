@@ -1280,3 +1280,24 @@ Full detail in `docs/CINEMATIC_PERFORMANCE.md`.
   The acceptance list is in `docs/CINEMATIC_PERFORMANCE.md`.
 - **Merge — NOT DONE.** Flag stays off by default; the fallback renderer is
   untouched and still never imports Skia.
+
+### Effect delivery (Priority 1, 2026-07-31)
+
+- **Multi-effect rendering contract** — both renderers take
+  `readonly EffectSequence[]`, effects have stable ids, render independently and
+  in priority order, and cinematic clock slots are leased by id so retiring one
+  effect cannot restart another. DONE.
+- **Development-only effect harness** — `src/dev/`, route `/dev-effects`,
+  reachable from Settings in a development build only. Thirteen fixed scenarios
+  driven through the same event pipeline gameplay uses; a test forbids the
+  harness from naming any queue or renderer internal. DONE.
+- **Development-only diagnostics overlay** — queue depth, drawn, accepted,
+  started, completed, evicted, dropped, session generation, renderer flag,
+  oldest waiting age, enqueue-to-first-draw latency, and per-effect id, type,
+  priority and leased clock slot. Polls a plain-JavaScript ledger every 250 ms;
+  structured logging is off by default and limited to six lifecycle kinds. DONE.
+- **Coverage** — 88.4% lines / 80.7% branches overall (was 87.5% / 79.4%).
+  `src/dev/**` is 93–100% lines; `effectDiagnostics.ts` is 93.4%. DONE.
+- **Device QA procedure — WRITTEN, NOT RUN.** The exact steps, the thirteen
+  scenarios with what each must show, and how to read the overlay are in
+  `docs/CINEMATIC_PERFORMANCE.md`. Still no phone, so still no frame time.

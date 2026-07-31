@@ -475,6 +475,17 @@ eas build --profile development --platform android
 EXPO_PUBLIC_CINEMATIC_BOARD=1 eas build ... # cinematic renderer build
 ```
 
+### Testing effects on a phone
+
+Development builds carry an effect delivery harness at `/dev-effects`, reachable
+from Settings → **EFFECT HARNESS (DEV)**. Thirteen fixed scenarios drive the
+real event pipeline, and a diagnostics overlay shows queue depth, accepted,
+started, completed, evicted and dropped counts, the leased cinematic clock slot
+per effect, the session generation, and enqueue-to-first-draw latency.
+
+It is absent outside a development build — not disabled. The procedure and how
+to read the overlay are in `docs/CINEMATIC_PERFORMANCE.md`.
+
 ### Read these in this order
 
 1. `BUILD_SPEC.md` — the authority

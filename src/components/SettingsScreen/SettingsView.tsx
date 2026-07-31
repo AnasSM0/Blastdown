@@ -14,6 +14,12 @@ type SettingsViewProps = {
   onThemes: () => void;
   onReplayTutorial: () => void;
   onBack: () => void;
+  /** Opens the development-only effect delivery harness.
+   *
+   *  Optional, and absent is the normal case: the route supplies it only in a
+   *  development build, so the row does not exist in a preview or store build
+   *  rather than existing and being disabled. */
+  onEffectHarness?: () => void;
 };
 
 const ROWS: { key: ToggleKey; label: string }[] = [
@@ -34,6 +40,7 @@ export function SettingsView({
   onThemes,
   onReplayTutorial,
   onBack,
+  onEffectHarness,
 }: SettingsViewProps) {
   const valueFor = (key: ToggleKey): boolean =>
     key === "reducedMotion" ? settings.reducedMotionOverride === true : settings[key];
@@ -94,6 +101,19 @@ export function SettingsView({
           <Text style={styles.label}>REPLAY TUTORIAL</Text>
           <Text style={styles.chevron}>›</Text>
         </Pressable>
+        {onEffectHarness ? (
+          <Pressable
+            style={styles.navRow}
+            onPress={onEffectHarness}
+            accessibilityRole="button"
+            accessibilityLabel="Effect harness"
+            accessibilityHint="Opens the development-only effect delivery harness"
+            testID="settings-effect-harness-button"
+          >
+            <Text style={styles.label}>EFFECT HARNESS (DEV)</Text>
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
+        ) : null}
       </View>
     </SafeAreaView>
   );

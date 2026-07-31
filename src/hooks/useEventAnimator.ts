@@ -18,6 +18,7 @@ import {
   type EffectSequence,
   type LiveEffect,
 } from "../ui/effects/effectQueue";
+import { recordEffectEnqueue, recordQueueTransition } from "../ui/effects/effectDiagnostics";
 import {
   buildCuePlan,
   buildEffectPlan,
@@ -41,6 +42,9 @@ type UseEventAnimatorArgs = {
 export type EventAnimator = {
   /** True while any admitted effect holds the input lock. */
   isAnimating: boolean;
+  /** The current run generation. Bumped by `reset`, carried by every effect id.
+   *  Diagnostics and tests read it; renderers have no business with it. */
+  sessionId: number;
   /** Every live effect, each with its own identity, priority and start time.
    *  A renderer may draw all of them concurrently. */
   effects: readonly LiveEffect[];
@@ -130,6 +134,20 @@ export function useEventAnimator({
     reducedRef.current = reducedMotion;
     latestGridRef.current = grid;
   });
+
+  // Effect delivery diagnostics, derived from COMMITTED queue transitions.
+  //
+  // Recording from inside the state updater would be the obvious place — it is
+  // where admission and eviction actually happen — and it is wrong: an updater
+  // is re-invoked on a rebase and twice under StrictMode, so every counter would
+  // inflate under re-render. Inflated counters lie in the direction of
+  // "everything is fine", which is the most expensive way for a diagnostic to be
+  // wrong. Observing a committed pair is idempotent instead.
+  const observedRef = useRef(queue);
+  useEffect(() => {
+    recordQueueTransition(observedRef.current, queue, Date.now());
+    observedRef.current = queue;
+  }, [queue]);
 
   const clearAllTimers = useCallback(() => {
     for (const timer of timersRef.current.values()) {
@@ -222,6 +240,14 @@ export function useEventAnimator({
       const cuePlan = buildCuePlan(kind, cells, reducedRef.current);
       cueCountRef.current += 1;
       const cueCount = cueCountRef.current;
+      // The attempt, counted before the queue sees it. A refused admission
+      // leaves no trace in the queue — nothing is added — so this is the only
+      // evidence that a cue the player paid for was ever offered.
+      recordEffectEnqueue(
+        cueEffectId(queueRef.current.sessionId, cueCount),
+        queueRef.current.sessionId,
+        Date.now(),
+      );
       // No busy check. A cue is a rewarded outcome the player paid for, so it is
       // admitted alongside whatever is playing rather than instead of it. The id
       // is derived inside the updater so it always carries the live generation,
@@ -273,6 +299,11 @@ export function useEventAnimator({
       return;
     }
 
+    recordEffectEnqueue(
+      turnEffectId(queueRef.current.sessionId, turn),
+      queueRef.current.sessionId,
+      Date.now(),
+    );
     setQueue((current) => {
       const id = turnEffectId(current.sessionId, turn);
       scheduleWatchdog(id, current.sessionId, nextPlan.durationMs);
@@ -311,6 +342,7 @@ export function useEventAnimator({
 
   return {
     isAnimating: holdsInputLock(queue),
+    sessionId: queue.sessionId,
     effects: queue.effects,
     /** Every live effect in drawing order. Both renderers consume this. */
     sequences,

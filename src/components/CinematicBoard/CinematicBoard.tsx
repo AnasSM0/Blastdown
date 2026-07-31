@@ -19,6 +19,7 @@ import { buildBoardScene, buildPreviewCells } from "../../rendering/cinematic/sc
 import { radius } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import { getTimerVisualState } from "../../ui/timerStates";
+import { recordClockLeases } from "../../ui/effects/effectDiagnostics";
 import { assignClockSlots } from "../../ui/effects/effectQueue";
 import { cellLabel, placementHintFor } from "../GridCell/cellLabel";
 import type { GameBoardProps } from "../GameBoard/boardProps";
@@ -262,6 +263,11 @@ function CinematicBoardImpl(
         elapsed: clocks[slot],
       })),
     );
+    // Publish the leases rather than let the overlay derive them. Deriving them
+    // from draw order is exactly the positional assignment the leases replaced,
+    // so a diagnostic built that way would report the arrangement that caused
+    // the bug instead of the one in force.
+    recordClockLeases(leasesRef.current);
   }, [sequences, sceneById, clocks]);
 
   // Start each effect's own clock, and report its draw, exactly once.
