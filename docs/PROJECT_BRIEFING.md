@@ -475,6 +475,26 @@ eas build --profile development --platform android
 EXPO_PUBLIC_CINEMATIC_BOARD=1 eas build ... # cinematic renderer build
 ```
 
+### The cinematic renderer flag
+
+`EXPO_PUBLIC_CINEMATIC_BOARD` accepts exactly `1`, `true` or `skia`. Anything
+else — unset, empty, misspelled, or merely mis-cased like `SKIA` — keeps the
+device-tested React Native renderer. The match is exact on purpose: it is the
+expression Metro folds, and case normalisation would make it unfoldable.
+
+With the flag off the cinematic renderer is **not in the bundle at all** — not
+`CinematicBoard`, not the canvas layers, not `@shopify/react-native-skia`. The
+Android bundle is 3.839 MB off against 4.422 MB on. Verify a claim like that by
+grepping the exported `.hbc`, never by reading the gate:
+
+```bash
+npx expo export --platform android --output-dir /tmp/off
+grep -c CinematicBoardCanvas /tmp/off/_expo/static/js/android/*.hbc
+```
+
+Three bugs on this branch were "correct at runtime, wrong in the bundle", and all
+three read as correct in review. `docs/DECISIONS.md` has the shapes that fail.
+
 ### Testing effects on a phone
 
 Development builds carry an effect delivery harness at `/dev-effects`, reachable

@@ -22,19 +22,38 @@ export type BoardRenderer = "views" | "skia";
 
 export const DEFAULT_BOARD_RENDERER: BoardRenderer = "views";
 
-/** Expo inlines `process.env.EXPO_PUBLIC_*` at build time by substituting the
- *  literal expression, so this must be written out in full — a computed lookup
- *  reads `undefined` in a release bundle. */
-function rawFlag(): string | undefined {
-  return process.env.EXPO_PUBLIC_CINEMATIC_BOARD;
-}
-
 /** Resolve the renderer for this build. Anything other than an explicit opt-in
  *  keeps the proven renderer: an unset, empty, misspelled or half-written value
- *  must never be the reason an untested renderer ships. */
+ *  must never be the reason an untested renderer ships.
+ *
+ *  ## Why this is an exact match and no longer case-insensitive
+ *
+ *  It used to read `raw?.trim().toLowerCase()`, so `"SKIA"` and `" true "` opted
+ *  in too. That tolerance cost more than it bought.
+ *
+ *  Expo substitutes `process.env.EXPO_PUBLIC_*` with a string literal in a
+ *  production build, which is what lets `src/rendering/boardRenderer.ts` fold its
+ *  branch away and keep the cinematic renderer out of the bundle entirely. A
+ *  `.trim().toLowerCase()` is a runtime computation on that literal, so it can
+ *  only ever be evaluated at runtime — the tolerant spellings are unreachable to
+ *  the bundler by construction.
+ *
+ *  Keeping them would mean `EXPO_PUBLIC_CINEMATIC_BOARD="SKIA"` resolving to
+ *  `"skia"` here while the bundle excluded the module: the app would silently
+ *  mount the fallback while this function, and the diagnostics overlay reading
+ *  it, both reported `skia`. A diagnostic that disagrees with what is on screen
+ *  is worse than a strict flag.
+ *
+ *  So the comparison below is character-for-character the one `boardRenderer.ts`
+ *  folds on, and the two cannot drift. The cost is that a mis-cased value now
+ *  falls back — which is the direction this flag is supposed to fail in anyway.
+ *  This is a deploy-time switch set in EAS config, not user input. */
 export function resolveBoardRenderer(): BoardRenderer {
-  const raw = rawFlag()?.trim().toLowerCase();
-  if (raw === "1" || raw === "true" || raw === "skia") {
+  if (
+    process.env.EXPO_PUBLIC_CINEMATIC_BOARD === "1" ||
+    process.env.EXPO_PUBLIC_CINEMATIC_BOARD === "true" ||
+    process.env.EXPO_PUBLIC_CINEMATIC_BOARD === "skia"
+  ) {
     return "skia";
   }
   return DEFAULT_BOARD_RENDERER;

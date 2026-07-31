@@ -417,10 +417,78 @@ it. A source-pattern guard was not used on purpose: this document already
 records one certifying two broken blur implementations, because a test that
 checks the shape of the code will always agree with the code.
 
-One caveat, unfixed and pre-existing: `src/rendering/boardRenderer.ts` gates its
-cinematic require on `isCinematicRendererEnabled()`, a function call, and its
-comment claims the bundler can see both sides. By the reasoning above it cannot.
-That does not put Skia into a flag-off _runtime_ — the require never executes —
-but the module is in the graph, and the comment overstates what the flag buys.
+The same fault was then found in `boardRenderer.ts` itself, and fixed — see
+below.
+
+## The flag now excludes the bundle, not just the runtime (2026-07-31)
+
+"The flag" above described two guarantees and delivered one.
+
+**Initialisation** was always real: with the flag off the require never
+executes, so Skia never installs its JSI bindings. That was the defect the flag
+was built for, and `rendererIsolation.test.ts` has pinned it since.
+
+**Bundling** was not. The require was gated on `isCinematicRendererEnabled()`,
+under a comment claiming the branch was a constant the bundler could see both
+sides of. Expo does substitute `EXPO_PUBLIC_*` with a literal in a production
+build — that part was true — but wrapping it in a function call throws the
+constant away. Metro folded nothing, `collectDependencies` walked into the
+require, and the cinematic renderer, Skia, Reanimated and every canvas layer
+shipped inside builds that would never draw one frame with them. The runtime
+guarantee held the whole time, which is exactly why it went unnoticed through
+two reviews.
+
+The gate is now a direct comparison of the inlined literal, with the require
+inside the branch that folds away:
+
+```ts
+if (
+  process.env.EXPO_PUBLIC_CINEMATIC_BOARD === "1" ||
+  process.env.EXPO_PUBLIC_CINEMATIC_BOARD === "true" ||
+  process.env.EXPO_PUBLIC_CINEMATIC_BOARD === "skia"
+) {
+  cinematic = require("../components/CinematicBoard").CinematicBoard;
+}
+export const CINEMATIC_RENDERER = cinematic !== null;
+export const BoardRenderer = cinematic ?? GameBoard;
+```
+
+Three things are load-bearing and each one silently restores the bug on its own:
+the condition touches the env var **directly** (no function call, no local, no
+`.trim()`); the require sits **inside** the folded branch (an inverted `if` folds
+to its consequent and leaves the require underneath — the near-miss made in
+`effectHarnessEntry.ts`); and `CINEMATIC_RENDERER` is derived from whether the
+require **happened**, so a build that excluded the module reports `false` and
+mounts `GameBoard` rather than disagreeing with itself.
+
+Measured on the exported Android bundle:
+
+|                                                                            | flag OFF             | flag ON              |
+| -------------------------------------------------------------------------- | -------------------- | -------------------- |
+| bytes                                                                      | 4,025,319 (3.839 MB) | 4,636,872 (4.422 MB) |
+| sha256                                                                     | `9D9EE685…C830B8AF`  | `154C8E13…77BFBE31`  |
+| `CinematicBoard`                                                           | absent               | present              |
+| `CinematicBoardCanvas`                                                     | absent               | present              |
+| `@shopify/react-native-skia`                                               | absent               | present              |
+| `buildBoardScene`, `buildEffectScene`, `sceneGeometry`, `cinematicPalette` | absent               | present              |
+| `game-board` (fallback board)                                              | present              | present              |
+
+**597 KB** of renderer that a disabled build previously carried and never ran.
+
+One consequence, deliberate and worth knowing before setting the flag:
+`resolveBoardRenderer()` no longer normalises case or whitespace, so `"SKIA"`,
+`"True"` and `" true "` now fall back instead of opting in. Only `"1"`, `"true"`
+and `"skia"` opt in. That normalisation was a runtime computation on the inlined
+literal, so it could never be folded; keeping it would have meant the resolver —
+and the diagnostics overlay reading it — reporting `skia` for a build whose
+bundle does not contain the renderer. The flag is a deploy-time switch in EAS
+config, and falling back is the direction it is supposed to fail in.
+
+`boardRendererBundle.test.ts` runs Expo's own `expoInlineEnvVars` plugin and
+Metro's `constantFoldingPlugin` over the real file and asserts what survived, in
+both directions — and, in the same suite, that the old function-call gate and the
+inverted-`if` gate both still retain the require. `rendererIsolation.test.ts`
+stopped pinning the gate's source shape: it pinned the ternary, and the ternary
+was the bug.
 
 The device procedure is in `docs/CINEMATIC_PERFORMANCE.md`.

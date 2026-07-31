@@ -28,7 +28,7 @@ describe("the board renderer flag", () => {
     expect(isCinematicRendererEnabled()).toBe(false);
   });
 
-  it.each(["1", "true", "skia", "SKIA", " true "])("opts in on %p", (value) => {
+  it.each(["1", "true", "skia"])("opts in on %p", (value) => {
     process.env.EXPO_PUBLIC_CINEMATIC_BOARD = value;
 
     expect(resolveBoardRenderer()).toBe("skia");
@@ -41,5 +41,22 @@ describe("the board renderer flag", () => {
     // human and are not one here. Silently shipping an untested renderer to
     // someone who typed the wrong true-ish word is the failure this prevents.
     expect(resolveBoardRenderer()).toBe("views");
+  });
+
+  it.each(["SKIA", "True", " true ", "Skia"])("no longer opts in on %p", (value) => {
+    process.env.EXPO_PUBLIC_CINEMATIC_BOARD = value;
+
+    // These four DID opt in, through a `.trim().toLowerCase()`. They stopped,
+    // and the change is deliberate: that normalisation is a runtime computation
+    // on a literal Expo inlines at build time, so Metro cannot fold the branch
+    // that keeps the cinematic renderer out of a disabled bundle. Tolerating
+    // them would mean this function answering "skia" for a build whose bundle
+    // does not contain the renderer — the app silently mounting the fallback
+    // while every diagnostic claimed otherwise.
+    //
+    // Falling back is the safe direction, and the flag is a deploy-time switch
+    // in EAS config rather than something a person types under pressure.
+    expect(resolveBoardRenderer()).toBe("views");
+    expect(isCinematicRendererEnabled()).toBe(false);
   });
 });

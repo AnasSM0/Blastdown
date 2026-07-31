@@ -91,14 +91,24 @@ describe("nothing pulls Skia into the startup path", () => {
     expect(source).not.toMatch(/from "react-native-reanimated"/);
   });
 
-  it("reaches the cinematic board only through a flag-guarded require", () => {
+  it("reaches the cinematic board only through a require, never a static import", () => {
     const source = readFileSync("src/rendering/boardRenderer.ts", "utf8");
 
-    // Both halves matter: the require must exist, or the renderer is
-    // unreachable; and it must sit behind the flag, or it is a static import
-    // wearing a different hat.
+    // The require must exist, or the renderer is unreachable; and it must not be
+    // a static import wearing a different hat, which would evaluate Skia at
+    // startup regardless of the flag.
     expect(source).toMatch(/require\("\.\.\/components\/CinematicBoard"\)/);
-    expect(/CINEMATIC_RENDERER\s*\?[\s\S]{0,240}?require\(/.test(source)).toBe(true);
+    expect(/^import\s[^;]*from\s+".*CinematicBoard"/m.test(source)).toBe(false);
+
+    // What this test does NOT assert any more: the exact shape of the gate. It
+    // used to pin the ternary `CINEMATIC_RENDERER ? require(...) : GameBoard`,
+    // and that ternary was the bug — it kept the cinematic module in every
+    // production bundle, because Metro cannot fold a function call. A guard that
+    // pins a shape certifies whatever shape is there.
+    //
+    // `boardRendererBundle.test.ts` runs Expo's inlining plugin and Metro's
+    // constant folding over this file and asks what survived, which is a
+    // question the source text cannot answer.
   });
 
   it("imports Skia only from the two directories the flag gates", () => {

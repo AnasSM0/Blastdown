@@ -1280,6 +1280,12 @@ Full detail in `docs/CINEMATIC_PERFORMANCE.md`.
   The acceptance list is in `docs/CINEMATIC_PERFORMANCE.md`.
 - **Merge — NOT DONE.** Flag stays off by default; the fallback renderer is
   untouched and still never imports Skia.
+- **Flag excludes the bundle, not just the runtime** — the require is gated on a
+  direct comparison of the inlined `EXPO_PUBLIC_CINEMATIC_BOARD` literal and sits
+  inside the branch Metro folds away. A disabled Android bundle is 3.839 MB
+  against 4.422 MB enabled, with `CinematicBoard`, the canvas layers and
+  `@shopify/react-native-skia` all absent. The flag now accepts exactly `1`,
+  `true` or `skia`. DONE (2026-07-31).
 
 ### Effect delivery (Priority 1, 2026-07-31)
 
