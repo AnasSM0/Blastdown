@@ -9,7 +9,7 @@ import {
 } from "react";
 
 import { useGameController, type GameController } from "../hooks/useGameController";
-import { useGamePersistence } from "../hooks/useGamePersistence";
+import { useGamePersistence, type HydrationState } from "../hooks/useGamePersistence";
 import { useAnalytics } from "../services/analytics/AnalyticsServiceProvider";
 import {
   applyDoubleBolts,
@@ -22,6 +22,8 @@ import { useProfile } from "./ProfileProvider";
 export type GameSession = {
   /** The single app-lifetime controller shared by Home and the game screen. */
   controller: GameController;
+  /** Explicit active-run persistence decision lifecycle. */
+  hydrationState: HydrationState;
   /** True once persistence has restored (or confirmed no) saved run. */
   hydrated: boolean;
   /** True once the player has started a run this session. */
@@ -53,6 +55,7 @@ const GameSessionContext = createContext<GameSession | null>(null);
 export function GameSessionProvider({ children }: { children: ReactNode }) {
   const controller = useGameController();
   const {
+    hydrationState,
     hydrated,
     hasActiveRun,
     canContinue,
@@ -125,6 +128,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   const value = useMemo<GameSession>(
     () => ({
       controller,
+      hydrationState,
       hydrated,
       hasActiveRun,
       canContinue,
@@ -136,6 +140,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     }),
     [
       controller,
+      hydrationState,
       hydrated,
       hasActiveRun,
       canContinue,

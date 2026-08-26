@@ -9,7 +9,7 @@ import { useProfile } from "../src/state/ProfileProvider";
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { canContinue, startNewRun } = useGameSession();
+  const { hydrated, canContinue, startNewRun } = useGameSession();
   const { profile, loaded } = useProfile();
   const reducedMotion = useEffectiveReducedMotion();
 
@@ -25,19 +25,26 @@ export default function HomeScreen() {
   }, [loaded, profile.tutorialCompleted, router]);
 
   const handlePlay = useCallback(() => {
+    if (!hydrated) {
+      return;
+    }
     startNewRun();
     router.push("/game");
-  }, [router, startNewRun]);
+  }, [hydrated, router, startNewRun]);
 
   const handleContinue = useCallback(() => {
+    if (!hydrated || !canContinue) {
+      return;
+    }
     router.push("/game");
-  }, [router]);
+  }, [canContinue, hydrated, router]);
 
   return (
     <>
       <HomeScreenView
         bestScore={profile.bestScore}
         bolts={profile.bolts}
+        actionsEnabled={hydrated}
         canContinue={canContinue}
         onPlay={handlePlay}
         onContinue={handleContinue}

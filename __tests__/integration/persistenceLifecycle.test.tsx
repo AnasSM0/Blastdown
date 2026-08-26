@@ -1,25 +1,45 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { captureAppStateHandlers } from "../../test-utils/appState";
 
 import { createInitialGameState } from "../../src/domain/game";
 import type { GameState, GridCell } from "../../src/domain/gameTypes";
-import { useGameController } from "../../src/hooks/useGameController";
+import { useGameController, type GameController } from "../../src/hooks/useGameController";
 import { useGamePersistence } from "../../src/hooks/useGamePersistence";
+import { createMemoryErrorReporter } from "../../src/services/diagnostics/MemoryErrorReporter";
 import {
+  resetActiveErrorReporter,
+  setActiveErrorReporter,
+} from "../../src/services/diagnostics/reportError";
+import {
+  STORAGE_KEYS,
   StorageServiceProvider,
   createMemoryStorageService,
   loadActiveRun,
+  type StorageService,
   writeActiveRun,
-  type MemoryStorageService,
 } from "../../src/services/storage";
 
 const NOW = 1_752_800_000_000;
 
-function wrapper(storage: MemoryStorageService) {
+function wrapper(storage: StorageService) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return <StorageServiceProvider service={storage}>{children}</StorageServiceProvider>;
+  };
+}
+
+function deferred<T>() {
+  let resolve: ((value: T) => void) | undefined;
+  let reject: ((reason?: unknown) => void) | undefined;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return {
+    promise,
+    resolve: (value: T) => resolve?.(value),
+    reject: (reason?: unknown) => reject?.(reason),
   };
 }
 
@@ -55,7 +75,28 @@ function playingRun(): GameState {
   };
 }
 
+function controllerStub(seed: string): GameController {
+  return {
+    state: createInitialGameState(seed, NOW),
+    selectedHandId: null,
+    lastEvents: [],
+    selectPiece: jest.fn(),
+    clearSelection: jest.fn(),
+    previewAt: jest.fn(() => null),
+    placeAt: jest.fn(() => false),
+    previewFor: jest.fn(() => null),
+    place: jest.fn(() => false),
+    activateFreeze: jest.fn(() => false),
+    defuse: jest.fn(() => false),
+    revive: jest.fn(() => false),
+    hydrate: jest.fn(),
+    restart: jest.fn(),
+  };
+}
+
 describe("active run persistence lifecycle", () => {
+  afterEach(() => resetActiveErrorReporter());
+
   it("restores a valid unfinished run on launch and offers Continue", async () => {
     const storage = createMemoryStorageService();
     const saved = playingRun();
@@ -161,5 +202,139 @@ describe("active run persistence lifecycle", () => {
     } finally {
       restore();
     }
+  });
+
+  it("does not let delayed hydration overwrite a new run that supersedes it", async () => {
+    const memory = createMemoryStorageService();
+    await writeActiveRun(memory, playingRun(), 1, NOW);
+    const savedRaw = await memory.getItem(STORAGE_KEYS.activeRun);
+    const activeRunRead = deferred<string | null>();
+    const storage: StorageService = {
+      ...memory,
+      getItem: (key) =>
+        key === STORAGE_KEYS.activeRun ? activeRunRead.promise : memory.getItem(key),
+    };
+    const { result } = await renderHook(() => useHarness(), { wrapper: wrapper(storage) });
+
+    expect(result.current.persistence.hydrated).toBe(false);
+    expect(result.current.persistence.hydrationState).toBe("pending");
+    await act(async () => {
+      result.current.persistence.startNewRun();
+    });
+    const newRunSeed = result.current.controller.state.seed;
+    expect(newRunSeed).not.toBe("saved-seed");
+
+    await act(async () => {
+      activeRunRead.resolve(savedRaw);
+      await activeRunRead.promise;
+    });
+
+    await waitFor(() => expect(result.current.persistence.hydrated).toBe(true));
+    expect(result.current.persistence.hydrationState).toBe("hydrated");
+    expect(result.current.controller.state.seed).toBe(newRunSeed);
+    expect(result.current.persistence.hasActiveRun).toBe(true);
+  });
+
+  it("finishes hydration, reports once, and can start fresh after a read rejection", async () => {
+    const reporter = createMemoryErrorReporter();
+    setActiveErrorReporter(reporter);
+    const memory = createMemoryStorageService();
+    const storage: StorageService = {
+      ...memory,
+      getItem: async (key) => {
+        if (key === STORAGE_KEYS.activeRun) {
+          throw new Error("active run read failed");
+        }
+        return memory.getItem(key);
+      },
+    };
+    const { result } = await renderHook(() => useHarness(), { wrapper: wrapper(storage) });
+
+    await waitFor(() => expect(result.current.persistence.hydrated).toBe(true));
+    expect(result.current.persistence.hydrationState).toBe("hydrated");
+    expect(result.current.persistence.canContinue).toBe(false);
+    expect(reporter.bySurface("persistence")).toEqual([
+      expect.objectContaining({
+        surface: "persistence",
+        message: "active run read failed",
+        context: { operation: "load_active_run" },
+      }),
+    ]);
+
+    await act(async () => {
+      result.current.persistence.startNewRun();
+    });
+    expect(result.current.controller.state.status).toBe("playing");
+    expect(result.current.persistence.hasActiveRun).toBe(true);
+  });
+
+  it("ignores stale hydration completion after replacing the session controller", async () => {
+    const memory = createMemoryStorageService();
+    await writeActiveRun(memory, playingRun(), 1, NOW);
+    const savedRaw = await memory.getItem(STORAGE_KEYS.activeRun);
+    const oldRead = deferred<string | null>();
+    let activeRunReads = 0;
+    const storage: StorageService = {
+      ...memory,
+      getItem: (key) => {
+        if (key !== STORAGE_KEYS.activeRun) {
+          return memory.getItem(key);
+        }
+        activeRunReads += 1;
+        return activeRunReads === 1 ? oldRead.promise : Promise.resolve(null);
+      },
+    };
+    const originalController = controllerStub("original-controller");
+    const replacementController = controllerStub("replacement-controller");
+    const session = await renderHook(
+      ({ controller }: { controller: GameController }) =>
+        useGamePersistence(controller, { now: () => NOW }),
+      {
+        initialProps: { controller: originalController },
+        wrapper: wrapper(storage),
+      },
+    );
+
+    await act(async () => {
+      session.rerender({ controller: replacementController });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(session.result.current.hydrated).toBe(true));
+
+    await act(async () => {
+      oldRead.resolve(savedRaw);
+      await oldRead.promise;
+      await Promise.resolve();
+    });
+
+    expect(originalController.hydrate).not.toHaveBeenCalled();
+    expect(replacementController.hydrate).not.toHaveBeenCalled();
+    expect(session.result.current.hasActiveRun).toBe(false);
+  });
+
+  it("completes hydration exactly once", async () => {
+    const onHydrationComplete = jest.fn();
+    const storage = createMemoryStorageService();
+
+    function useObservedHarness() {
+      const harness = useHarness();
+      const wasHydrated = useRef(false);
+      useEffect(() => {
+        if (!wasHydrated.current && harness.persistence.hydrated) {
+          onHydrationComplete();
+        }
+        wasHydrated.current = harness.persistence.hydrated;
+      }, [harness.persistence.hydrated]);
+      return harness;
+    }
+
+    const observed = await renderHook(() => useObservedHarness(), { wrapper: wrapper(storage) });
+    await waitFor(() => expect(observed.result.current.persistence.hydrated).toBe(true));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(onHydrationComplete).toHaveBeenCalledTimes(1);
   });
 });

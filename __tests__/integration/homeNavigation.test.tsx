@@ -1,6 +1,11 @@
-import { fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 
-import { StorageServiceProvider, createMemoryStorageService } from "../../src/services/storage";
+import {
+  STORAGE_KEYS,
+  StorageServiceProvider,
+  createMemoryStorageService,
+  type StorageService,
+} from "../../src/services/storage";
 import { GameSessionProvider } from "../../src/state/GameSessionProvider";
 import { ProfileProvider } from "../../src/state/ProfileProvider";
 import { SettingsProvider } from "../../src/state/SettingsProvider";
@@ -16,7 +21,7 @@ jest.mock("expo-router", () => ({
   }),
 }));
 
-function renderHome() {
+function renderHome(storage: StorageService = createMemoryStorageService()) {
   // Loaded after jest.mock so the expo-router stub is in place.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const HomeScreen = require("../../app/index").default;
@@ -24,7 +29,7 @@ function renderHome() {
     // Mirrors the real provider stack (app/_layout): the Home route reads the
     // effective reduced-motion setting for its button press feedback, so it
     // renders under SettingsProvider like it does in production.
-    <StorageServiceProvider service={createMemoryStorageService()}>
+    <StorageServiceProvider service={storage}>
       <SettingsProvider>
         <ProfileProvider>
           <GameSessionProvider>
@@ -34,6 +39,17 @@ function renderHome() {
       </SettingsProvider>
     </StorageServiceProvider>,
   );
+}
+
+function deferred<T>() {
+  let resolve: ((value: T) => void) | undefined;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return {
+    promise,
+    resolve: (value: T) => resolve?.(value),
+  };
 }
 
 describe("Home route wiring", () => {
@@ -59,6 +75,33 @@ describe("Home route wiring", () => {
     mockPush.mockClear();
 
     await fireEvent.press(continueButton);
+    expect(mockPush).toHaveBeenCalledWith("/game");
+  });
+
+  it("does not allow Play to navigate until active-run hydration resolves", async () => {
+    const memory = createMemoryStorageService();
+    const activeRunRead = deferred<string | null>();
+    const storage: StorageService = {
+      ...memory,
+      getItem: (key) =>
+        key === STORAGE_KEYS.activeRun ? activeRunRead.promise : memory.getItem(key),
+    };
+    const result = await renderHome(storage);
+
+    fireEvent.press(result.getByTestId("play-button"));
+    expect(mockPush).not.toHaveBeenCalledWith("/game");
+
+    await act(async () => {
+      activeRunRead.resolve(null);
+      await activeRunRead.promise;
+    });
+    await waitFor(() =>
+      expect(result.getByTestId("play-button").props.accessibilityState).toEqual({
+        disabled: false,
+      }),
+    );
+
+    fireEvent.press(result.getByTestId("play-button"));
     expect(mockPush).toHaveBeenCalledWith("/game");
   });
 });

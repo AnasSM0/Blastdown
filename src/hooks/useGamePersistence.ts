@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 
 import type { GameController } from "./useGameController";
+import { reportCaught } from "../services/diagnostics/reportError";
 import {
   createActiveRunPersister,
   loadActiveRun,
@@ -14,7 +15,21 @@ function isUnfinished(status: string): boolean {
   return status === "playing";
 }
 
+/** The persister reports an operation failure exactly once. React effects and
+ *  event handlers still attach a rejection handler so a handled persistence
+ *  failure never becomes an unhandled promise rejection. */
+function ignoreReportedFailure(operation: Promise<void>): void {
+  void operation.catch(() => {
+    // createActiveRunPersister already reported this operation once.
+  });
+}
+
+export type HydrationState = "pending" | "hydrated";
+
 export type GamePersistence = {
+  /** Explicit initial-read lifecycle. A failed read still settles to hydrated,
+   *  meaning "the decision is complete", not "a saved run was found". */
+  hydrationState: HydrationState;
   /** True once the initial load has resolved (restored run or confirmed none).
    *  Guards the save effect so the fresh initial controller state never
    *  overwrites a saved run before it is read. */
@@ -41,8 +56,11 @@ export function useGamePersistence(
   const storage = useStorageService();
   const { state, hydrate, restart } = controller;
 
-  const [hydrated, setHydrated] = useState(false);
+  const [hydrationState, setHydrationState] = useState<HydrationState>("pending");
   const [hasActiveRun, setHasActiveRun] = useState(false);
+  const hydrationResolvedRef = useRef(false);
+  const hydrationGenerationRef = useRef(0);
+  const hydrated = hydrationState === "hydrated";
 
   // Lazily created once; storage identity is stable for the provider lifetime.
   const [persister] = useState<ActiveRunPersister>(() =>
@@ -59,26 +77,50 @@ export function useGamePersistence(
     activeRef.current = hasActiveRun;
   });
 
-  // Restore once on mount.
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const saved = await loadActiveRun(storage);
-      if (cancelled) {
-        return;
-      }
-      if (saved && isUnfinished(saved.state.status)) {
-        hydrate(saved.state);
-        setHasActiveRun(true);
-      }
-      setHydrated(true);
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // Storage/controller identity is stable for the provider's lifetime.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const completeHydration = useCallback(() => {
+    if (hydrationResolvedRef.current) {
+      return;
+    }
+    hydrationResolvedRef.current = true;
+    setHydrationState("hydrated");
   }, []);
+
+  // Restore once per hook lifecycle. The generation guard invalidates a late
+  // callback after unmount or after a fresh run deliberately supersedes the
+  // pending read.
+  useEffect(() => {
+    const generation = hydrationGenerationRef.current + 1;
+    hydrationGenerationRef.current = generation;
+    let mounted = true;
+    const isCurrent = () =>
+      mounted && hydrationGenerationRef.current === generation && !hydrationResolvedRef.current;
+
+    void (async () => {
+      try {
+        const saved = await loadActiveRun(storage);
+        if (!isCurrent()) {
+          return;
+        }
+        if (saved && isUnfinished(saved.state.status)) {
+          hydrate(saved.state);
+          setHasActiveRun(true);
+        }
+      } catch (error) {
+        if (isCurrent()) {
+          reportCaught("persistence", error, { operation: "load_active_run" });
+        }
+      } finally {
+        if (mounted && hydrationGenerationRef.current === generation) {
+          completeHydration();
+        }
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      hydrationGenerationRef.current += 1;
+    };
+  }, [completeHydration, hydrate, storage]);
 
   // Persist on every state change once hydrated and a run is active. An
   // unfinished run is saved; reaching game over clears it (settlement, which
@@ -88,9 +130,9 @@ export function useGamePersistence(
       return;
     }
     if (isUnfinished(state.status)) {
-      void persister.save(state);
+      ignoreReportedFailure(persister.save(state));
     } else {
-      void persister.clear();
+      ignoreReportedFailure(persister.clear());
     }
   }, [hydrated, hasActiveRun, state, persister]);
 
@@ -100,7 +142,7 @@ export function useGamePersistence(
       if ((next === "background" || next === "inactive") && activeRef.current) {
         const current = stateRef.current;
         if (isUnfinished(current.status)) {
-          void persister.save(current);
+          ignoreReportedFailure(persister.save(current));
         }
       }
     };
@@ -109,16 +151,30 @@ export function useGamePersistence(
   }, [persister]);
 
   const startNewRun = useCallback(() => {
+    if (!hydrationResolvedRef.current) {
+      // A programmatic/stale Home action is allowed to choose New Run
+      // deterministically. It completes the decision and invalidates the
+      // pending read so that saved state can never overwrite the fresh run.
+      hydrationGenerationRef.current += 1;
+      completeHydration();
+    }
     restart();
     setHasActiveRun(true);
-  }, [restart]);
+  }, [completeHydration, restart]);
 
   const clearActiveRun = useCallback(() => {
-    void persister.clear();
+    ignoreReportedFailure(persister.clear());
     setHasActiveRun(false);
   }, [persister]);
 
   const canContinue = hasActiveRun && isUnfinished(state.status);
 
-  return { hydrated, hasActiveRun, canContinue, startNewRun, clearActiveRun };
+  return {
+    hydrationState,
+    hydrated,
+    hasActiveRun,
+    canContinue,
+    startNewRun,
+    clearActiveRun,
+  };
 }

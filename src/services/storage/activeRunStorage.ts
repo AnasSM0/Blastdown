@@ -1,4 +1,5 @@
 import type { GameState } from "../../domain/gameTypes";
+import { reportCaught } from "../diagnostics/reportError";
 import { STORAGE_KEYS } from "./keys";
 import { ACTIVE_RUN_SCHEMA_VERSION, parseActiveRun, type PersistedActiveRun } from "./schemas";
 import type { StorageService } from "./StorageService";
@@ -58,17 +59,40 @@ export function createActiveRunPersister(
   let running: Promise<void> | null = null;
 
   async function drain(): Promise<void> {
-    while (pending !== null) {
-      const op = pending;
-      pending = null;
-      if (op.kind === "clear") {
-        await clearActiveRun(storage);
-      } else {
-        seq += 1;
-        await writeActiveRun(storage, op.state, seq, now());
+    let firstFailure: unknown;
+    let failed = false;
+    try {
+      while (pending !== null) {
+        const op = pending;
+        pending = null;
+        try {
+          if (op.kind === "clear") {
+            await clearActiveRun(storage);
+          } else {
+            const nextSeq = seq + 1;
+            await writeActiveRun(storage, op.state, nextSeq, now());
+            seq = nextSeq;
+          }
+        } catch (error) {
+          reportCaught("persistence", error, {
+            operation: op.kind === "clear" ? "clear_active_run" : "save_active_run",
+          });
+          if (!failed) {
+            failed = true;
+            firstFailure = error;
+          }
+          // Do not retry the failed operation. A newer operation that was
+          // queued while it was in flight may still drain once.
+        }
       }
+      if (failed) {
+        throw firstFailure;
+      }
+    } finally {
+      // A rejected set/remove must never leave the persister permanently
+      // attached to a rejected promise. The next enqueue starts a fresh drain.
+      running = null;
     }
-    running = null;
   }
 
   function enqueue(op: Op): Promise<void> {

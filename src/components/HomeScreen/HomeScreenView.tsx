@@ -7,6 +7,8 @@ import { PressableFeedback } from "../PressableFeedback";
 type HomeScreenViewProps = {
   bestScore: number;
   bolts: number;
+  /** New-run/resume decisions are disabled until active-run hydration settles. */
+  actionsEnabled?: boolean;
   /** Show the Continue button only when an in-memory run is resumable. */
   canContinue: boolean;
   onPlay: () => void;
@@ -33,6 +35,7 @@ function formatNumber(value: number): string {
 export function HomeScreenView({
   bestScore,
   bolts,
+  actionsEnabled = true,
   canContinue,
   onPlay,
   onContinue,
@@ -72,8 +75,10 @@ export function HomeScreenView({
           reducedMotion={reducedMotion}
           style={[styles.playButton, neonGlow(colors.scoreOrange, "high")]}
           onPress={onPlay}
+          disabled={!actionsEnabled}
           accessibilityRole="button"
           accessibilityLabel="Play a new game"
+          accessibilityState={{ disabled: !actionsEnabled }}
           testID="play-button"
         >
           <Text style={styles.playGlyph}>▶</Text>
@@ -85,8 +90,10 @@ export function HomeScreenView({
             reducedMotion={reducedMotion}
             style={styles.continueButton}
             onPress={onContinue}
+            disabled={!actionsEnabled}
             accessibilityRole="button"
             accessibilityLabel="Continue your current game"
+            accessibilityState={{ disabled: !actionsEnabled }}
             testID="continue-button"
           >
             <Text style={styles.continueText}>CONTINUE</Text>
