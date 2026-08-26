@@ -74,29 +74,29 @@ export function HomeScreenView({
         <PressableFeedback
           reducedMotion={reducedMotion}
           style={[styles.playButton, neonGlow(colors.scoreOrange, "high")]}
-          onPress={onPlay}
+          onPress={canContinue ? onContinue : onPlay}
           disabled={!actionsEnabled}
           accessibilityRole="button"
-          accessibilityLabel="Play a new game"
+          accessibilityLabel={canContinue ? "Continue your current game" : "Play a new game"}
           accessibilityState={{ disabled: !actionsEnabled }}
-          testID="play-button"
+          testID={canContinue ? "continue-button" : "play-button"}
         >
           <Text style={styles.playGlyph}>▶</Text>
-          <Text style={styles.playText}>PLAY</Text>
+          <Text style={styles.playText}>{canContinue ? "CONTINUE" : "PLAY"}</Text>
         </PressableFeedback>
 
         {canContinue ? (
           <PressableFeedback
             reducedMotion={reducedMotion}
             style={styles.continueButton}
-            onPress={onContinue}
+            onPress={onPlay}
             disabled={!actionsEnabled}
             accessibilityRole="button"
-            accessibilityLabel="Continue your current game"
+            accessibilityLabel="Start a new game"
             accessibilityState={{ disabled: !actionsEnabled }}
-            testID="continue-button"
+            testID="play-button"
           >
-            <Text style={styles.continueText}>CONTINUE</Text>
+            <Text style={styles.continueText}>NEW GAME</Text>
           </PressableFeedback>
         ) : null}
       </View>

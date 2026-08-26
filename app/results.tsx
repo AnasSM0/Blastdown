@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
+import { BackHandler } from "react-native";
 
 import { ResultsView } from "../src/components/ResultsScreen";
 import { useAudio } from "../src/hooks/useAudio";
@@ -24,6 +25,7 @@ export default function ResultsScreen() {
   const {
     controller,
     startNewRun,
+    clearActiveRun,
     settleCurrentRun,
     doubleBoltsForCurrentRun,
     isCurrentRunDoubled,
@@ -44,6 +46,7 @@ export default function ResultsScreen() {
   const doubled = isCurrentRunDoubled;
   const state = controller.state;
   const boltsEarned = computeBoltsEarned(state);
+  const routeTransitionRef = useRef(false);
 
   // Settle on mount. The session guards against a second settlement (remount /
   // Back), so this is safe to call unconditionally. results_view is logged once
@@ -52,10 +55,11 @@ export default function ResultsScreen() {
   useEffect(() => {
     if (!settledRef.current) {
       settledRef.current = true;
+      clearActiveRun();
       settleCurrentRun();
       track({ name: "results_view" });
     }
-  }, [settleCurrentRun, track]);
+  }, [clearActiveRun, settleCurrentRun, track]);
 
   const handleDoubleBolts = useCallback(() => {
     // Single-flight and once-per-run are enforced below and in the session;
@@ -85,13 +89,29 @@ export default function ResultsScreen() {
   }, [audio, doubled, doubleBoltsForCurrentRun, haptics, outcome, reward, track]);
 
   const handlePlayAgain = useCallback(() => {
+    if (routeTransitionRef.current) {
+      return;
+    }
+    routeTransitionRef.current = true;
     startNewRun();
     router.replace("/game");
   }, [router, startNewRun]);
 
   const handleHome = useCallback(() => {
+    if (routeTransitionRef.current) {
+      return;
+    }
+    routeTransitionRef.current = true;
     router.replace("/");
   }, [router]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      handleHome();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [handleHome]);
 
   return (
     <>

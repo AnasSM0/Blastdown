@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import { BackHandler, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
@@ -12,6 +12,7 @@ import { GameOverOverlay } from "../src/components/modals/GameOverOverlay";
 import { DefuseConfirmCard } from "../src/components/modals/DefuseConfirmCard";
 import { SecondChanceBanner } from "../src/components/modals/SecondChanceBanner";
 import { PauseOverlay } from "../src/components/modals/PauseOverlay";
+import { RunConfirmationCard } from "../src/components/modals/RunConfirmationCard";
 import { RewardedActionBar } from "../src/components/RewardedActionButton";
 import { DragGhost, DRAG_LIFT, type DragGhostHandle } from "../src/components/DragGhost";
 import { BOARD_SIZE } from "../src/domain/board";
@@ -116,6 +117,9 @@ type GameViewProps = {
   onExit?: () => void;
   /** Invoked to open the end-of-run results screen. */
   onResults?: () => void;
+  /** Replaces the active session with a fresh generation. The real route uses
+   * GameSession; isolated tests fall back to the controller restart seam. */
+  onRestart?: () => void;
   /** Persistence boundary supplied by the real session. Isolated component
    * tests default to an already-resolved no-op. */
   flushActiveRun?: () => Promise<void>;
@@ -159,6 +163,7 @@ export function GameView({
   boardSize,
   onExit,
   onResults,
+  onRestart,
   flushActiveRun = resolvedFlush,
 }: GameViewProps) {
   const { state } = controller;
@@ -187,6 +192,10 @@ export function GameView({
   const theme = useTheme();
 
   const [paused, setPaused] = useState(false);
+  const [restartConfirmation, setRestartConfirmation] = useState<"closed" | "open">("closed");
+  const restartTransitionRef = useRef(false);
+  const homeTransitionRef = useRef(false);
+  const resultsTransitionRef = useRef(false);
   // Input is locked during a required effect sequence, while a rewarded ad is
   // in flight, and while paused, so a reward can't overlap a placement or
   // another reward and no move lands behind the pause menu.
@@ -558,9 +567,10 @@ export function GameView({
   }, [animator, audio, controller, haptics, reducedMotion, reward, reviveOutcome, state, track]);
 
   const handleEndRun = useCallback(() => {
-    if (reward.pending) {
+    if (reward.pending || resultsTransitionRef.current) {
       return;
     }
+    resultsTransitionRef.current = true;
     audio.playSfx("button");
     clearSecondChance();
     onResults?.();
@@ -578,6 +588,7 @@ export function GameView({
 
   const handleResume = useCallback(() => {
     audio.playSfx("button");
+    setRestartConfirmation("closed");
     setPaused(false);
   }, [audio]);
 
@@ -585,6 +596,7 @@ export function GameView({
   // by Restart (pause menu) and leaving to Home.
   const clearPendingUi = useCallback(() => {
     setPaused(false);
+    setRestartConfirmation("closed");
     setDefuseConfirmOpen(false);
     setPreviewOrigin(null);
     clearSecondChance();
@@ -597,16 +609,64 @@ export function GameView({
 
   const handleRestart = useCallback(() => {
     audio.playSfx("button");
-    clearPendingUi();
-    controller.restart();
-  }, [audio, clearPendingUi, controller]);
+    // A previous confirmed restart deliberately leaves its latch closed to
+    // reject stale duplicate events. Reaching this button again proves the new
+    // run is active and the player has opened a new confirmation cycle.
+    restartTransitionRef.current = false;
+    setRestartConfirmation("open");
+  }, [audio]);
 
-  const handleHome = useCallback(() => {
+  const handleRestartCancel = useCallback(() => {
+    audio.playSfx("button");
+    setRestartConfirmation("closed");
+  }, [audio]);
+
+  const handleRestartConfirm = useCallback(() => {
+    if (restartTransitionRef.current) {
+      return;
+    }
+    restartTransitionRef.current = true;
     audio.playSfx("button");
     clearPendingUi();
-    void flushActiveRun();
-    onExit?.();
+    (onRestart ?? controller.restart)();
+  }, [audio, clearPendingUi, controller.restart, onRestart]);
+
+  const handleHome = useCallback(() => {
+    if (homeTransitionRef.current) {
+      return;
+    }
+    homeTransitionRef.current = true;
+    audio.playSfx("button");
+    // Stay paused/input-locked until the durability boundary completes so no
+    // move can land after the snapshot we intend Home to resume.
+    void flushActiveRun().then(() => {
+      clearPendingUi();
+      onExit?.();
+    });
   }, [audio, clearPendingUi, flushActiveRun, onExit]);
+
+  // Android Back is a screen-state action, never a route-pop action. Gameplay
+  // opens Pause; Pause closes back to the exact run. A nested restart confirm
+  // first cancels back to Pause, matching the explicit Cancel action.
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (restartConfirmation === "open") {
+        setRestartConfirmation("closed");
+        return true;
+      }
+      if (paused) {
+        handleResume();
+        return true;
+      }
+      if (state.status === "playing") {
+        audio.playSfx("button");
+        setPaused(true);
+        void flushActiveRun();
+      }
+      return true;
+    });
+    return () => subscription.remove();
+  }, [audio, flushActiveRun, handleResume, paused, restartConfirmation, state.status]);
 
   // Cancel a pending second-chance timer on unmount. Each reward outcome clears
   // its own timer (useRewardOutcome), and the animator clears its sequence.
@@ -741,6 +801,17 @@ export function GameView({
             reducedMotion={reducedMotion}
           />
         ) : null}
+        {restartConfirmation === "open" ? (
+          <RunConfirmationCard
+            kind="restart"
+            title="RESTART THIS RUN?"
+            message="Your current run will be replaced."
+            confirmLabel="RESTART"
+            onConfirm={handleRestartConfirm}
+            onCancel={handleRestartCancel}
+            reducedMotion={reducedMotion}
+          />
+        ) : null}
         {state.status === "gameOver" ? (
           <GameOverOverlay
             score={state.score}
@@ -784,6 +855,7 @@ type GameScreenContentProps = {
   analytics?: AnalyticsService;
   onExit?: () => void;
   onResults?: () => void;
+  onRestart?: () => void;
 };
 
 /** Test entry point: builds a controller from injected options so a crafted
@@ -798,6 +870,7 @@ export function GameScreenContent({
   analytics,
   onExit,
   onResults,
+  onRestart,
 }: GameScreenContentProps) {
   const controller = useGameController(controllerOptions);
   const storage = useMemo(() => createMemoryStorageService(), []);
@@ -813,6 +886,7 @@ export function GameScreenContent({
                 boardSize={boardSize}
                 onExit={onExit}
                 onResults={onResults}
+                onRestart={onRestart}
               />
             </AdServiceProvider>
           </AudioServiceProvider>
@@ -831,25 +905,23 @@ function boardSizeToCell(outerSize: number): number {
 
 export default function GameScreen() {
   const router = useRouter();
-  const { controller, flushActiveRun } = useGameSession();
+  const { controller, startNewRun, clearActiveRun, flushActiveRun } = useGameSession();
   // Single profile read path for the HUD best score; before load this is the
   // default profile (bestScore 0), which is a safe value to display.
   const { profile } = useProfile();
   const handleExit = useCallback(() => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/");
-    }
+    router.replace("/");
   }, [router]);
   const handleResults = useCallback(() => {
-    router.push("/results");
-  }, [router]);
+    clearActiveRun();
+    router.replace("/results");
+  }, [clearActiveRun, router]);
   return (
     <GameView
       controller={controller}
       best={profile.bestScore}
       flushActiveRun={flushActiveRun}
+      onRestart={startNewRun}
       onExit={handleExit}
       onResults={handleResults}
     />

@@ -30,6 +30,9 @@ export type GameSession = {
   hasActiveRun: boolean;
   /** True when a started run is still in progress (drives Continue). */
   canContinue: boolean;
+  /** Monotonic app-lifetime identity for transient UI isolation. Hydrating an
+   * existing run preserves it; every deliberate fresh run increments it. */
+  sessionGeneration: number;
   /** Begin a fresh seeded run and mark the session active. */
   startNewRun: () => void;
   /** Clear the saved run and mark the session inactive (End Run / settlement). */
@@ -77,10 +80,15 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   // mirrors it so consumers can render from it without reading a ref in render.
   const doubledRunIdRef = useRef<string | null>(null);
   const [doubledRunId, setDoubledRunId] = useState<string | null>(null);
+  const sessionGenerationRef = useRef(0);
+  const [sessionGeneration, setSessionGeneration] = useState(0);
 
   // Begin a fresh run and log run_start once per start (Play / Play Again are
   // distinct, user-initiated starts, so each is its own event).
   const startNewRun = useCallback(() => {
+    const nextGeneration = sessionGenerationRef.current + 1;
+    sessionGenerationRef.current = nextGeneration;
+    setSessionGeneration(nextGeneration);
     startPersistedRun();
     track({ name: "run_start" });
   }, [startPersistedRun, track]);
@@ -136,6 +144,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       hydrated,
       hasActiveRun,
       canContinue,
+      sessionGeneration,
       startNewRun,
       clearActiveRun,
       flushActiveRun,
@@ -149,6 +158,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       hydrated,
       hasActiveRun,
       canContinue,
+      sessionGeneration,
       startNewRun,
       clearActiveRun,
       flushActiveRun,

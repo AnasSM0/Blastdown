@@ -1,4 +1,5 @@
-import { fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
+import { BackHandler } from "react-native";
 
 // Imported at module scope, not required inside the test: `jest.mock` calls are
 // hoisted above imports, and loading the route here keeps its (substantial)
@@ -14,6 +15,8 @@ const NOW = 1_752_800_000_000;
 const mockReplace = jest.fn();
 const mockStartNewRun = jest.fn();
 const mockSettle = jest.fn();
+const mockClearActiveRun = jest.fn();
+const mockBack = jest.fn();
 
 const mockFinishedState: GameState = {
   ...createInitialGameState("results-seed", NOW),
@@ -27,7 +30,7 @@ const mockFinishedState: GameState = {
 };
 
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ replace: mockReplace, push: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ replace: mockReplace, push: jest.fn(), back: mockBack }),
 }));
 
 // Mirrors the real session's once-per-run guard: the first call applies and
@@ -46,6 +49,7 @@ jest.mock("../../src/state/GameSessionProvider", () => ({
   useGameSession: () => ({
     controller: { state: mockFinishedState },
     startNewRun: mockStartNewRun,
+    clearActiveRun: mockClearActiveRun,
     settleCurrentRun: mockSettle,
     doubleBoltsForCurrentRun: mockDoubleBolts,
     isCurrentRunDoubled: mockRunDoubled,
@@ -73,13 +77,27 @@ jest.mock("../../src/state/ProfileProvider", () => ({
 }));
 
 describe("results route", () => {
+  let hardwareBack: Parameters<typeof BackHandler.addEventListener>[1] | undefined;
+  let backSubscription: jest.SpyInstance;
+
   beforeEach(() => {
     mockReplace.mockClear();
     mockStartNewRun.mockClear();
     mockSettle.mockClear();
+    mockClearActiveRun.mockClear();
+    mockBack.mockClear();
     mockDoubleBolts.mockClear();
     mockRunDoubled = false;
+    hardwareBack = undefined;
+    backSubscription = jest
+      .spyOn(BackHandler, "addEventListener")
+      .mockImplementation((_event, handler) => {
+        hardwareBack = handler;
+        return { remove: jest.fn() };
+      });
   });
+
+  afterEach(() => backSubscription.mockRestore());
 
   function renderResults() {
     // Mirrors the real provider stack (app/_layout): the route plays the shared
@@ -109,6 +127,7 @@ describe("results route", () => {
   it("settles the finished run exactly once on mount", async () => {
     await renderResults();
     expect(mockSettle).toHaveBeenCalledTimes(1);
+    expect(mockClearActiveRun).toHaveBeenCalledTimes(1);
   });
 
   it("Play Again starts a fresh run and navigates to the game", async () => {
@@ -122,6 +141,41 @@ describe("results route", () => {
     const result = await renderResults();
     await fireEvent.press(result.getByTestId("results-home-button"));
     expect(mockReplace).toHaveBeenCalledWith("/");
+  });
+
+  it("coalesces rapid duplicate Home presses", async () => {
+    const result = await renderResults();
+    const home = result.getByTestId("results-home-button");
+
+    await fireEvent.press(home);
+    await fireEvent.press(home);
+
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith("/");
+  });
+
+  it("hardware Back replaces Results with Home and never reveals completed gameplay", async () => {
+    await renderResults();
+
+    await act(async () => {
+      expect(hardwareBack).toBeDefined();
+      expect(hardwareBack?.({ type: "hardwareBackPress", timeStamp: Date.now() })).toBe(true);
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith("/");
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it("coalesces rapid duplicate Play Again presses", async () => {
+    const result = await renderResults();
+    const playAgain = result.getByTestId("play-again-button");
+
+    await fireEvent.press(playAgain);
+    await fireEvent.press(playAgain);
+
+    expect(mockStartNewRun).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith("/game");
   });
 
   it("double Bolts applies once and swaps to the applied state", async () => {
