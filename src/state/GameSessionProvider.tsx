@@ -34,6 +34,9 @@ export type GameSession = {
   startNewRun: () => void;
   /** Clear the saved run and mark the session inactive (End Run / settlement). */
   clearActiveRun: () => void;
+  /** Await the newest authoritative active-run snapshot before a critical
+   * lifecycle transition such as opening rewarded native UI. */
+  flushActiveRun: () => Promise<void>;
   /** Settle the current finished run into the profile exactly once (best score,
    *  Bolts, cumulative stats). Idempotent per run across remount/Back/repeat
    *  calls. Returns the Bolts earned this run. */
@@ -61,6 +64,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     canContinue,
     startNewRun: startPersistedRun,
     clearActiveRun,
+    flushActiveRun,
   } = useGamePersistence(controller);
   const { updateProfile } = useProfile();
   const { track } = useAnalytics();
@@ -134,6 +138,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       canContinue,
       startNewRun,
       clearActiveRun,
+      flushActiveRun,
       settleCurrentRun,
       doubleBoltsForCurrentRun,
       isCurrentRunDoubled,
@@ -146,6 +151,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       canContinue,
       startNewRun,
       clearActiveRun,
+      flushActiveRun,
       settleCurrentRun,
       doubleBoltsForCurrentRun,
       isCurrentRunDoubled,

@@ -1,14 +1,33 @@
 import type { GameState } from "../../domain/gameTypes";
 import { reportCaught } from "../diagnostics/reportError";
 import { STORAGE_KEYS } from "./keys";
-import { ACTIVE_RUN_SCHEMA_VERSION, parseActiveRun, type PersistedActiveRun } from "./schemas";
+import { ACTIVE_RUN_SCHEMA_VERSION, inspectActiveRun, type PersistedActiveRun } from "./schemas";
 import type { StorageService } from "./StorageService";
 
 /** Load and validate the saved run. Returns null on missing/corrupt/
  *  incompatible data (the caller starts fresh). */
 export async function loadActiveRun(storage: StorageService): Promise<PersistedActiveRun | null> {
   const raw = await storage.getItem(STORAGE_KEYS.activeRun);
-  return parseActiveRun(raw);
+  const parsed = inspectActiveRun(raw);
+  if (parsed.kind === "valid") {
+    return parsed.value;
+  }
+  if (parsed.kind === "missing") {
+    return null;
+  }
+
+  reportCaught("persistence", new Error("Invalid active-run payload"), {
+    operation: "load_active_run",
+    reason: parsed.reason,
+  });
+  try {
+    await clearActiveRun(storage);
+  } catch (error) {
+    // Cleanup is best-effort and never blocks hydration. A later valid save
+    // still replaces the corrupt record through the normal writer.
+    reportCaught("persistence", error, { operation: "cleanup_active_run" });
+  }
+  return null;
 }
 
 export async function clearActiveRun(storage: StorageService): Promise<void> {
@@ -42,6 +61,9 @@ export type ActiveRunPersister = {
   clear: () => Promise<void>;
   /** Resolves once the queue is drained — used for background-flush. */
   whenIdle: () => Promise<void>;
+  /** Explicit durability boundary. Resolves/rejects with the current drain,
+   * including the newest operation queued before that drain completes. */
+  flush: () => Promise<void>;
   /** Highest sequence number written so far (diagnostics/tests). */
   readonly seq: number;
 };
@@ -109,6 +131,7 @@ export function createActiveRunPersister(
     save: (state) => enqueue({ kind: "save", state }),
     clear: () => enqueue({ kind: "clear" }),
     whenIdle: () => running ?? Promise.resolve(),
+    flush: () => running ?? Promise.resolve(),
     get seq() {
       return seq;
     },

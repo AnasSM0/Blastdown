@@ -268,6 +268,114 @@ describe("active run persistence lifecycle", () => {
     expect(result.current.persistence.hasActiveRun).toBe(true);
   });
 
+  it("cleans a corrupt run without blocking hydration or unrelated storage", async () => {
+    const reporter = createMemoryErrorReporter();
+    setActiveErrorReporter(reporter);
+    const profile = '{"bestScore":9876}';
+    const settings = '{"musicEnabled":false}';
+    const storage = createMemoryStorageService({
+      [STORAGE_KEYS.activeRun]: "corrupt-json{",
+      [STORAGE_KEYS.profile]: profile,
+      [STORAGE_KEYS.settings]: settings,
+    });
+
+    const { result } = await renderHook(() => useHarness(), { wrapper: wrapper(storage) });
+
+    await waitFor(() => expect(result.current.persistence.hydrated).toBe(true));
+    expect(result.current.persistence.canContinue).toBe(false);
+    expect(storage.store.has(STORAGE_KEYS.activeRun)).toBe(false);
+    expect(storage.store.get(STORAGE_KEYS.profile)).toBe(profile);
+    expect(storage.store.get(STORAGE_KEYS.settings)).toBe(settings);
+    expect(reporter.bySurface("persistence")).toHaveLength(1);
+
+    await act(async () => {
+      result.current.persistence.startNewRun();
+    });
+    expect(result.current.persistence.hasActiveRun).toBe(true);
+  });
+
+  it("finishes hydration when corrupt-run cleanup fails and reports both failures once", async () => {
+    const reporter = createMemoryErrorReporter();
+    setActiveErrorReporter(reporter);
+    const memory = createMemoryStorageService({
+      [STORAGE_KEYS.activeRun]: "corrupt-json{",
+    });
+    const storage: StorageService = {
+      ...memory,
+      removeItem: async (key) => {
+        if (key === STORAGE_KEYS.activeRun) {
+          throw new Error("cleanup failed");
+        }
+        await memory.removeItem(key);
+      },
+    };
+
+    const { result } = await renderHook(() => useHarness(), { wrapper: wrapper(storage) });
+
+    await waitFor(() => expect(result.current.persistence.hydrated).toBe(true));
+    expect(result.current.persistence.canContinue).toBe(false);
+    expect(reporter.bySurface("persistence")).toEqual([
+      expect.objectContaining({
+        message: "Invalid active-run payload",
+        context: { operation: "load_active_run", reason: "invalid_json" },
+      }),
+      expect.objectContaining({
+        message: "cleanup failed",
+        context: { operation: "cleanup_active_run" },
+      }),
+    ]);
+  });
+
+  it("exposes a critical flush that waits for the latest completed turn", async () => {
+    const saved = playingRun();
+    const memory = createMemoryStorageService();
+    await writeActiveRun(memory, saved, 1, NOW);
+    let blockWrites = false;
+    let releaseWrite: (() => void) | undefined;
+    let markWriteStarted: (() => void) | undefined;
+    const writeStarted = new Promise<void>((resolve) => {
+      markWriteStarted = resolve;
+    });
+    const writeGate = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    const storage: StorageService = {
+      ...memory,
+      setItem: async (key, value) => {
+        if (key === STORAGE_KEYS.activeRun && blockWrites) {
+          markWriteStarted?.();
+          await writeGate;
+        }
+        await memory.setItem(key, value);
+      },
+    };
+    const { result } = await renderHook(() => useHarness(), { wrapper: wrapper(storage) });
+    await waitFor(() => expect(result.current.persistence.hasActiveRun).toBe(true));
+    await waitFor(async () => expect((await loadActiveRun(memory))?.state.score).toBe(1200));
+
+    blockWrites = true;
+    await act(async () => {
+      result.current.controller.place("h-a", { row: 0, column: 0 });
+    });
+    const authoritativeState = result.current.controller.state;
+    let flushResolved = false;
+    let flush: Promise<void> | undefined;
+    await act(async () => {
+      flush = result.current.persistence.flushActiveRun().then(() => {
+        flushResolved = true;
+      });
+      await writeStarted;
+    });
+    expect(flushResolved).toBe(false);
+
+    await act(async () => {
+      releaseWrite?.();
+      await flush;
+    });
+
+    expect((await loadActiveRun(memory))?.state).toEqual(authoritativeState);
+  });
+
   it("ignores stale hydration completion after replacing the session controller", async () => {
     const memory = createMemoryStorageService();
     await writeActiveRun(memory, playingRun(), 1, NOW);

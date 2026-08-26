@@ -42,6 +42,9 @@ export type GamePersistence = {
   startNewRun: () => void;
   /** Clear the saved run and mark the session inactive (End Run / settlement). */
   clearActiveRun: () => void;
+  /** Await an authoritative save of the current run at a lifecycle boundary.
+   * Storage failures are already reported and do not block the caller. */
+  flushActiveRun: () => Promise<void>;
 };
 
 /** Wires a game controller to persistent active-run storage: restores a valid
@@ -104,6 +107,10 @@ export function useGamePersistence(
         if (saved && isUnfinished(saved.state.status)) {
           hydrate(saved.state);
           setHasActiveRun(true);
+        } else if (saved) {
+          // A structurally valid but completed/non-resumable run is stale
+          // active-run data. Remove only that record and continue to Home.
+          ignoreReportedFailure(persister.clear());
         }
       } catch (error) {
         if (isCurrent()) {
@@ -120,7 +127,7 @@ export function useGamePersistence(
       mounted = false;
       hydrationGenerationRef.current += 1;
     };
-  }, [completeHydration, hydrate, storage]);
+  }, [completeHydration, hydrate, persister, storage]);
 
   // Persist on every state change once hydrated and a run is active. An
   // unfinished run is saved; reaching game over clears it (settlement, which
@@ -142,7 +149,10 @@ export function useGamePersistence(
       if ((next === "background" || next === "inactive") && activeRef.current) {
         const current = stateRef.current;
         if (isUnfinished(current.status)) {
-          ignoreReportedFailure(persister.save(current));
+          // AppState cannot keep Android alive, but this starts an explicit
+          // authoritative flush and observes its failure. Device process-kill
+          // durability still requires physical QA.
+          ignoreReportedFailure(persister.save(current).then(() => persister.flush()));
         }
       }
     };
@@ -167,6 +177,21 @@ export function useGamePersistence(
     setHasActiveRun(false);
   }, [persister]);
 
+  const flushActiveRun = useCallback(async (): Promise<void> => {
+    try {
+      if (hasActiveRun && isUnfinished(state.status)) {
+        // Enqueue the state from this committed render, then await the whole
+        // drain. A newer operation queued before the drain finishes is included.
+        await persister.save(state);
+      } else {
+        await persister.flush();
+      }
+    } catch {
+      // The persister reports each failed operation exactly once. Lifecycle
+      // callers must remain usable after the attempted durability boundary.
+    }
+  }, [hasActiveRun, persister, state]);
+
   const canContinue = hasActiveRun && isUnfinished(state.status);
 
   return {
@@ -176,5 +201,6 @@ export function useGamePersistence(
     canContinue,
     startNewRun,
     clearActiveRun,
+    flushActiveRun,
   };
 }

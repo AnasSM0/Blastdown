@@ -116,6 +116,9 @@ type GameViewProps = {
   onExit?: () => void;
   /** Invoked to open the end-of-run results screen. */
   onResults?: () => void;
+  /** Persistence boundary supplied by the real session. Isolated component
+   * tests default to an already-resolved no-op. */
+  flushActiveRun?: () => Promise<void>;
 };
 
 const SECOND_CHANCE_MS = 1500;
@@ -148,7 +151,16 @@ export function computeBoardSide(content: { width: number; height: number }): nu
 
 /** Presentational gameplay screen over a supplied controller. Holds no
  *  gameplay rules — every decision is delegated to the domain controller. */
-export function GameView({ controller, best = 0, boardSize, onExit, onResults }: GameViewProps) {
+const resolvedFlush = (): Promise<void> => Promise.resolve();
+
+export function GameView({
+  controller,
+  best = 0,
+  boardSize,
+  onExit,
+  onResults,
+  flushActiveRun = resolvedFlush,
+}: GameViewProps) {
   const { state } = controller;
   const haptics = useHaptics();
   const reducedMotion = useEffectiveReducedMotion();
@@ -171,7 +183,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
   // logged once per turn from the domain event stream.
   useGameAnalytics({ turn: state.turn, events: controller.lastEvents });
   const { track } = useAnalytics();
-  const reward = useRewardedAction();
+  const reward = useRewardedAction({ beforeShow: flushActiveRun });
   const theme = useTheme();
 
   const [paused, setPaused] = useState(false);
@@ -561,7 +573,8 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
     }
     audio.playSfx("button");
     setPaused(true);
-  }, [audio, reward.pending]);
+    void flushActiveRun();
+  }, [audio, flushActiveRun, reward.pending]);
 
   const handleResume = useCallback(() => {
     audio.playSfx("button");
@@ -591,8 +604,9 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
   const handleHome = useCallback(() => {
     audio.playSfx("button");
     clearPendingUi();
+    void flushActiveRun();
     onExit?.();
-  }, [audio, clearPendingUi, onExit]);
+  }, [audio, clearPendingUi, flushActiveRun, onExit]);
 
   // Cancel a pending second-chance timer on unmount. Each reward outcome clears
   // its own timer (useRewardOutcome), and the animator clears its sequence.
@@ -817,7 +831,7 @@ function boardSizeToCell(outerSize: number): number {
 
 export default function GameScreen() {
   const router = useRouter();
-  const { controller } = useGameSession();
+  const { controller, flushActiveRun } = useGameSession();
   // Single profile read path for the HUD best score; before load this is the
   // default profile (bestScore 0), which is a safe value to display.
   const { profile } = useProfile();
@@ -835,6 +849,7 @@ export default function GameScreen() {
     <GameView
       controller={controller}
       best={profile.bestScore}
+      flushActiveRun={flushActiveRun}
       onExit={handleExit}
       onResults={handleResults}
     />
