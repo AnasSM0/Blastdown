@@ -1,5 +1,13 @@
 # BlastDown — CTO Product and Engineering Specification
 
+> **Historical document after A-04 (2026-08-28).** This file preserves the
+> original specification and ownership model for traceability. It is no longer
+> the primary source of truth. Use the hierarchy in `AGENTS.md`: PRD, Technical
+> Design, App Flow, UI/UX Brief, Backend Design, Engineering Plan, Game Rules,
+> Decisions, then this file only where not superseded. Claude/Codex ownership,
+> Bolts, Themes/economy, Double Bolts, rewarded Revive, and interstitial content
+> below is historical and not a current instruction or V1 requirement.
+
 **Document version:** 1.0
 **Project status:** Pre-production
 **Primary platform:** Android

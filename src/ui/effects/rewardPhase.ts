@@ -1,9 +1,8 @@
 import type { RewardedResult } from "../../services/ads/types";
 
-/** The transient presentation state of a rewarded action. Shared by every
- *  reward surface — the Freeze and Defuse dock buttons, the game-over Revive,
- *  and the results-screen Double Bolts — so an outcome reads the same wherever
- *  it happens. Presentation only: it never gates or repeats a reward, which
+/** The transient presentation state of the V1 Freeze and Defuse reward
+ *  surfaces, so an outcome reads the same wherever it happens. Presentation
+ *  only: it never gates or repeats a reward, which
  *  stays earn-only in `useRewardedAction`. */
 export type RewardActionPhase =
   | "idle"

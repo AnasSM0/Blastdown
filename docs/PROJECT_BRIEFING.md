@@ -1,11 +1,14 @@
 # BlastDown — project briefing
 
+> **Historical briefing after A-04.** Start with `AGENTS.md` and the approved
+> product hierarchy. Statements below assigning authority to `BUILD_SPEC.md` or
+> an agent are superseded.
+
 A complete orientation for someone (or some agent) picking this repository up
 cold, with the intent of researching and expanding the game.
 
-Read this first, then `BUILD_SPEC.md` (2,220 lines) for anything it does not
-cover. **`BUILD_SPEC.md` is the authority.** Where this briefing and the spec
-disagree, the spec wins and this file is wrong.
+Use this as historical orientation only. Current scope and architecture are
+defined by the hierarchy in `AGENTS.md`.
 
 ---
 
@@ -371,9 +374,9 @@ Jest runs with `randomize: true` so no test can come to depend on ordering.
 
 ## 11. House rules
 
-From `CLAUDE.md` and `AGENTS.md`:
+Current rules come from `AGENTS.md` and the approved product hierarchy:
 
-- `BUILD_SPEC.md` wins over any generated code or suggestion.
+- The PRD-led hierarchy wins over generated code, suggestions, and historical plans.
 - Domain purity is absolute.
 - No hardcoded balance values outside `src/config/balance.ts`.
 - Seeded determinism must hold.

@@ -44,7 +44,7 @@ export type GameController = {
   activateFreeze: () => boolean;
   /** Apply the rewarded defuse to the domain-selected lowest-timer piece. */
   defuse: () => boolean;
-  /** Apply the one-per-run rewarded revive from the game-over state. */
+  /** @deprecated Dormant compatibility seam; V1 has no Revive production flow. */
   revive: () => boolean;
   /** Replace the current run with a restored GameState (persistence rehydrate).
    *  Clears selection and events; does not emit any domain events. */

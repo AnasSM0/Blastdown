@@ -53,6 +53,16 @@ describe("active run save/load", () => {
     expect(loaded?.state.seed).toBe(state.seed);
   });
 
+  it("restores an older active run containing the deprecated revive marker", async () => {
+    const storage = createMemoryStorageService();
+    const state = { ...runWithTimer(), reviveUsed: true };
+    await writeActiveRun(storage, state, 1, NOW);
+
+    const loaded = await loadActiveRun(storage);
+    expect(loaded?.state).toEqual(state);
+    expect(loaded?.state.status).toBe("playing");
+  });
+
   it("leaves timers unchanged after a simulated closure", async () => {
     const storage = createMemoryStorageService();
     const state = runWithTimer();

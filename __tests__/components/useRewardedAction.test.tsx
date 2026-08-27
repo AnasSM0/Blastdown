@@ -58,8 +58,6 @@ describe("useRewardedAction", () => {
         new Promise((resolve) => {
           resolveShow = () => resolve("earned");
         }),
-      preloadInterstitial: async () => {},
-      showInterstitial: async () => "shown",
     };
     const onEarned = jest.fn();
     const { result } = await renderHook(() => useRewardedAction(), {
@@ -95,8 +93,6 @@ describe("useRewardedAction", () => {
         order.push("show");
         return "earned";
       },
-      preloadInterstitial: async () => {},
-      showInterstitial: async () => "shown",
     };
     const beforeShow = jest.fn(async () => {
       order.push("flush-start");

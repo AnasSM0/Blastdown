@@ -1,9 +1,13 @@
 # Visual Polish Review — Phase 0 Audit
 
+> **Historical review after A-04.** This audit records a prior visual phase and
+> is not implementation authority. Current scope, hierarchy, and ownership are
+> defined in `AGENTS.md` and the approved product documents.
+
 Read-only audit of the current gameplay UI against the approved references and
 `docs/PROFESSIONAL_UI_POLISH_MASTER_PLAN.md` ("Neon Reactor Premium"). No
 production UI was modified in Phase 0. This document plus the Phase 1 task block
-in `docs/TASKS.md` are the implementation authority for Phase 1.
+in `docs/TASKS.md` were the implementation inputs for that historical phase.
 
 Baseline: `docs/current game images/gameplay screen.jpg` (current device
 capture; do not overwrite). Source-of-truth order is defined in the master plan

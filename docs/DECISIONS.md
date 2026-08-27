@@ -1823,3 +1823,29 @@ near-miss, and now the renderer flag: each was a correct runtime decision
 mistaken for a build-time one, and each was reasoned about rather than measured.
 The rule this leaves: **a claim about what is in a bundle is only ever settled by
 looking in the bundle.**
+
+---
+
+## 2026-08-28 — A-04 locked V1 scope and repository governance
+
+The Product Requirements Document is now the primary product source, followed
+by Technical Design, App Flow, UI/UX Brief, Backend Design, Engineering Plan,
+Game Rules, and this decision log. `BUILD_SPEC.md` remains historical context
+only where those sources do not supersede it. Codex is the sole engineering
+agent; product direction comes from the approved documents. Architecture-
+affecting changes must be surfaced and recorded rather than applied silently.
+
+V1 includes the endless 8×8 game, three-piece hand, move-based timers, natural
+defuse, explosions/rubble, score/combo/best score, active-run persistence,
+tutorial, Home/Game/Pause/Results/Settings, rewarded Freeze/Defuse,
+audio/music/haptics, accessibility/reduced motion, consent/privacy, production
+rewarded-ad support, analytics/crash reporting, and Android-first release work.
+
+V1 excludes Bolts, Themes/economy, Double Bolts, rewarded Revive,
+interstitials, accounts/cloud/leaderboards/missions/achievements/daily systems,
+levels, special hazards, and progression. Production routes and offers for the
+legacy features were removed; the rewarded catalog and analytics/settlement
+contracts no longer require them. Deprecated stored fields and isolated pure
+helpers remain where needed for backward compatibility and future reuse, but
+they cannot drive current UI or product behavior. Real AdMob integration stays
+deferred to G-01 through G-03.

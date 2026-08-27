@@ -8,10 +8,7 @@ type ToggleKey = "soundEnabled" | "musicEnabled" | "hapticsEnabled" | "reducedMo
 
 type SettingsViewProps = {
   settings: PersistedSettings;
-  /** Display name of the active theme, shown on the Themes row. */
-  themeName: string;
   onToggle: (key: ToggleKey, value: boolean) => void;
-  onThemes: () => void;
   onReplayTutorial: () => void;
   onBack: () => void;
   /** Opens the development-only effect delivery harness.
@@ -29,15 +26,13 @@ const ROWS: { key: ToggleKey; label: string }[] = [
   { key: "reducedMotion", label: "REDUCED MOTION" },
 ];
 
-/** Settings screen (BUILD_SPEC.md §10.7). Every toggle is wired to persisted
+/** V1 Settings screen. Every toggle is wired to persisted
  *  settings and survives restart. Reduced motion is an explicit override once
- *  touched (null = follow OS until then). Also the hub for Themes navigation
- *  and replaying the tutorial. All controls are at least 44x44. */
+ *  touched (null = follow OS until then). It also replays the tutorial. All
+ *  controls are at least 44x44. */
 export function SettingsView({
   settings,
-  themeName,
   onToggle,
-  onThemes,
   onReplayTutorial,
   onBack,
   onEffectHarness,
@@ -77,19 +72,6 @@ export function SettingsView({
       </View>
 
       <View style={styles.card}>
-        <Pressable
-          style={styles.navRow}
-          onPress={onThemes}
-          accessibilityRole="button"
-          accessibilityLabel={`Themes, currently ${themeName}`}
-          testID="settings-themes-button"
-        >
-          <Text style={styles.label}>THEMES</Text>
-          <View style={styles.navValue}>
-            <Text style={styles.navValueText}>{themeName}</Text>
-            <Text style={styles.chevron}>›</Text>
-          </View>
-        </Pressable>
         <Pressable
           style={styles.navRow}
           onPress={onReplayTutorial}
@@ -168,15 +150,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-  navValue: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  navValueText: {
-    ...typography.buttonText,
-    color: colors.onSurfaceVariant,
   },
   chevron: {
     ...typography.numericValue,

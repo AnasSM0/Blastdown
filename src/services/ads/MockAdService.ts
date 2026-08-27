@@ -1,4 +1,4 @@
-import type { AdService, InterstitialResult, RewardedPlacement, RewardedResult } from "./types";
+import type { AdService, RewardedPlacement, RewardedResult } from "./types";
 
 /** Per-placement scripted outcomes for the mock. A single result repeats for
  *  every show; an array is consumed one entry per show (the last entry repeats
@@ -11,7 +11,6 @@ export type MockAdServiceConfig = {
   /** Default result for any placement without a script entry. */
   defaultRewarded?: RewardedResult;
   rewarded?: MockRewardedScript;
-  interstitial?: InterstitialResult;
 };
 
 /** In-memory `AdService` for development and tests. Deterministic: no timers,
@@ -53,12 +52,6 @@ export function createMockAdService(config: MockAdServiceConfig = {}): AdService
     async showRewarded(placement: RewardedPlacement): Promise<RewardedResult> {
       shown.push(placement);
       return nextRewarded(placement);
-    },
-    async preloadInterstitial() {
-      // No-op.
-    },
-    async showInterstitial(): Promise<InterstitialResult> {
-      return config.interstitial ?? "shown";
     },
   };
 }

@@ -2,8 +2,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { colors, neonGlow, radius, spacing, typography } from "../../ui/theme";
-import type { RewardActionPhase } from "../../ui/effects/rewardPhase";
-import { RewardOutcomeNotice } from "../RewardOutcomeNotice";
 
 export type RunStats = {
   score: number;
@@ -15,30 +13,10 @@ export type RunStats = {
   rubbleCleared: number;
 };
 
-/** Optional mock "double Bolts" rewarded action. Absent (or amount 0) hides the
- *  control entirely — there is nothing to double. */
-export type DoubleBoltsProps = {
-  /** Bolts that would be banked a second time. */
-  amount: number;
-  onPress: () => void;
-  /** True while the rewarded ad request is in flight. */
-  pending: boolean;
-  /** True once the reward has been applied for this run (one-time). */
-  applied: boolean;
-  /** Transient outcome of the last request (pending / success / cancelled /
-   *  failure), shown with the same status line every other reward surface uses
-   *  so a dismissed or failed ad is never silent. */
-  phase?: RewardActionPhase;
-};
-
 type ResultsViewProps = {
   stats: RunStats;
   /** Player best score after this run is settled. */
   bestScore: number;
-  /** Bolts earned by this run (floor(score/250) + defuses). */
-  boltsEarned: number;
-  /** Mock double-Bolts rewarded action; omit to hide it. */
-  doubleBolts?: DoubleBoltsProps;
   onPlayAgain: () => void;
   onHome: () => void;
 };
@@ -52,20 +30,11 @@ function StatRow({ label, value, accent }: { label: string; value: string; accen
   );
 }
 
-/** End-of-run results (Stitch 06) built from the run's real domain stats plus
- *  the settled profile (best score, Bolts earned). Play Again starts a fresh
- *  run; Home returns to the menu. Double Bolts stays deferred — no rewarded
- *  contract for it yet (see docs/DECISIONS.md). */
-export function ResultsView({
-  stats,
-  bestScore,
-  boltsEarned,
-  doubleBolts,
-  onPlayAgain,
-  onHome,
-}: ResultsViewProps) {
+/** Canonical V1 end-of-run results. Play Again starts a fresh run and Home
+ *  returns to the menu; excluded economy and rewarded-result offers are not
+ *  part of this production surface. */
+export function ResultsView({ stats, bestScore, onPlayAgain, onHome }: ResultsViewProps) {
   const n = (value: number) => value.toLocaleString("en-US");
-  const showDoubleBolts = doubleBolts !== undefined && doubleBolts.amount > 0;
   return (
     <SafeAreaView style={styles.screen} testID="results-screen">
       <ScrollView contentContainerStyle={styles.content}>
@@ -82,7 +51,6 @@ export function ResultsView({
         </Text>
 
         <View style={styles.card}>
-          <StatRow label="Bolts Earned" value={`+${n(boltsEarned)}`} accent={colors.scoreOrange} />
           <StatRow label="Best Combo" value={`x${stats.bestCombo}`} accent={colors.cyanBlock} />
           <StatRow label="Lines Cleared" value={n(stats.linesCleared)} accent={colors.cyanBlock} />
           <StatRow label="Pieces Placed" value={n(stats.piecesPlaced)} accent={colors.cyanBlock} />
@@ -98,40 +66,6 @@ export function ResultsView({
             accent={colors.cyanBlock}
           />
         </View>
-
-        {showDoubleBolts ? (
-          doubleBolts.applied ? (
-            <View
-              style={styles.doubleBoltsApplied}
-              accessibilityLabel={`Bolts doubled, plus ${n(doubleBolts.amount)}`}
-              testID="double-bolts-applied"
-            >
-              <Text style={styles.doubleBoltsAppliedText}>
-                BOLTS DOUBLED ✓ +{n(doubleBolts.amount)}
-              </Text>
-            </View>
-          ) : (
-            <>
-              <Pressable
-                onPress={doubleBolts.onPress}
-                disabled={doubleBolts.pending}
-                style={[styles.doubleBolts, neonGlow(colors.scoreOrange, "low")]}
-                accessibilityRole="button"
-                accessibilityLabel={`Watch an ad to double your Bolts, plus ${n(doubleBolts.amount)}`}
-                accessibilityState={{ disabled: doubleBolts.pending }}
-                testID="double-bolts-button"
-              >
-                <Text style={styles.doubleBoltsText}>
-                  {doubleBolts.pending ? "LOADING…" : `DOUBLE BOLTS +${n(doubleBolts.amount)} ▶`}
-                </Text>
-              </Pressable>
-              <RewardOutcomeNotice
-                phase={doubleBolts.phase ?? "idle"}
-                testID="double-bolts-outcome"
-              />
-            </>
-          )
-        ) : null}
 
         <Pressable
           onPress={onPlayAgain}
@@ -203,33 +137,6 @@ const styles = StyleSheet.create({
   statValue: {
     ...typography.buttonText,
     color: colors.onSurface,
-  },
-  doubleBolts: {
-    marginTop: spacing.lg,
-    minHeight: 52,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.scoreOrange,
-    backgroundColor: `${colors.scoreOrange}1F`,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  doubleBoltsText: {
-    ...typography.buttonText,
-    color: colors.scoreOrange,
-  },
-  doubleBoltsApplied: {
-    marginTop: spacing.lg,
-    minHeight: 52,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  doubleBoltsAppliedText: {
-    ...typography.buttonText,
-    color: colors.scoreOrange,
   },
   playAgain: {
     marginTop: spacing.lg,

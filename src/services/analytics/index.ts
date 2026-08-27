@@ -14,5 +14,4 @@ export type {
   AnalyticsEventName,
   AnalyticsService,
   RewardResultOutcome,
-  ThemePurchaseOutcome,
 } from "./types";

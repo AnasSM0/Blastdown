@@ -1,10 +1,14 @@
 # BlastDown Professional UI Polish — Master Phase Plan
 
+> **Historical polish plan after A-04.** This document may inform visual work
+> only where it agrees with the current hierarchy in `AGENTS.md`. Its agent
+> ownership and legacy-feature instructions are not current.
+
 ## Purpose
 
-This document is the single implementation authority for the complete BlastDown professional UI-polish program.
+This document records the original BlastDown professional UI-polish program.
 
-Claude Code must read this file before beginning any polish phase. It defines:
+For historical polish context, it defines:
 
 - Visual direction
 - Phase order
@@ -160,9 +164,9 @@ These apply to every polish phase.
 Before editing:
 
 1. Confirm the working tree is clean.
-2. Confirm no other Claude or Codex agent is editing the same files.
+2. Confirm no other writer is editing the same files.
 3. Assign bounded file ownership.
-4. Review every Codex diff.
+4. Review the complete diff.
 5. Never allow parallel edits to the same UI files.
 
 ---

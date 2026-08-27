@@ -7,7 +7,8 @@ type SecondChanceBannerProps = {
   reducedMotion?: boolean;
 };
 
-/** Transient "SECOND CHANCE" banner shown across the board after a revive
+/** @deprecated Dormant legacy presentation with no V1 production caller.
+ * Transient "SECOND CHANCE" banner shown across the board after a revive
  *  (Stitch 10). Cosmetic only. Under reduced motion it appears at full opacity
  *  with no fade; otherwise it fades in. The parent unmounts it on a timer, so
  *  it holds no dismissal logic of its own. */

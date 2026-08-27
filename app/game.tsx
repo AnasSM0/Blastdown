@@ -10,7 +10,6 @@ import { ReactorBackground } from "../src/components/ReactorBackground";
 import { ScoreHeader } from "../src/components/ScoreHeader";
 import { GameOverOverlay } from "../src/components/modals/GameOverOverlay";
 import { DefuseConfirmCard } from "../src/components/modals/DefuseConfirmCard";
-import { SecondChanceBanner } from "../src/components/modals/SecondChanceBanner";
 import { PauseOverlay } from "../src/components/modals/PauseOverlay";
 import { RunConfirmationCard } from "../src/components/modals/RunConfirmationCard";
 import { RewardedActionBar } from "../src/components/RewardedActionButton";
@@ -21,7 +20,6 @@ import { getShapeById } from "../src/domain/shapes";
 import {
   canActivateFreeze,
   canApplyRewardedDefuse,
-  canRevive,
   getRewardedDefuseTarget,
   getTimerBadgePlacements,
 } from "../src/domain/selectors";
@@ -29,7 +27,7 @@ import {
 // off never evaluates Skia at all. See the module's own comment.
 import { BoardRenderer, CINEMATIC_RENDERER } from "../src/rendering/boardRenderer";
 import { dragOriginFromFinger, type BoardLayout, type Point } from "../src/ui/boardGeometry";
-import { cellsOfPiece, rubbleCellsOf } from "../src/ui/effects/eventEffects";
+import { cellsOfPiece } from "../src/ui/effects/eventEffects";
 import {
   useGameController,
   type GameController,
@@ -125,9 +123,6 @@ type GameViewProps = {
   flushActiveRun?: () => Promise<void>;
 };
 
-const SECOND_CHANCE_MS = 1500;
-const SECOND_CHANCE_REDUCED_MS = 800;
-
 /** Upper bound on the board's edge so it never balloons on tablets/wide screens
  *  (mirrors GameBoard's own maxWidth). */
 const MAX_BOARD_SIZE = 420;
@@ -221,15 +216,11 @@ export function GameView({
   }, []);
 
   const [defuseConfirmOpen, setDefuseConfirmOpen] = useState(false);
-  const [secondChance, setSecondChance] = useState(false);
-  const secondChanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Transient per-action reward feedback (pending while the ad is in flight,
   // then a brief success/failure/cancelled outcome). One shared hook per action
-  // so Freeze, Defuse, and Revive — and Double Bolts on the results screen —
-  // present, sound, and time out identically. Presentation only.
+  // so Freeze and Defuse present, sound, and time out identically.
   const freezeOutcome = useRewardOutcome(reducedMotion);
   const defuseOutcome = useRewardOutcome(reducedMotion);
-  const reviveOutcome = useRewardOutcome(reducedMotion);
   const [previewOrigin, setPreviewOrigin] = useState<CellPosition | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dragOrigin, setDragOrigin] = useState<CellPosition | null>(null);
@@ -517,64 +508,14 @@ export function GameView({
       });
   }, [animator, audio, controller, defuseOutcome, haptics, reward, state, track]);
 
-  const clearSecondChance = useCallback(() => {
-    if (secondChanceTimer.current !== null) {
-      clearTimeout(secondChanceTimer.current);
-      secondChanceTimer.current = null;
-    }
-    setSecondChance(false);
-  }, []);
-
-  const handleRevive = useCallback(() => {
-    if (reward.pending || !canRevive(state)) {
-      return;
-    }
-    audio.playSfx("button");
-    track({ name: "revive_offer" });
-    reviveOutcome.begin();
-    // The rubble the revive is about to clear, read before it is applied — the
-    // recovery wave then covers exactly the cells that were restored.
-    const restoredCells = rubbleCellsOf(state.grid);
-    let applied = false;
-    void reward
-      .run(REWARD_PLACEMENTS.revive, () => {
-        if (controller.revive()) {
-          applied = true;
-          haptics.success();
-          audio.playSfx("revive");
-          // Revive advances no turn either, so the wave is played explicitly and
-          // holds no input lock — play resumes the moment the domain allows it.
-          animator.playCue("revive", restoredCells);
-          // "SECOND CHANCE" banner over the repaired board (Stitch 10), then
-          // auto-dismiss. Reduced motion shortens the hold and skips the fade.
-          setSecondChance(true);
-          if (secondChanceTimer.current !== null) {
-            clearTimeout(secondChanceTimer.current);
-          }
-          secondChanceTimer.current = setTimeout(
-            () => {
-              secondChanceTimer.current = null;
-              setSecondChance(false);
-            },
-            reducedMotion ? SECOND_CHANCE_REDUCED_MS : SECOND_CHANCE_MS,
-          );
-        }
-      })
-      .then((result) => {
-        track({ name: "revive_result", result: rewardOutcome(result) });
-        reviveOutcome.settle(result, applied);
-      });
-  }, [animator, audio, controller, haptics, reducedMotion, reward, reviveOutcome, state, track]);
-
   const handleEndRun = useCallback(() => {
     if (reward.pending || resultsTransitionRef.current) {
       return;
     }
     resultsTransitionRef.current = true;
     audio.playSfx("button");
-    clearSecondChance();
     onResults?.();
-  }, [audio, clearSecondChance, onResults, reward.pending]);
+  }, [audio, onResults, reward.pending]);
 
   const handlePause = useCallback(() => {
     // Pausing mid-reward is disallowed so the confirm/overlay stack stays sane.
@@ -599,13 +540,11 @@ export function GameView({
     setRestartConfirmation("closed");
     setDefuseConfirmOpen(false);
     setPreviewOrigin(null);
-    clearSecondChance();
     clearDrag();
     freezeOutcome.reset();
     defuseOutcome.reset();
-    reviveOutcome.reset();
     animator.reset();
-  }, [animator, clearDrag, clearSecondChance, defuseOutcome, freezeOutcome, reviveOutcome]);
+  }, [animator, clearDrag, defuseOutcome, freezeOutcome]);
 
   const handleRestart = useCallback(() => {
     audio.playSfx("button");
@@ -667,10 +606,6 @@ export function GameView({
     });
     return () => subscription.remove();
   }, [audio, flushActiveRun, handleResume, paused, restartConfirmation, state.status]);
-
-  // Cancel a pending second-chance timer on unmount. Each reward outcome clears
-  // its own timer (useRewardOutcome), and the animator clears its sequence.
-  useEffect(() => () => clearSecondChance(), [clearSecondChance]);
 
   const freezeActive = state.freezeTurnsRemaining > 0;
   const defuseTarget = defuseConfirmOpen ? getRewardedDefuseTarget(state) : null;
@@ -792,7 +727,6 @@ export function GameView({
             reducedMotion={reducedMotion}
           />
         ) : null}
-        {secondChance ? <SecondChanceBanner reducedMotion={reducedMotion} /> : null}
         {paused ? (
           <PauseOverlay
             onResume={handleResume}
@@ -815,11 +749,7 @@ export function GameView({
         {state.status === "gameOver" ? (
           <GameOverOverlay
             score={state.score}
-            reviveAvailable={canRevive(state)}
-            onRevive={handleRevive}
             onEndRun={handleEndRun}
-            busy={reward.pending}
-            revivePhase={reviveOutcome.phase}
             reducedMotion={reducedMotion}
           />
         ) : null}

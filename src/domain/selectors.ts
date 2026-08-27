@@ -121,7 +121,8 @@ export function canApplyRewardedDefuse(state: GameState): boolean {
   );
 }
 
-/** True when the one-per-run rewarded revive is still available from the
+/** @deprecated Dormant legacy selector; V1 has no Revive offer.
+ * True when the one-per-run rewarded revive is still available from the
  *  game-over state. Mirrors `applyRevive`'s precondition. */
 export function canRevive(state: GameState): boolean {
   return state.status === "gameOver" && !state.reviveUsed;

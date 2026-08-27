@@ -98,9 +98,7 @@ describe("game screen vertical slice", () => {
     await user.press(result.getByTestId("cell-0-0"));
 
     expect(result.getByTestId("game-over-overlay")).toBeTruthy();
-    // The overlay offers the one-per-run revive and an end-run exit to results;
-    // in-place restart now happens from the results screen (Play Again).
-    expect(result.getByTestId("revive-button")).toBeTruthy();
+    expect(result.queryByTestId("revive-button")).toBeNull();
     expect(result.getByTestId("end-run-button")).toBeTruthy();
   });
 });

@@ -1,7 +1,9 @@
 # Architecture
 
-Source of truth: `BUILD_SPEC.md` sections 12–15. This document is the
-practical, code-facing derivation Claude Code maintains as the project grows.
+The source-of-truth hierarchy is defined in `AGENTS.md`; `BUILD_SPEC.md` is
+historical where superseded. This document is a practical, code-facing
+reference maintained by Codex, the sole engineering agent. Architecture
+changes must be surfaced explicitly and recorded when approved.
 
 ## Stack
 
@@ -154,10 +156,12 @@ interface AdService {
   showRewarded(
     placement: RewardedPlacement,
   ): Promise<"earned" | "closed" | "unavailable" | "error">;
-  preloadInterstitial(): Promise<void>;
-  showInterstitial(): Promise<"shown" | "unavailable" | "error">;
 }
 ```
+
+The complete V1 rewarded placement union is `rewarded_freeze |
+rewarded_defuse`. Interstitial methods and excluded legacy placements are not
+part of the production contract.
 
 `MockAdService` backs development and tests; `GoogleMobileAdsService` backs
 native development and production builds. Analytics, storage, and consent

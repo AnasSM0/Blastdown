@@ -41,37 +41,17 @@ function renderOver(adService: AdService, onResults = jest.fn(), state = gameOve
   );
 }
 
-describe("revive lifecycle", () => {
-  it("repairs and resumes the run on an earned reward, then shows SECOND CHANCE", async () => {
-    const service = createMockAdService({ rewarded: { rewarded_revive: "earned" } });
+describe("game-over V1 scope", () => {
+  it("does not offer rewarded Revive for an older run where it was unused", async () => {
+    const service = createMockAdService();
     const result = await renderOver(service);
 
     expect(result.getByTestId("game-over-overlay")).toBeTruthy();
-
-    await fireEvent.press(result.getByTestId("revive-button"));
-
-    // Back in play: overlay gone, second-chance banner shown, reward spent.
-    expect(result.queryByTestId("game-over-overlay")).toBeNull();
-    expect(result.getByTestId("second-chance-banner")).toBeTruthy();
-    expect(service.shown).toEqual(["rewarded_revive"]);
+    expect(result.queryByTestId("revive-button")).toBeNull();
+    expect(result.queryByTestId("second-chance-banner")).toBeNull();
   });
 
-  it.each(["closed", "error"] as const)(
-    "leaves the game over unchanged when the revive reward is %s",
-    async (outcome) => {
-      const service = createMockAdService({ rewarded: { rewarded_revive: outcome } });
-      const result = await renderOver(service);
-
-      await fireEvent.press(result.getByTestId("revive-button"));
-
-      // Still game over, no second chance.
-      expect(result.getByTestId("game-over-overlay")).toBeTruthy();
-      expect(result.queryByTestId("second-chance-banner")).toBeNull();
-      expect(service.shown).toEqual(["rewarded_revive"]);
-    },
-  );
-
-  it("offers no revive once the run's revive is already used", async () => {
+  it("does not let a deprecated revive marker break the game-over route", async () => {
     const service = createMockAdService();
     const result = await renderOver(service, jest.fn(), gameOverState({ reviveUsed: true }));
 

@@ -1,9 +1,15 @@
 # Tasks
 
-Numbered, checkable tasks per phase, derived from `BUILD_SPEC.md` section 25.
-Each phase's acceptance criteria must pass before the next phase starts.
-"Owner" is who implements; Claude Code reviews and integrates everything
-regardless of owner (see `CLAUDE.md`).
+> **Historical execution ledger after A-04 (2026-08-28).** Owner/reviewer
+> labels and legacy feature tasks below record how earlier work was organized;
+> they are not current instructions. Codex is now the sole engineering agent,
+> and current scope/planning follows `AGENTS.md` plus the approved product
+> document hierarchy.
+
+Numbered, checkable historical tasks per phase, originally derived from `BUILD_SPEC.md` section 25.
+Each phase's acceptance criteria was intended to pass before the next phase.
+All owner/reviewer labels below are historical records and have no current
+governance effect.
 
 Checkbox convention: `[ ]` pending, `[x]` done, `[~]` in progress.
 

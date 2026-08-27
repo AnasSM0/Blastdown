@@ -16,7 +16,7 @@ import { DEFAULT_UNLOCKED_THEME_IDS, sanitizeUnlocked } from "../../economy/them
  *  The envelope version guards the persisted *shape*; the inner
  *  `state.version` guards the domain GameState shape. */
 export const ACTIVE_RUN_SCHEMA_VERSION = 2;
-/** v2 adds `unlockedThemeIds`; v1 profiles migrate forward keeping Bolts/stats. */
+/** v2 added legacy theme ownership; fields remain parseable but dormant in V1. */
 export const PROFILE_SCHEMA_VERSION = 2;
 export const SETTINGS_SCHEMA_VERSION = 1;
 
@@ -35,6 +35,7 @@ export type PersistedActiveRun = {
 export type PersistedProfile = {
   schemaVersion: number;
   bestScore: number;
+  /** @deprecated Backward-compatible parse-only economy field. */
   bolts: number;
   totalRuns: number;
   piecesPlaced: number;
@@ -43,9 +44,10 @@ export type PersistedProfile = {
   explosions: number;
   rubbleCleared: number;
   bestCombo: number;
+  /** @deprecated Backward-compatible parse-only legacy statistic. */
   revivesUsed: number;
   tutorialCompleted: boolean;
-  /** Theme ids the player owns. Always includes the default-unlocked themes. */
+  /** @deprecated Backward-compatible parse-only theme ownership. */
   unlockedThemeIds: string[];
   createdAt: number;
   updatedAt: number;
@@ -58,6 +60,7 @@ export type PersistedSettings = {
   hapticsEnabled: boolean;
   /** null = follow the OS reduced-motion setting; true/false = explicit override. */
   reducedMotionOverride: boolean | null;
+  /** @deprecated Backward-compatible parse-only theme selection. */
   themeId: string;
 };
 

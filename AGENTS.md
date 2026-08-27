@@ -1,82 +1,76 @@
 # AGENTS.md
 
-Repository-wide rules for any coding agent (Claude Code, Codex, or otherwise)
-working in BlastDown. `BUILD_SPEC.md` is the source of truth; this file is a
-condensed, enforceable checklist derived from it.
+Repository-wide rules for engineering work in BlastDown.
+
+## Authority and governance
+
+Codex is the sole engineering agent for the current build. Product direction
+comes from the approved product documents, not from an agent. If a requested
+change affects architecture, gameplay rules, persistence, monetization,
+analytics, dependencies, or the source-of-truth documents, Codex must surface
+that impact explicitly and record an approved decision. No agent may silently
+change product direction or architecture.
+
+When documents conflict, use this order:
+
+1. `docs/PRD.md`
+2. `docs/TECHNICAL_DESIGN.md`
+3. `docs/APP_FLOW.md`
+4. `docs/UI_UX_BRIEF.md`
+5. `docs/BACKEND_DESIGN.md`
+6. `docs/ENGINEERING_PLAN.md`
+7. `docs/GAME_RULES.md`
+8. `docs/DECISIONS.md`
+9. `BUILD_SPEC.md`, as historical context only where it has not been superseded
+
+The current task prompt governs execution details when it does not conflict
+with a higher product source. Existing code is evidence, not product authority.
+
+## Locked V1 scope
+
+V1 includes the endless 8×8 game, three-piece hand, move-based timers, natural
+defuse, explosions/rubble, score/combo/best score, active-run persistence,
+tutorial, Home/Game/Pause/Results/Settings, rewarded Freeze and Defuse,
+audio/music/haptics, accessibility/reduced motion, consent/privacy,
+production rewarded-ad support, analytics/crash reporting, and Android-first
+release work.
+
+V1 excludes Bolts, Themes/economy, Double Bolts, rewarded Revive,
+interstitials, accounts, cloud save, leaderboards, missions, achievements,
+daily systems, levels, special hazards, and progression systems. Excluded
+features must not appear in production UI or be required by current
+persistence, analytics, or monetization. Deprecated stored fields may remain
+parseable for backward compatibility.
 
 ## Language and types
 
-- Strict TypeScript everywhere (`tsconfig.json` has `"strict": true` — do not
-  weaken it).
-- No `any` without an inline comment justifying why it's unavoidable.
-- Prefer precise union types over booleans/strings for state (see
-  `GameStatus`, `CellKind` in `docs/ARCHITECTURE.md`).
+- Keep strict TypeScript enabled.
+- Do not use `any` without an inline justification.
+- Prefer precise union types over loose booleans or strings.
 
 ## Architecture boundaries
 
-- No gameplay logic in UI components. Placement validity, line clearing,
-  timers, explosions, and scoring live only in `src/domain/` and must stay
-  pure (no AsyncStorage, no animation calls, no ad SDK calls, no sound, no
-  navigation, no React hooks).
-- No direct ad-SDK calls in screens or components. Go through the
-  `AdService` interface (`src/services/ads/`). Same pattern for analytics,
-  storage, consent, and audio: screens call an interface, never a vendor SDK
-  directly.
-- No hardcoded balance values (timer durations, scoring multipliers, ad
-  frequency caps, etc.) inside components or the reducer. They live in
-  `src/config/` and are imported.
-- Do not add a global state management library (Redux, MobX, Zustand, ...).
-  Use pure domain functions, a typed reducer, and React Context only for
-  app-level services/preferences.
-- Do not add React Native Skia, a custom backend, or replace Expo Router
-  unless `BUILD_SPEC.md` is updated first.
+- Keep gameplay rules pure in `src/domain/`; no storage, animation, ads, audio,
+  navigation, or React hooks there.
+- Screens and components call typed service interfaces, never vendor SDKs.
+- Keep balance values in `src/config/`, not components or reducers.
+- Do not add global state management, a backend, or a navigation replacement.
+- Do not change board size, timer rules, explosion rules, scoring, or seeded
+  determinism without explicit product authorization.
 
-## Dependencies
+## Dependencies and process
 
-- No unapproved dependencies. If a task seems to need a new package, stop and
-  flag it instead of installing it silently.
-- No dependency upgrades outside a task that explicitly authorizes it.
-
-## Process
-
-- No unrelated refactors bundled into a task's diff. Touch only what the task
-  scopes.
-- Tests are required for any behavior change: unit tests for domain logic,
-  component tests for UI, integration tests for cross-cutting scenarios (see
-  `docs/TEST_PLAN.md`).
-- Preserve seeded determinism in anything touching random generation or the
-  reducer.
-- Maintain offline gameplay: never make core gameplay depend on a network
-  call succeeding.
-- Respect assigned file boundaries exactly. If a task's "allowed files" list
-  doesn't cover something you need to change, stop and ask rather than
-  expanding scope.
-- Return exact verification results (command + pass/fail + relevant output),
-  not a summary claim of "it works."
-
-## Codex-specific scope
-
-Codex is preferred for, and should stay within: Expo screen implementation,
-responsive layouts, reusable UI components, grid/piece rendering, tap and
-drag interaction, placement preview presentation, Reanimated effects, timer
-visual states, explosion presentation, haptic wiring, audio wiring, theme
-presentation, accessibility improvements, component tests, Android layout
-fixes, visual polish, and store screenshot staging tools.
-
-Codex must not, without explicit task authorization: add a state-management
-library, add Skia, add a backend, replace Expo Router, change board size,
-change timer rules, change explosion rules, add new currencies, add new ad
-placements, upgrade dependencies, or rewrite domain modules. Codex may
-propose a domain change but must report it rather than implement it.
+- Do not add or upgrade dependencies unless the task explicitly authorizes it.
+- Keep changes scoped; do not bundle unrelated refactors.
+- Add unit, component, or integration tests appropriate to every behavior
+  change.
+- Preserve offline core gameplay.
+- Preserve user changes in a dirty worktree.
+- Return exact verification commands and results.
+- Do not merge automatically unless explicitly instructed.
 
 ## Git
 
-- One repository. Branch names: `main`, `develop`, `feat/<task-id>-<desc>`,
-  `fix/<task-id>-<desc>`.
-- Commit format: `type(scope): summary`, e.g.
-  `feat(engine): implement countdown resolution`,
-  `fix(ads): preserve reward state after load failure`,
-  `test(engine): cover simultaneous explosions`,
-  `docs(architecture): record ad-service decision`.
-- Claude and another agent must not edit the same files at the same time
-  (single-writer rule per file/module for the duration of a task).
+- Use task branches and the commit format `type(scope): summary`.
+- Inspect the complete diff and repository status before committing.
+- Push only when the task asks for it.

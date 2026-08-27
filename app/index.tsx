@@ -70,12 +70,10 @@ export default function HomeScreen() {
     <>
       <HomeScreenView
         bestScore={profile.bestScore}
-        bolts={profile.bolts}
         actionsEnabled={hydrated}
         canContinue={canContinue}
         onPlay={handlePlay}
         onContinue={handleContinue}
-        onThemes={() => router.push("/themes")}
         onSettings={() => router.push("/settings")}
         onHowToPlay={() => router.push("/tutorial")}
         onPrivacy={() => {}}

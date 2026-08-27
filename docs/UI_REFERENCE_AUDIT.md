@@ -1,8 +1,12 @@
 # UI Reference Audit
 
+> **Historical audit after A-04.** Findings retain their original wording for
+> traceability. Current authority and agent responsibility are defined by
+> `AGENTS.md`; legacy UI references do not restore excluded V1 features.
+
 Audit of the 16 approved Stitch screens (`docs/references/ui/stitch-mcp/`)
-against `BUILD_SPEC.md` and `docs/GAME_RULES.md`, which remain authoritative
-for gameplay. Stitch is authoritative only for visual direction. Every
+against the then-current `BUILD_SPEC.md` and `docs/GAME_RULES.md`. Stitch is a
+visual reference only. Every
 finding below was verified by reading the actual retrieved
 `source.html`/`styles.css`, not assumed from screen titles.
 
@@ -185,8 +189,8 @@ appears in the Developer Handoff's color-token section (`16`) or in the
 **Needs a decision:** formalize `#FF003D` as a distinct `urgentRed` token
 (recommended, so "invalid action" and "piece about to explode" stay
 visually distinct) or fold it into the existing `error` token. See
-`docs/STYLE_GUIDE.md`. Not yet recorded as a final decision — flag for
-Claude Code sign-off before the timer-badge component is built.
+`docs/STYLE_GUIDE.md`. This historical gap required a recorded product/design
+decision before the timer-badge component was built.
 
 **Authoritative rule:** N/A — visual token gap, not a gameplay rule.
 

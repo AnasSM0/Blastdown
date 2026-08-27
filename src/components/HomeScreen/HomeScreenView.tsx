@@ -6,14 +6,12 @@ import { PressableFeedback } from "../PressableFeedback";
 
 type HomeScreenViewProps = {
   bestScore: number;
-  bolts: number;
   /** New-run/resume decisions are disabled until active-run hydration settles. */
   actionsEnabled?: boolean;
   /** Show the Continue button only when an in-memory run is resumable. */
   canContinue: boolean;
   onPlay: () => void;
   onContinue: () => void;
-  onThemes: () => void;
   onSettings: () => void;
   onHowToPlay: () => void;
   onPrivacy: () => void;
@@ -34,12 +32,10 @@ function formatNumber(value: number): string {
  *  navigation logic lives here. */
 export function HomeScreenView({
   bestScore,
-  bolts,
   actionsEnabled = true,
   canContinue,
   onPlay,
   onContinue,
-  onThemes,
   onSettings,
   onHowToPlay,
   onPrivacy,
@@ -58,10 +54,6 @@ export function HomeScreenView({
         >
           <Text style={styles.iconGlyph}>⚙</Text>
         </PressableFeedback>
-        <View style={styles.boltsPill} testID="bolts-balance">
-          <Text style={styles.boltsText}>{formatNumber(bolts)}</Text>
-          <Text style={styles.boltsGlyph}> ⚡</Text>
-        </View>
       </View>
 
       <View style={styles.hero}>
@@ -106,17 +98,6 @@ export function HomeScreenView({
           <PressableFeedback
             reducedMotion={reducedMotion}
             style={styles.menuButton}
-            onPress={onThemes}
-            accessibilityRole="button"
-            accessibilityLabel="Themes"
-            testID="themes-button"
-          >
-            <Text style={styles.menuGlyph}>◑</Text>
-            <Text style={styles.menuLabel}>THEMES</Text>
-          </PressableFeedback>
-          <PressableFeedback
-            reducedMotion={reducedMotion}
-            style={styles.menuButton}
             onPress={onHowToPlay}
             accessibilityRole="button"
             accessibilityLabel="How to play"
@@ -149,7 +130,7 @@ const styles = StyleSheet.create({
   },
   topRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     alignItems: "center",
     paddingTop: spacing.md,
   },
@@ -166,24 +147,6 @@ const styles = StyleSheet.create({
   iconGlyph: {
     fontSize: 20,
     color: colors.onSurfaceVariant,
-  },
-  boltsPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.cyanBlock,
-    backgroundColor: `${colors.cyanBlock}14`,
-  },
-  boltsText: {
-    ...typography.numericValue,
-    color: colors.cyanBlock,
-  },
-  boltsGlyph: {
-    ...typography.numericValue,
-    color: colors.amberBlock,
   },
   hero: {
     alignItems: "center",

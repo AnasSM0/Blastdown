@@ -364,9 +364,7 @@ describe("the harness is absent outside development", () => {
     const withoutEntry = await render(
       <SettingsView
         settings={settings as never}
-        themeName="Reactor"
         onToggle={() => {}}
-        onThemes={() => {}}
         onReplayTutorial={() => {}}
         onBack={() => {}}
       />,
@@ -378,9 +376,7 @@ describe("the harness is absent outside development", () => {
     const withEntry = await render(
       <SettingsView
         settings={settings as never}
-        themeName="Reactor"
         onToggle={() => {}}
-        onThemes={() => {}}
         onReplayTutorial={() => {}}
         onBack={() => {}}
         onEffectHarness={() => opened.push(1)}
