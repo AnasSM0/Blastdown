@@ -14,6 +14,20 @@
         "EXPO_PUBLIC_APP_ENV": "development"
       }
     },
+    "development-cinematic-off": {
+      "extends": "development",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "development",
+        "EXPO_PUBLIC_CINEMATIC_BOARD": "0"
+      }
+    },
+    "development-cinematic-on": {
+      "extends": "development",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "development",
+        "EXPO_PUBLIC_CINEMATIC_BOARD": "1"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "android": {
