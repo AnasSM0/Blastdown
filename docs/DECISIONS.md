@@ -1849,3 +1849,32 @@ contracts no longer require them. Deprecated stored fields and isolated pure
 helpers remain where needed for backward compatibility and future reuse, but
 they cannot drive current UI or product behavior. Real AdMob integration stays
 deferred to G-01 through G-03.
+
+---
+
+## 2026-08-28 — A-05 aligned the Expo SDK 57 runtime patch baseline
+
+BlastDown remains on Expo SDK 57 and React 19.2.3. Expo moved from 57.0.7 to
+57.0.17 and React Native from 0.86.0 to 0.86.3; the latter moves Hermes V1 from
+`250829098.0.14` to `250829098.0.17`. Expo identifies `.16` as the first Hermes
+build containing the memory-regression fix and explicitly recommends
+`expo@57.0.9` or later with React Native 0.86.2 or later for applications that
+import Reanimated or Worklets.
+
+The remaining Expo-managed packages reported by `npx expo install --check` were
+aligned to the current SDK 57 compatibility map: expo-asset 57.0.6 → 57.0.15,
+expo-audio 57.0.2 → 57.0.4, expo-constants 57.0.6 → 57.0.15, expo-dev-client
+57.0.7 → 57.0.16, expo-haptics 57.0.1 → 57.0.2, expo-linking 57.0.3 → 57.0.8,
+expo-router 57.0.7 → 57.0.17, expo-splash-screen 57.0.4 → 57.0.8,
+expo-system-ui 57.0.1 → 57.0.3, Reanimated 4.5.0 → 4.5.1, Screens 4.25.2 →
+4.26.2, Worklets 0.10.0 → 0.10.1, eslint-config-expo 57.0.0 → 57.0.2, and
+jest-expo 57.0.2 → 57.0.5. The authority is Expo's SDK 57 release note and the
+SDK 57 bundled-native-module map surfaced by Expo CLI/Doctor, not package
+freshness alone.
+
+Skia 2.6.2, Gesture Handler 2.32.0, React 19.2.3, AsyncStorage 2.2.0, and Google
+Mobile Ads 16.3.4 were already compatible and were intentionally not changed.
+The known risk is native rather than behavioral: every development client must
+be rebuilt after the native dependency update, the still-open Hermes
+development-startup regression is not a production regression, and physical
+Android launch/memory/performance acceptance remains an A-06 gate.
