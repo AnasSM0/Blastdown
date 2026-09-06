@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 16.0.0",
+    "version": "23.2.0",
+    "requireCommit": true,
     "appVersionSource": "remote"
   },
   "build": {
@@ -14,15 +15,29 @@
         "EXPO_PUBLIC_APP_ENV": "development"
       }
     },
-    "development-cinematic-off": {
-      "extends": "development",
+    "android-qualification-fallback": {
+      "node": "22.23.1",
+      "developmentClient": true,
+      "distribution": "internal",
+      "environment": "development",
+      "android": {
+        "image": "ubuntu-26.04-jdk-17-ndk-r27b-sdk-57",
+        "buildType": "apk"
+      },
       "env": {
         "EXPO_PUBLIC_APP_ENV": "development",
         "EXPO_PUBLIC_CINEMATIC_BOARD": "0"
       }
     },
-    "development-cinematic-on": {
-      "extends": "development",
+    "android-qualification-cinematic": {
+      "node": "22.23.1",
+      "developmentClient": true,
+      "distribution": "internal",
+      "environment": "development",
+      "android": {
+        "image": "ubuntu-26.04-jdk-17-ndk-r27b-sdk-57",
+        "buildType": "apk"
+      },
       "env": {
         "EXPO_PUBLIC_APP_ENV": "development",
         "EXPO_PUBLIC_CINEMATIC_BOARD": "1"

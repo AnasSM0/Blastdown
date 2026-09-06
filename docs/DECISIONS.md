@@ -1878,3 +1878,37 @@ The known risk is native rather than behavioral: every development client must
 be rebuilt after the native dependency update, the still-open Hermes
 development-startup regression is not a production regression, and physical
 Android launch/memory/performance acceptance remains an A-06 gate.
+
+---
+
+## 2026-09-07 — A-06B freeze the Android qualification baseline
+
+Under the A-06B reproducibility decision rule, retain A-05's exact lockfile:
+Expo 57.0.17, React Native 0.86.3, Hermes V1 `250829098.0.17`, React 19.2.3,
+Reanimated 4.5.1, Worklets 0.10.1, and Skia 2.6.2. Package manifests and the
+lockfile are unchanged from `e3aadc96541eade966c23a2997cda0c857f81f97`.
+
+The installed Expo CLI fetches `sdks/57.0.0/native-modules` and
+`versions/latest` from the Expo API, preferring those results over installed
+`expo/bundledNativeModules.json`. The live map now recommends Expo 57.0.20,
+Asset 57.0.16, Constants 57.0.17, Dev Client 57.0.18, Font 57.0.3,
+Linking 57.0.9, and Router 57.0.19. This accounts for Doctor's 20/21 result
+without any lockfile change. Reviewed SDK-57 changelogs identify no Android
+build/runtime fix requiring these seven updates: functional changes in this
+interval concern iOS Expo reloads and web font handling. Sources:
+[Expo changelog](https://github.com/expo/expo/blob/sdk-57/packages/expo/CHANGELOG.md),
+[Font changelog](https://github.com/expo/expo/blob/sdk-57/packages/expo-font/CHANGELOG.md),
+and the other five package changelogs linked in the qualification baseline.
+This accepts a specific Android qualification graph, not a guarantee that all
+future advisories are harmless. The npm audit findings remain recorded and
+require separate security triage; no exclusions or offline settings suppress
+the live Doctor check.
+
+The two explicit qualification profiles use the same development environment,
+APK configuration, Node 22.23.1 and SDK-57 EAS image, differing only in the
+cinematic flag. EAS CLI 23.2.0 and `requireCommit: true` make source provenance
+mandatory for future uploads. Earlier A-06 `EAS_NO_VCS` jobs have no EAS Git
+commit metadata; retain their results but qualify the new named profiles from
+one clean commit. No dependency, renderer, gameplay, identifier, signing, or
+AdMob integration change is part of this decision. Physical validation remains
+pending even after cloud success.
