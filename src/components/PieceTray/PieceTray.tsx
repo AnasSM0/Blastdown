@@ -222,6 +222,7 @@ function TraySlot({
   }
 
   const pan = Gesture.Pan()
+    .withTestId(`tray-drag-${piece.handId}`)
     .runOnJS(true)
     .minDistance(DRAG_ACTIVATION_DISTANCE)
     .onStart((event) => onDragStart?.(piece.handId, { x: event.absoluteX, y: event.absoluteY }))

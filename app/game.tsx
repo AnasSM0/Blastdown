@@ -32,6 +32,7 @@ import {
   useGameController,
   type GameController,
   type GameControllerOptions,
+  type PlacementIntent,
 } from "../src/hooks/useGameController";
 import { useHaptics } from "../src/hooks/useHaptics";
 import { useEffectiveReducedMotion } from "../src/hooks/useEffectiveReducedMotion";
@@ -57,6 +58,7 @@ import { useTheme } from "../src/ui/ThemeProvider";
 
 type DragState = {
   handId: string;
+  intent: PlacementIntent;
   shapeId: string;
   colorId: string;
   startX: number;
@@ -191,11 +193,6 @@ export function GameView({
   const restartTransitionRef = useRef(false);
   const homeTransitionRef = useRef(false);
   const resultsTransitionRef = useRef(false);
-  // Input is locked during a required effect sequence, while a rewarded ad is
-  // in flight, and while paused, so a reward can't overlap a placement or
-  // another reward and no move lands behind the pause menu.
-  const inputLocked = animator.isAnimating || reward.pending || paused;
-
   // Measured gameplay content box; drives a responsive square board that fits
   // both the available width and a height budget. A caller-supplied `boardSize`
   // (test seam) overrides measurement, since onLayout doesn't fire under jest.
@@ -227,15 +224,29 @@ export function GameView({
   const [returning, setReturning] = useState(false);
   const [cellSize, setCellSize] = useState(boardSize ? boardSizeToCell(boardSize) : 0);
 
+  // Only authoritative interaction states block a new action. Presentation
+  // effects intentionally do not participate: their queue can remain active
+  // across later turns. A live drag blocks every new action except its own
+  // move/finalize callbacks.
+  const inputLocked =
+    reward.pending ||
+    paused ||
+    defuseConfirmOpen ||
+    restartConfirmation === "open" ||
+    state.status !== "playing" ||
+    drag !== null;
+
   const boardRef = useRef<View>(null);
   const ghostRef = useRef<DragGhostHandle>(null);
   const boardLayoutRef = useRef<BoardLayout | null>(null);
   const cellSizeRef = useRef(cellSize);
   const lastDragOriginRef = useRef<CellPosition | null>(null);
+  const dragRef = useRef<DragState | null>(null);
+  const dragFinalizedRef = useRef(false);
   // The board's press handler must keep a stable identity: `controller` is a
-  // fresh object every render and `inputLocked` flips on every animation,
-  // pause, and reward transition — depending on either would change the prop on
-  // each of those and re-render all 64 cells for something purely cosmetic.
+  // fresh object every render and `inputLocked` flips on pause, modal, drag,
+  // and reward transitions — depending on either would change the prop on each
+  // of those and re-render all 64 cells for unrelated screen state.
   // Both are read through refs written in an effect, so the handler stays
   // referentially stable while still seeing current values when it runs.
   const controllerRef = useRef(controller);
@@ -326,7 +337,7 @@ export function GameView({
   );
 
   const measureBoard = useCallback(() => {
-    boardRef.current?.measureInWindow((x, y, _width, _height) => {
+    const captureLayout = (x: number, y: number) => {
       const size = cellSizeRef.current;
       if (size <= 0) {
         boardLayoutRef.current = null;
@@ -339,8 +350,16 @@ export function GameView({
         pitch: size + spacing.gridGutter,
         size: BOARD_SIZE,
       };
-    });
-  }, []);
+    };
+    // A fixed board size is the existing isolated-test seam. Jest has no native
+    // window measurement, so anchor that synthetic board at the window origin;
+    // production always takes the measured branch below.
+    if (boardSize !== undefined) {
+      captureLayout(0, 0);
+      return;
+    }
+    boardRef.current?.measureInWindow((x, y, _width, _height) => captureLayout(x, y));
+  }, [boardSize]);
 
   const originForPoint = useCallback((shapeId: string, point: Point): CellPosition | null => {
     const layout = boardLayoutRef.current;
@@ -353,35 +372,47 @@ export function GameView({
 
   const handleDragStart = useCallback(
     (handId: string, point: Point) => {
-      const piece = state.hand.find((candidate) => candidate.handId === handId);
-      if (inputLocked || !piece || cellSizeRef.current <= 0) {
+      const activeController = controllerRef.current;
+      const piece = activeController.state.hand.find((candidate) => candidate.handId === handId);
+      const intent = activeController.createPlacementIntent(handId);
+      if (
+        inputLocked ||
+        dragRef.current !== null ||
+        !piece ||
+        !intent ||
+        cellSizeRef.current <= 0
+      ) {
         return;
       }
-      controller.clearSelection();
+      activeController.clearSelection();
       setPreviewOrigin(null);
       measureBoard();
       lastDragOriginRef.current = null;
       setDragOrigin(null);
-      setDrag({
+      dragFinalizedRef.current = false;
+      const nextDrag: DragState = {
         handId,
+        intent,
         shapeId: piece.shapeId,
         colorId: piece.colorId,
         startX: point.x,
         startY: point.y,
-      });
+      };
+      dragRef.current = nextDrag;
+      setDrag(nextDrag);
       haptics.selection();
     },
-    [controller, haptics, inputLocked, measureBoard, state.hand],
+    [haptics, inputLocked, measureBoard],
   );
 
   const handleDragMove = useCallback(
     (handId: string, point: Point) => {
       ghostRef.current?.moveTo(point.x, point.y);
-      const piece = state.hand.find((candidate) => candidate.handId === handId);
-      if (!piece) {
+      const activeDrag = dragRef.current;
+      if (!activeDrag || activeDrag.handId !== handId || dragFinalizedRef.current) {
         return;
       }
-      const origin = originForPoint(piece.shapeId, point);
+      const origin = originForPoint(activeDrag.shapeId, point);
       const last = lastDragOriginRef.current;
       const changed =
         (origin === null) !== (last === null) ||
@@ -393,10 +424,12 @@ export function GameView({
         setDragOrigin(origin);
       }
     },
-    [originForPoint, state.hand],
+    [originForPoint],
   );
 
   const clearDrag = useCallback(() => {
+    dragRef.current = null;
+    dragFinalizedRef.current = false;
     setDrag(null);
     setDragOrigin(null);
     setReturning(false);
@@ -405,11 +438,16 @@ export function GameView({
 
   const handleDragEnd = useCallback(
     (handId: string, point: Point) => {
-      const piece = state.hand.find((candidate) => candidate.handId === handId);
-      const origin = piece ? originForPoint(piece.shapeId, point) : null;
-      // A duplicated finalize is a no-op: the piece is already gone from the
-      // hand, so the domain rejects the second attempt.
-      const placed = origin ? controller.place(handId, origin) : false;
+      const activeDrag = dragRef.current;
+      // Native gesture completion can be delivered twice around cancellation /
+      // unmount edges. Consume the logical finalize synchronously so the second
+      // delivery produces neither a turn nor duplicate imperative feedback.
+      if (!activeDrag || activeDrag.handId !== handId || dragFinalizedRef.current) {
+        return;
+      }
+      dragFinalizedRef.current = true;
+      const origin = originForPoint(activeDrag.shapeId, point);
+      const placed = origin ? controllerRef.current.place(activeDrag.intent, origin) : false;
       if (placed) {
         haptics.success();
         clearDrag();
@@ -425,7 +463,7 @@ export function GameView({
         }
       }
     },
-    [audio, clearDrag, controller, haptics, originForPoint, state.hand, track],
+    [audio, clearDrag, haptics, originForPoint, track],
   );
 
   const handleFreeze = useCallback(() => {
@@ -494,8 +532,8 @@ export function GameView({
           haptics.success();
           audio.playSfx("defuse");
           // A rewarded defuse advances no turn, so the turn-keyed animator never
-          // sees it — play it explicitly. It holds no input lock: the board is
-          // already updated and must stay usable.
+          // sees it — play it explicitly. The board is already updated and stays
+          // usable while this presentation runs.
           animator.playCue("rewardedDefuse", targetCells);
         }
       })

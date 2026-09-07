@@ -1912,3 +1912,26 @@ commit metadata; retain their results but qualify the new named profiles from
 one clean commit. No dependency, renderer, gameplay, identifier, signing, or
 AdMob integration change is part of this decision. Physical validation remains
 pending even after cloud success.
+
+---
+
+## 2026-09-08 — B-01 made effect playback nonblocking and placement commits synchronous
+
+Required presentation sequences remain observable and continue through the
+existing bounded queue, but they no longer participate in gameplay input
+eligibility. Input is blocked only by authoritative screen/action states:
+Pause, a confirmation modal, Game Over/results transition, a pending rewarded
+flow, an unfinished drag, or the synchronous domain transaction itself.
+
+Placement handlers now mirror the authoritative state in refs before scheduling
+React updates. A drag captures an immutable intent containing session generation,
+state revision, and hand-piece identity; a stale generation/revision/piece is
+rejected synchronously. The transaction latch is released immediately after the
+pure domain result is committed, so a new legal action needs no debounce or
+animation wait. Duplicate native gesture finalization is also consumed once at
+the screen boundary to avoid duplicate imperative feedback.
+
+The effect cap remains six, and effect IDs, priority, renderer contracts,
+independent clocks, durations, and session cleanup are unchanged. Automated
+tests prove consecutive-turn admission and fallback/cinematic contract parity;
+physical Android responsiveness and smoothness remain `A-DEVICE-PENDING`.

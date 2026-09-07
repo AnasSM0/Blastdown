@@ -85,6 +85,7 @@ function controllerStub(seed: string): GameController {
     previewAt: jest.fn(() => null),
     placeAt: jest.fn(() => false),
     previewFor: jest.fn(() => null),
+    createPlacementIntent: jest.fn(() => null),
     place: jest.fn(() => false),
     activateFreeze: jest.fn(() => false),
     defuse: jest.fn(() => false),

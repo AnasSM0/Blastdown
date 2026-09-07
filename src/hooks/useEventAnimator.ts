@@ -8,7 +8,7 @@ import {
   drawOrder,
   createEffectQueue,
   cueEffectId,
-  holdsInputLock,
+  hasRequiredSequence,
   priorityFor,
   resetSession,
   retireEffect,
@@ -40,7 +40,8 @@ type UseEventAnimatorArgs = {
 };
 
 export type EventAnimator = {
-  /** True while any admitted effect holds the input lock. */
+  /** True while a required presentation sequence is active. Observational only;
+   * gameplay input must never depend on it. */
   isAnimating: boolean;
   /** The current run generation. Bumped by `reset`, carried by every effect id.
    *  Diagnostics and tests read it; renderers have no business with it. */
@@ -341,7 +342,7 @@ export function useEventAnimator({
   const sequences = useMemo(() => drawOrder(queue), [queue]);
 
   return {
-    isAnimating: holdsInputLock(queue),
+    isAnimating: hasRequiredSequence(queue),
     sessionId: queue.sessionId,
     effects: queue.effects,
     /** Every live effect in drawing order. Both renderers consume this. */
@@ -377,8 +378,8 @@ type WatchdogContext = {
  *  however long it waits.
  *
  *  Waiting forever is not available either: the React Native fallback renderer
- *  never reports draws at all, and a required sequence holds the input lock, so
- *  its effects would freeze the board.
+ *  never reports draws at all, so a required sequence would remain mounted
+ *  indefinitely.
  *
  *  The two cases are distinguishable. A renderer that has EVER reported a draw
  *  is participating, so the watchdog waits again rather than cutting the effect
@@ -386,7 +387,7 @@ type WatchdogContext = {
  *  retire on schedule.
  *
  *  Re-arming is bounded: a participating renderer whose board unmounts mid
- *  sequence must not hold the input lock indefinitely.
+ *  sequence must not keep stale presentation mounted indefinitely.
  *
  *  Module level rather than a `useCallback` because it recurses, and a callback
  *  cannot reference its own identity. */
@@ -438,8 +439,8 @@ const RETIRE_GRACE_MS = 400;
 
 /** How many times the watchdog will wait again for a participating renderer
  *  that has not yet drawn an effect. Bounded so a board unmounted mid-sequence
- *  cannot hold the input lock forever; generous enough that an ordinary stall
- *  never truncates an effect. */
+ *  cannot retain it forever; generous enough that an ordinary stall never
+ *  truncates an effect. */
 const MAX_WATCHDOG_EXTENSIONS = 3;
 
 const PRIORITY_ORDER = { critical: 3, high: 2, standard: 1 } as const;

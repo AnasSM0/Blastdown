@@ -123,6 +123,90 @@ describe("useGameController", () => {
     expect(result.current.state).toBe(afterFirst);
   });
 
+  it("rejects a synchronous duplicate before React rerenders", async () => {
+    const { result } = await renderHook(() => useGameController(options()));
+    const handId = result.current.state.hand[0].handId;
+
+    let first = false;
+    let duplicate = true;
+    await act(() => {
+      first = result.current.place(handId, { row: 0, column: 0 });
+      duplicate = result.current.place(handId, { row: 0, column: 0 });
+    });
+
+    expect(first).toBe(true);
+    expect(duplicate).toBe(false);
+    expect(result.current.state.turn).toBe(1);
+    expect(result.current.state.piecesPlaced).toBe(1);
+  });
+
+  it("rejects a duplicated gesture intent and stale hand identity", async () => {
+    const { result } = await renderHook(() => useGameController(options()));
+    const handId = result.current.state.hand[0].handId;
+    const intent = result.current.createPlacementIntent(handId);
+    expect(intent).not.toBeNull();
+
+    let first = false;
+    let duplicate = true;
+    await act(() => {
+      first = result.current.place(intent!, { row: 0, column: 0 });
+      duplicate = result.current.place(intent!, { row: 2, column: 2 });
+    });
+
+    expect(first).toBe(true);
+    expect(duplicate).toBe(false);
+    expect(result.current.state.turn).toBe(1);
+    expect(result.current.state.hand.some((piece) => piece.handId === handId)).toBe(false);
+  });
+
+  it("rejects a previous-session gesture after restart", async () => {
+    const { result } = await renderHook(() => useGameController(options()));
+    const intent = result.current.createPlacementIntent(result.current.state.hand[0].handId);
+    expect(intent).not.toBeNull();
+
+    let staleAccepted = true;
+    let freshAccepted = false;
+    await act(() => {
+      result.current.restart();
+      staleAccepted = result.current.place(intent!, { row: 0, column: 0 });
+      // Restart intentionally reuses slot-shaped hand ids; generation is what
+      // distinguishes this fresh logical piece from the stale gesture above.
+      const freshIntent = result.current.createPlacementIntent(intent!.handId);
+      freshAccepted =
+        freshIntent !== null && result.current.place(freshIntent, { row: 0, column: 0 });
+    });
+
+    expect(staleAccepted).toBe(false);
+    expect(freshAccepted).toBe(true);
+    expect(result.current.state.seed).toBe("restart-1");
+    expect(result.current.state.turn).toBe(1);
+    expect(result.current.state.piecesPlaced).toBe(1);
+  });
+
+  it("accepts the next legitimate placement synchronously with no delay", async () => {
+    const initialState: GameState = {
+      ...createInitialGameState("fast-follow", NOW),
+      hand: [
+        { handId: "first", shapeId: "single", colorId: "cyan" },
+        { handId: "second", shapeId: "single", colorId: "purple" },
+      ],
+    };
+    const { result } = await renderHook(() => useGameController({ ...options(), initialState }));
+
+    let first = false;
+    let second = false;
+    await act(() => {
+      first = result.current.place("first", { row: 0, column: 0 });
+      const nextIntent = result.current.createPlacementIntent("second");
+      second = nextIntent !== null && result.current.place(nextIntent, { row: 2, column: 2 });
+    });
+
+    expect(first).toBe(true);
+    expect(second).toBe(true);
+    expect(result.current.state.turn).toBe(2);
+    expect(result.current.state.piecesPlaced).toBe(2);
+  });
+
   it("place rejects an out-of-bounds origin without mutating state", async () => {
     const { result } = await renderHook(() => useGameController(options()));
     const handId = result.current.state.hand[0].handId;

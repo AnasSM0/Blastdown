@@ -3,7 +3,7 @@ import {
   assignClockSlots,
   createEffectQueue,
   cueEffectId,
-  holdsInputLock,
+  hasRequiredSequence,
   MAX_LIVE_EFFECTS,
   priorityFor,
   resetSession,
@@ -291,34 +291,32 @@ describe("cleanup happens exactly once, and only for this run", () => {
   });
 });
 
-describe("the input lock follows the queue", () => {
-  it("holds while any required sequence is live", () => {
+describe("required-sequence observation follows the queue", () => {
+  it("reports while any required sequence is live", () => {
     const queue = admitEffect(createEffectQueue(), effect("clear", { plan: clearPlan }));
 
-    expect(holdsInputLock(queue)).toBe(true);
+    expect(hasRequiredSequence(queue)).toBe(true);
   });
 
-  it("does not hold for a cue, which leaves the board usable", () => {
+  it("does not report a cue as a required turn sequence", () => {
     const queue = admitEffect(createEffectQueue(), effect("cue", { plan: cuePlan }));
 
-    expect(holdsInputLock(queue)).toBe(false);
+    expect(hasRequiredSequence(queue)).toBe(false);
   });
 
-  it("holds across an effect that has not been drawn yet", () => {
-    // Otherwise a stalled frame would unlock input and immediately re-lock it,
-    // which is felt as a dropped tap.
+  it("reports an effect that has not been drawn yet", () => {
     const queue = admitEffect(createEffectQueue(), effect("clear", { plan: clearPlan }));
 
     expect(queue.effects[0].startedAt).toBeNull();
-    expect(holdsInputLock(queue)).toBe(true);
+    expect(hasRequiredSequence(queue)).toBe(true);
   });
 
-  it("releases once everything has retired", () => {
+  it("clears once everything has retired", () => {
     let queue = admitEffect(createEffectQueue(), effect("clear", { plan: clearPlan }));
     queue = startEffect(queue, "clear", 0);
     queue = retireFinished(queue, 1000);
 
-    expect(holdsInputLock(queue)).toBe(false);
+    expect(hasRequiredSequence(queue)).toBe(false);
   });
 });
 

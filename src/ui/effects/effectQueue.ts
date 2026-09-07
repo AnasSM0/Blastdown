@@ -259,13 +259,11 @@ export function resetSession(queue: EffectQueue): EffectQueue {
   return { effects: [], sessionId: queue.sessionId + 1, nextSequence: 1 };
 }
 
-/** True while any admitted effect still holds the input lock.
+/** True while an admitted effect has a required presentation sequence.
  *
- *  Only effects whose plan declares a required sequence lock input; commentary
- *  and cues never do. An effect that has not started yet counts as holding the
- *  lock, so input stays held across a stalled frame rather than unlocking and
- *  then re-locking. */
-export function holdsInputLock(queue: EffectQueue): boolean {
+ *  This is observational state for diagnostics/harnesses, never a gameplay
+ *  input gate. An effect that has not started yet is still active. */
+export function hasRequiredSequence(queue: EffectQueue): boolean {
   return queue.effects.some((effect) => effect.plan.hasRequiredSequence);
 }
 

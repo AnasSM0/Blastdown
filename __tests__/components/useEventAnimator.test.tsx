@@ -24,12 +24,14 @@ const PLAIN_TURN: GameEvent[] = [
 
 describe("useEventAnimator", () => {
   beforeEach(() => jest.useFakeTimers());
-  afterEach(() => {
-    jest.runOnlyPendingTimers();
+  afterEach(async () => {
+    await act(async () => {
+      jest.runOnlyPendingTimers();
+    });
     jest.useRealTimers();
   });
 
-  it("locks input for a required sequence, then unlocks after its duration", async () => {
+  it("reports a required sequence as active until its duration ends", async () => {
     const { result, rerender } = await renderHook(
       (props: { turn: number; events: GameEvent[]; reducedMotion: boolean }) =>
         useEventAnimator({ ...props, grid: EMPTY_GRID }),
@@ -133,7 +135,7 @@ describe("useEventAnimator", () => {
 
     expect(result.current.effects).toHaveLength(2);
     expect(result.current.effects.some((effect) => effect.plan.cue === "revive")).toBe(true);
-    // The clear still holds the input lock; the cue never did.
+    // The clear remains the required turn sequence; the cue is independent.
     expect(result.current.isAnimating).toBe(true);
     // A rewarded outcome outranks a clear, so the single-plan renderer shows it.
     expect(result.current.plan?.cue).toBe("revive");
@@ -154,6 +156,28 @@ describe("useEventAnimator", () => {
 
     // The old hook called stop() here, wiping the cue mid-play.
     expect(result.current.effects).toHaveLength(2);
+  });
+
+  it("keeps an earlier turn's progress when a consecutive turn is admitted", async () => {
+    const { result, rerender } = await renderHook(
+      (props: { turn: number; events: GameEvent[]; reducedMotion: boolean }) =>
+        useEventAnimator({ ...props, grid: EMPTY_GRID }),
+      { initialProps: { turn: 0, events: [] as GameEvent[], reducedMotion: false } },
+    );
+    await act(async () => {
+      rerender({ turn: 1, events: CLEAR_TURN, reducedMotion: false });
+    });
+    const firstId = result.current.effects[0].id;
+    await act(async () => {
+      result.current.startedDrawing(firstId, 125);
+    });
+
+    await act(async () => {
+      rerender({ turn: 2, events: CLEAR_TURN, reducedMotion: false });
+    });
+
+    expect(result.current.effects).toHaveLength(2);
+    expect(result.current.effects.find((effect) => effect.id === firstId)?.startedAt).toBe(125);
   });
 
   it("waits for a slow renderer instead of eating the effect", async () => {
@@ -206,7 +230,7 @@ describe("useEventAnimator", () => {
   it("still retires for a renderer that never reports a draw", async () => {
     // The other half, and why the watchdog exists at all. The React Native
     // fallback never calls startedDrawing, so waiting forever would leave a
-    // required sequence holding the input lock and freeze the board.
+    // required sequence mounted indefinitely.
     const { result, rerender } = await renderHook(
       (props: { turn: number; events: GameEvent[]; reducedMotion: boolean }) =>
         useEventAnimator({ ...props, grid: EMPTY_GRID }),
@@ -226,7 +250,7 @@ describe("useEventAnimator", () => {
   });
 
   it("gives up on a participating renderer that stops drawing", async () => {
-    // A board unmounted mid-sequence must not hold the input lock forever, so
+    // A board unmounted mid-sequence must not retain stale presentation forever, so
     // the waiting is bounded rather than open-ended.
     const { result, rerender } = await renderHook(
       (props: { turn: number; events: GameEvent[]; reducedMotion: boolean }) =>
