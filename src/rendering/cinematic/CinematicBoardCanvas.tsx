@@ -7,8 +7,9 @@ import { BoardFrame } from "./layers/BoardFrame";
 import { EffectsLayer } from "./layers/EffectsLayer";
 import { NumeralsLayer } from "./layers/NumeralsLayer";
 import { PreviewLayer } from "./layers/PreviewLayer";
+import { PreClearLayer } from "./layers/PreClearLayer";
 import { RubbleLayer } from "./layers/RubbleLayer";
-import type { BoardScene, PreviewScene } from "./types";
+import type { BoardScene, PreClearScene, PreviewScene } from "./types";
 
 /** The single canvas.
  *
@@ -35,6 +36,8 @@ import type { BoardScene, PreviewScene } from "./types";
 export function CinematicBoardCanvas({
   scene,
   preview,
+  preClear,
+  preClearOpacity,
   sequences,
   shakeScene,
   elapsed,
@@ -44,6 +47,9 @@ export function CinematicBoardCanvas({
   scene: BoardScene;
   /** Separate from the scene so a drag does not invalidate the board. */
   preview: PreviewScene;
+  /** Predicted full-line lanes, separate from static board and ghost. */
+  preClear: PreClearScene;
+  preClearOpacity: number | SharedValue<number>;
   /** Every live effect, bottom-first. Each draws through its own child, which
    *  owns its own clock — a hook cannot be called in a loop, so per-effect
    *  independence has to come from a component per effect. */
@@ -95,6 +101,7 @@ export function CinematicBoardCanvas({
         <BoardFrame geometry={geometry} palette={palette} />
         <RubbleLayer rubble={scene.rubble} geometry={geometry} palette={palette} />
         <BlocksLayer blocks={scene.blocks} geometry={geometry} palette={palette} />
+        <PreClearLayer highlights={preClear} geometry={geometry} opacity={preClearOpacity} />
         <PreviewLayer preview={preview} geometry={geometry} />
         {/* One child per live effect, keyed by the effect's own id. Keying by
             id is what makes them independent: a retiring effect unmounts only

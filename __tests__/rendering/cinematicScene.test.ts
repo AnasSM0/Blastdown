@@ -174,6 +174,7 @@ describe("the placement preview", () => {
           { row: 1, column: 2 },
         ],
         conflictCells: [{ row: 1, column: 2 }],
+        clear: { rows: [], columns: [], cells: [], intersections: [] },
       },
       geometry,
       theme,
@@ -186,12 +187,22 @@ describe("the placement preview", () => {
 
   it("gives an unplaceable ghost a dashed edge, not just a different colour", () => {
     const invalid = buildPreviewCells(
-      { valid: false, cells: [{ row: 0, column: 0 }], conflictCells: [] },
+      {
+        valid: false,
+        cells: [{ row: 0, column: 0 }],
+        conflictCells: [],
+        clear: { rows: [], columns: [], cells: [], intersections: [] },
+      },
       geometry,
       theme,
     )[0];
     const valid = buildPreviewCells(
-      { valid: true, cells: [{ row: 0, column: 0 }], conflictCells: [] },
+      {
+        valid: true,
+        cells: [{ row: 0, column: 0 }],
+        conflictCells: [],
+        clear: { rows: [], columns: [], cells: [], intersections: [] },
+      },
       geometry,
       theme,
     )[0];
@@ -215,7 +226,12 @@ describe("the placement preview", () => {
 
   it("draws nothing before the board has been measured", () => {
     const cells = buildPreviewCells(
-      { valid: true, cells: [{ row: 0, column: 0 }], conflictCells: [] },
+      {
+        valid: true,
+        cells: [{ row: 0, column: 0 }],
+        conflictCells: [],
+        clear: { rows: [], columns: [], cells: [], intersections: [] },
+      },
       sceneGeometry(0, 8),
       theme,
     );

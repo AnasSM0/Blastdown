@@ -183,6 +183,25 @@ describe("useGameController", () => {
     expect(result.current.state.piecesPlaced).toBe(1);
   });
 
+  it("invalidates a captured prediction after a turn or session change", async () => {
+    const { result } = await renderHook(() => useGameController(options()));
+    const firstId = result.current.state.hand[0].handId;
+    const secondId = result.current.state.hand[1].handId;
+    const firstIntent = result.current.createPlacementIntent(firstId);
+    const secondIntent = result.current.createPlacementIntent(secondId);
+    expect(firstIntent).not.toBeNull();
+    expect(secondIntent).not.toBeNull();
+    expect(result.current.previewFor(secondIntent!, { row: 2, column: 2 })).not.toBeNull();
+
+    await act(() => result.current.place(firstIntent!, { row: 0, column: 0 }));
+    expect(result.current.previewFor(secondIntent!, { row: 2, column: 2 })).toBeNull();
+
+    const beforeRestart = result.current.createPlacementIntent(secondId);
+    expect(beforeRestart).not.toBeNull();
+    await act(() => result.current.restart());
+    expect(result.current.previewFor(beforeRestart!, { row: 2, column: 2 })).toBeNull();
+  });
+
   it("accepts the next legitimate placement synchronously with no delay", async () => {
     const initialState: GameState = {
       ...createInitialGameState("fast-follow", NOW),

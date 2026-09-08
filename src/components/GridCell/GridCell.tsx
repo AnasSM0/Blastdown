@@ -41,6 +41,7 @@ type GridCellProps = {
    *  bound closure) lets the board pass one stable handler to all 64 cells, so
    *  a re-render of the board doesn't hand every cell a new prop. */
   onPress?: (position: CellPosition) => void;
+  onPreviewChange?: (position: CellPosition | null) => void;
   /** Changes each turn a piece lands on this cell, triggering a brief settle
    *  "snap" (docs/ANIMATION_SPEC.md "Placement feedback"). Undefined = no
    *  recent placement here. */
@@ -81,6 +82,7 @@ function GridCellImpl({
   critical,
   contourMask,
   onPress,
+  onPreviewChange,
   flashNonce,
   reducedMotion,
   placementState,
@@ -92,6 +94,11 @@ function GridCellImpl({
   const [snap] = useState(() => new Animated.Value(1));
   const lastFlash = useRef<number | undefined>(undefined);
   const handlePress = useCallback(() => onPress?.({ row, column }), [onPress, row, column]);
+  const handlePressIn = useCallback(
+    () => onPreviewChange?.({ row, column }),
+    [onPreviewChange, row, column],
+  );
+  const handlePressOut = useCallback(() => onPreviewChange?.(null), [onPreviewChange]);
 
   useEffect(() => {
     if (flashNonce === undefined || flashNonce === lastFlash.current) {
@@ -154,6 +161,8 @@ function GridCellImpl({
       key={motionKey(reducedMotion)}
       style={[styles.cell, base, visual, cellTransform]}
       onPress={onPress ? handlePress : undefined}
+      onPressIn={onPreviewChange ? handlePressIn : undefined}
+      onPressOut={onPreviewChange ? handlePressOut : undefined}
       disabled={onPress === undefined}
       testID={`cell-${row}-${column}`}
       accessibilityLabel={cellLabel(cell, row, column, { remainingTurns, critical, frozen })}

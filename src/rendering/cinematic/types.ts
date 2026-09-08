@@ -2,6 +2,7 @@ import type { BadgeVisual } from "../../components/TimerBadge/timerBadgeStyle";
 import type { RubbleGeometry } from "../../components/RubbleSurface/rubbleGeometry";
 import type { BlockSurfaceStyle } from "../../ui/blockSurface";
 import type { TimerVisualState } from "../../ui/timerStates";
+import type { PreClearVisual } from "../../ui/preClearPreview";
 
 /** The renderer contract.
  *
@@ -83,6 +84,17 @@ export type ScenePreview = {
   state: ScenePreviewState;
   surface: BlockSurfaceStyle;
 };
+
+/** One full predicted clear lane. A row and column are separate translucent
+ * draws, making their intersection naturally stronger. */
+export type ScenePreClearHighlight = {
+  orientation: "row" | "column";
+  index: number;
+  rect: SceneRect;
+  visual: PreClearVisual;
+};
+
+export type PreClearScene = readonly ScenePreClearHighlight[];
 
 /** A timer countdown drawn on its piece's badge cell.
  *

@@ -6,7 +6,8 @@ import type { PlacementPreview } from "../../domain/selectors";
 import { blockSurface, type BlockVariant } from "../../ui/blockSurface";
 import { blockColor, type ThemePalette } from "../../ui/themes";
 import { getTimerVisualState } from "../../ui/timerStates";
-import { badgeRect, cellRect } from "./geometry";
+import { preClearVisual } from "../../ui/preClearPreview";
+import { badgeRect, cellRect, laneRect } from "./geometry";
 import type {
   BoardScene,
   BoardSceneInput,
@@ -15,6 +16,7 @@ import type {
   SceneNumeral,
   ScenePreview,
   ScenePreviewState,
+  ScenePreClearHighlight,
   SceneRubble,
 } from "./types";
 
@@ -192,3 +194,33 @@ export function buildPreviewCells(
 /** Shared empty result, so "no piece held" — the common case — allocates
  *  nothing and keeps a stable identity the memoized preview layer can skip. */
 const EMPTY_PREVIEW: ScenePreview[] = [];
+
+/** Full lanes predicted by the pure domain preview. Kept separate from both the
+ * static board and the placement ghost so crossing a logical anchor rebuilds
+ * only these bounded arrays (at most eight rows plus eight columns). */
+export function buildPreClearHighlights(
+  preview: PlacementPreview | null | undefined,
+  geometry: SceneGeometry,
+  theme: ThemePalette,
+): readonly ScenePreClearHighlight[] {
+  if (!preview?.valid || geometry.cellSize <= 0) {
+    return EMPTY_PRE_CLEAR;
+  }
+  const visual = preClearVisual(theme);
+  return [
+    ...preview.clear.rows.map((index): ScenePreClearHighlight => ({
+      orientation: "row",
+      index,
+      rect: laneRect(geometry, "row", index),
+      visual,
+    })),
+    ...preview.clear.columns.map((index): ScenePreClearHighlight => ({
+      orientation: "column",
+      index,
+      rect: laneRect(geometry, "column", index),
+      visual,
+    })),
+  ];
+}
+
+const EMPTY_PRE_CLEAR: readonly ScenePreClearHighlight[] = [];

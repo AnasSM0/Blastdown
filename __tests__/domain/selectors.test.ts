@@ -143,6 +143,11 @@ describe("getPlacementPreview", () => {
   it("returns an invalid empty preview for an unknown shape", () => {
     const state = craftState({});
     const preview = getPlacementPreview(state, "not-a-shape", { row: 0, column: 0 });
-    expect(preview).toEqual({ valid: false, cells: [], conflictCells: [] });
+    expect(preview).toEqual({
+      valid: false,
+      cells: [],
+      conflictCells: [],
+      clear: { rows: [], columns: [], cells: [], intersections: [] },
+    });
   });
 });

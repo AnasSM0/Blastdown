@@ -128,6 +128,27 @@ describe("both renderers expose the same board to assistive technology", () => {
 });
 
 describe("both renderers offer the same press surface", () => {
+  it("reports the same pre-clear anchor lifecycle", async () => {
+    for (const Board of [GameBoard, CinematicBoard]) {
+      const anchors: string[] = [];
+      const view = await render(
+        <Board
+          {...props({
+            onCellPreviewChange: (position) =>
+              anchors.push(position ? `${position.row},${position.column}` : "none"),
+          })}
+        />,
+      );
+
+      const cell = view.getByTestId("cell-5-6");
+      await fireEvent(cell, "pressIn");
+      await fireEvent(cell, "pressOut");
+
+      expect(anchors).toEqual(["5,6", "none"]);
+      await view.unmount();
+    }
+  });
+
   it("reports the same cell for a press, from either renderer", async () => {
     for (const Board of [GameBoard, CinematicBoard]) {
       const pressed: string[] = [];

@@ -6,6 +6,7 @@ import {
   Easing,
   cancelAnimation,
   useSharedValue,
+  withRepeat,
   withTiming,
   type SharedValue,
 } from "react-native-reanimated";
@@ -15,12 +16,17 @@ import { CinematicBoardCanvas } from "../../rendering/cinematic/CinematicBoardCa
 import { buildEffectScene, type EffectScene } from "../../rendering/cinematic/effects/effectScene";
 import { sceneGeometry } from "../../rendering/cinematic/geometry";
 import { cinematicPalette } from "../../rendering/cinematic/palette";
-import { buildBoardScene, buildPreviewCells } from "../../rendering/cinematic/scene";
+import {
+  buildBoardScene,
+  buildPreClearHighlights,
+  buildPreviewCells,
+} from "../../rendering/cinematic/scene";
 import { radius } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import { getTimerVisualState } from "../../ui/timerStates";
 import { recordClockLeases } from "../../ui/effects/effectDiagnostics";
 import { assignClockSlots } from "../../ui/effects/effectQueue";
+import { PRE_CLEAR_PULSE_MIN, PRE_CLEAR_PULSE_MS } from "../../ui/preClearPreview";
 import { cellLabel, placementHintFor } from "../GridCell/cellLabel";
 import type { GameBoardProps } from "../GameBoard/boardProps";
 
@@ -64,6 +70,7 @@ const TouchCell = memo(function TouchCell({
   label,
   hint,
   onPress,
+  onPreviewChange,
 }: {
   row: number;
   column: number;
@@ -73,13 +80,21 @@ const TouchCell = memo(function TouchCell({
   label: string;
   hint: string | undefined;
   onPress: ((position: { row: number; column: number }) => void) | undefined;
+  onPreviewChange: ((position: { row: number; column: number } | null) => void) | undefined;
 }) {
   const handlePress = useCallback(() => onPress?.({ row, column }), [onPress, row, column]);
+  const handlePressIn = useCallback(
+    () => onPreviewChange?.({ row, column }),
+    [onPreviewChange, row, column],
+  );
+  const handlePressOut = useCallback(() => onPreviewChange?.(null), [onPreviewChange]);
 
   return (
     <Pressable
       style={[styles.touch, { left, top, width: size, height: size }]}
       onPress={onPress ? handlePress : undefined}
+      onPressIn={onPreviewChange ? handlePressIn : undefined}
+      onPressOut={onPreviewChange ? handlePressOut : undefined}
       disabled={onPress === undefined}
       testID={`cell-${row}-${column}`}
       accessibilityLabel={label}
@@ -123,6 +138,7 @@ function CinematicBoardImpl(
     boardSize,
     preview,
     onCellPress,
+    onCellPreviewChange,
     onCellSizeChange,
     highlightPieceId,
     reducedMotion: reducedMotionProp,
@@ -182,6 +198,31 @@ function CinematicBoardImpl(
     () => buildPreviewCells(preview, geometry, theme),
     [preview, geometry, theme],
   );
+  const preClearHighlights = useMemo(
+    () => buildPreClearHighlights(preview, geometry, theme),
+    [preview, geometry, theme],
+  );
+  const preClearPulse = useSharedValue(1);
+
+  useEffect(() => {
+    cancelAnimation(preClearPulse);
+    preClearPulse.value = 1;
+    if (preClearHighlights.length === 0 || reducedMotion) {
+      return;
+    }
+    preClearPulse.value = withRepeat(
+      withTiming(PRE_CLEAR_PULSE_MIN, {
+        duration: PRE_CLEAR_PULSE_MS,
+        easing: Easing.inOut(Easing.ease),
+      }),
+      -1,
+      true,
+    );
+    return () => {
+      cancelAnimation(preClearPulse);
+      preClearPulse.value = 1;
+    };
+  }, [preClearHighlights, preClearPulse, reducedMotion]);
 
   const { cellSize, pitch, contentInset } = geometry;
 
@@ -370,6 +411,8 @@ function CinematicBoardImpl(
         <CinematicBoardCanvas
           scene={scene}
           preview={previewCells}
+          preClear={preClearHighlights}
+          preClearOpacity={reducedMotion ? 1 : preClearPulse}
           sequences={timed}
           shakeScene={shakeScene}
           elapsed={shakeClock}
@@ -404,6 +447,7 @@ function CinematicBoardImpl(
                     placementHints?.get(`${row},${column}`),
                   )}
                   onPress={onCellPress}
+                  onPreviewChange={onCellPreviewChange}
                 />
               );
             }),

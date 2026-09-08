@@ -1935,3 +1935,25 @@ The effect cap remains six, and effect IDs, priority, renderer contracts,
 independent clocks, durations, and session cleanup are unchanged. Automated
 tests prove consecutive-turn admission and fallback/cinematic contract parity;
 physical Android responsiveness and smoothness remain `A-DEVICE-PENDING`.
+
+---
+
+## 2026-09-08 — B-02 uses one pure pre-clear prediction contract
+
+Pre-clear presentation is derived from the exact hand identity, authoritative
+GameState, and candidate anchor. The selector delegates legality to
+`isValidPlacement`, applies the shape only to a cloned grid, and delegates line
+detection to `detectCompletedLines`; it does not dispatch a turn, create events,
+advance timers/RNG, or mutate score/state. Its shared result identifies completed
+rows, columns, their deduplicated cell union, and intersections.
+
+Both board renderers consume that same result. They draw at most eight row lanes
+and eight column lanes with one shared pulse, so intersections strengthen by
+ordinary translucent overlap and no per-cell animation graph is introduced.
+Reduced Motion uses the same static treatment. Prediction updates only when the
+logical anchor changes and is discarded on invalid/stale identity, press end,
+gesture cancellation, drop, placement, restart, or session replacement. The
+committed effect queue remains the sole owner of post-placement celebration;
+gameplay, scoring, audio, haptics, and the default-OFF cinematic flag are
+unchanged. Physical Android latency and visual acceptance remain
+`A-DEVICE-PENDING`.

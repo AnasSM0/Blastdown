@@ -266,7 +266,7 @@ export function GameView({
       : { cells: [] as CellPosition[], nonce: 0 };
   }, [controller.lastEvents, state.turn]);
 
-  const dragPreview = drag && dragOrigin ? controller.previewFor(drag.handId, dragOrigin) : null;
+  const dragPreview = drag && dragOrigin ? controller.previewFor(drag.intent, dragOrigin) : null;
   const tapPreview = previewOrigin ? controller.previewAt(previewOrigin) : null;
   const preview = dragPreview ?? tapPreview;
 
@@ -335,6 +335,15 @@ export function GameView({
     },
     [audio, haptics, track],
   );
+
+  const handleCellPreviewChange = useCallback((position: CellPosition | null) => {
+    const activeController = controllerRef.current;
+    if (position === null || inputLockedRef.current || activeController.selectedHandId === null) {
+      setPreviewOrigin(null);
+      return;
+    }
+    setPreviewOrigin(position);
+  }, []);
 
   const measureBoard = useCallback(() => {
     const captureLayout = (x: number, y: number) => {
@@ -447,6 +456,11 @@ export function GameView({
       }
       dragFinalizedRef.current = true;
       const origin = originForPoint(activeDrag.shapeId, point);
+      // The pre-clear state ends with the gesture. Any following clear visuals
+      // belong to the committed effect system, including while a rejected
+      // piece animates back to its tray.
+      lastDragOriginRef.current = null;
+      setDragOrigin(null);
       const placed = origin ? controllerRef.current.place(activeDrag.intent, origin) : false;
       if (placed) {
         haptics.success();
@@ -464,6 +478,18 @@ export function GameView({
       }
     },
     [audio, clearDrag, haptics, originForPoint, track],
+  );
+
+  const handleDragCancel = useCallback(
+    (handId: string) => {
+      const activeDrag = dragRef.current;
+      if (!activeDrag || activeDrag.handId !== handId || dragFinalizedRef.current) {
+        return;
+      }
+      dragFinalizedRef.current = true;
+      clearDrag();
+    },
+    [clearDrag],
   );
 
   const handleFreeze = useCallback(() => {
@@ -683,6 +709,7 @@ export function GameView({
                   boardSize={boardSide}
                   preview={preview}
                   onCellPress={handleCellPress}
+                  onCellPreviewChange={handleCellPreviewChange}
                   onCellSizeChange={handleCellSizeChange}
                   placedCells={placement.cells}
                   placementNonce={placement.nonce}
@@ -722,6 +749,7 @@ export function GameView({
               onDragStart={handleDragStart}
               onDragMove={handleDragMove}
               onDragEnd={handleDragEnd}
+              onDragCancel={handleDragCancel}
               draggingHandId={drag?.handId ?? null}
               reducedMotion={reducedMotion}
             />

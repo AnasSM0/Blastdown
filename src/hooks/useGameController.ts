@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import type { GameState } from "../domain/gameTypes";
 import type { GameEvent } from "../domain/events";
@@ -10,7 +10,7 @@ import {
   createInitialGameState,
   placePiece,
 } from "../domain/game";
-import { getPlacementPreview, type PlacementPreview } from "../domain/selectors";
+import { getPlacementPrediction, type PlacementPreview } from "../domain/selectors";
 
 export type GameControllerOptions = {
   /** Seed for the first run. Later restarts derive a fresh seed via `nextSeed`. */
@@ -43,7 +43,7 @@ export type GameController = {
   placeAt: (origin: CellPosition) => boolean;
   /** Preview an explicit hand piece at an origin, independent of tap
    *  selection — used by the drag interaction while a finger is down. */
-  previewFor: (handId: string, origin: CellPosition) => PlacementPreview | null;
+  previewFor: (intent: PlacementIntent | string, origin: CellPosition) => PlacementPreview | null;
   /** Capture the exact run/state/piece identity a gesture will later commit. */
   createPlacementIntent: (handId: string) => PlacementIntent | null;
   /** Place an explicit hand piece, independent of tap selection. Returns
@@ -171,22 +171,13 @@ export function useGameController(options: GameControllerOptions = {}): GameCont
     [commit],
   );
 
-  const selectedShapeId = useMemo(() => {
-    if (selectedHandId === null) {
+  const previewAt = useCallback((origin: CellPosition): PlacementPreview | null => {
+    const handId = selectedHandIdRef.current;
+    if (handId === null) {
       return null;
     }
-    return state.hand.find((piece) => piece.handId === selectedHandId)?.shapeId ?? null;
-  }, [selectedHandId, state.hand]);
-
-  const previewAt = useCallback(
-    (origin: CellPosition): PlacementPreview | null => {
-      if (selectedShapeId === null) {
-        return null;
-      }
-      return getPlacementPreview(state, selectedShapeId, origin);
-    },
-    [selectedShapeId, state],
-  );
+    return getPlacementPrediction(stateRef.current, handId, origin);
+  }, []);
 
   const placeAt = useCallback(
     (origin: CellPosition): boolean => {
@@ -201,14 +192,18 @@ export function useGameController(options: GameControllerOptions = {}): GameCont
   );
 
   const previewFor = useCallback(
-    (handId: string, origin: CellPosition): PlacementPreview | null => {
-      const shapeId = state.hand.find((piece) => piece.handId === handId)?.shapeId ?? null;
-      if (shapeId === null) {
+    (intentOrHandId: PlacementIntent | string, origin: CellPosition): PlacementPreview | null => {
+      if (
+        typeof intentOrHandId !== "string" &&
+        (intentOrHandId.sessionGeneration !== sessionGenerationRef.current ||
+          intentOrHandId.stateRevision !== stateRevisionRef.current)
+      ) {
         return null;
       }
-      return getPlacementPreview(state, shapeId, origin);
+      const handId = typeof intentOrHandId === "string" ? intentOrHandId : intentOrHandId.handId;
+      return getPlacementPrediction(stateRef.current, handId, origin);
     },
-    [state],
+    [],
   );
 
   const place = useCallback(

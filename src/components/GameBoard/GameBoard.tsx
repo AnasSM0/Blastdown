@@ -10,6 +10,7 @@ import { useTheme } from "../../ui/ThemeProvider";
 import { GridCell, contourMaskOf, type CellEdges, type CellPreviewState } from "../GridCell";
 import { TimerBadge } from "../TimerBadge";
 import { motionKey } from "../../ui/motionKey";
+import { PRE_CLEAR_PULSE_MIN, PRE_CLEAR_PULSE_MS, preClearVisual } from "../../ui/preClearPreview";
 import type { GameBoardProps } from "./boardProps";
 
 /** Boundary sides of a timed cell within its piece: a side is a boundary when
@@ -57,6 +58,7 @@ function GameBoardImpl(
     boardSize,
     preview,
     onCellPress,
+    onCellPreviewChange,
     onCellSizeChange,
     placedCells,
     placementNonce,
@@ -74,8 +76,40 @@ function GameBoardImpl(
   const osReducedMotion = useReducedMotion();
   const reducedMotion = reducedMotionProp ?? osReducedMotion;
   const [shake] = useState(() => new Animated.Value(0));
+  const [preClearPulse] = useState(() => new Animated.Value(1));
   const rows = grid.length;
   const columns = grid[0]?.length ?? 0;
+  const showPreClear = Boolean(
+    preview?.valid && (preview.clear.rows.length > 0 || preview.clear.columns.length > 0),
+  );
+
+  // A single driver animates every predicted lane. It starts/stops only when
+  // prediction presence changes, never for every pointer pixel or board cell.
+  useEffect(() => {
+    if (!showPreClear || reducedMotion) {
+      preClearPulse.setValue(1);
+      return;
+    }
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(preClearPulse, {
+          toValue: PRE_CLEAR_PULSE_MIN,
+          duration: PRE_CLEAR_PULSE_MS,
+          useNativeDriver: true,
+        }),
+        Animated.timing(preClearPulse, {
+          toValue: 1,
+          duration: PRE_CLEAR_PULSE_MS,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => {
+      animation.stop();
+      preClearPulse.setValue(1);
+    };
+  }, [preClearPulse, reducedMotion, showPreClear]);
 
   // Subtle single board shake on an explosion turn (skipped under reduced
   // motion); keyed on effectKey so it retriggers each explosion sequence.
@@ -159,6 +193,8 @@ function GameBoardImpl(
     columns > 0 && contentSize > 0
       ? (contentSize - (columns - 1) * spacing.gridGutter) / columns
       : 0;
+  const contentSpan = columns > 0 ? columns * cellSize + (columns - 1) * spacing.gridGutter : 0;
+  const preClear = useMemo(() => preClearVisual(theme), [theme]);
 
   useEffect(() => {
     if (cellSize > 0) {
@@ -227,6 +263,7 @@ function GameBoardImpl(
                     // One shared handler for all 64 cells — each cell reports
                     // its own position, so no per-cell closure is created.
                     onPress={onCellPress}
+                    onPreviewChange={onCellPreviewChange}
                     flashNonce={placedSet.has(`${row},${column}`) ? placementNonce : undefined}
                     reducedMotion={reducedMotion}
                     placementState={
@@ -242,6 +279,50 @@ function GameBoardImpl(
                 </View>
               ))}
             </View>
+          ))
+        : null}
+      {cellSize > 0 && showPreClear
+        ? preview?.clear.rows.map((row) => (
+            <Animated.View
+              key={`preclear-row-${row}`}
+              pointerEvents="none"
+              testID={`preclear-row-${row}`}
+              style={[
+                styles.preClear,
+                {
+                  left: BOARD_CONTENT_INSET,
+                  top: BOARD_CONTENT_INSET + row * (cellSize + spacing.gridGutter),
+                  width: contentSpan,
+                  height: cellSize,
+                  backgroundColor: preClear.fill,
+                  borderColor: preClear.edge,
+                  borderWidth: preClear.edgeWidth,
+                  opacity: reducedMotion ? 1 : preClearPulse,
+                },
+              ]}
+            />
+          ))
+        : null}
+      {cellSize > 0 && showPreClear
+        ? preview?.clear.columns.map((column) => (
+            <Animated.View
+              key={`preclear-column-${column}`}
+              pointerEvents="none"
+              testID={`preclear-column-${column}`}
+              style={[
+                styles.preClear,
+                {
+                  left: BOARD_CONTENT_INSET + column * (cellSize + spacing.gridGutter),
+                  top: BOARD_CONTENT_INSET,
+                  width: cellSize,
+                  height: contentSpan,
+                  backgroundColor: preClear.fill,
+                  borderColor: preClear.edge,
+                  borderWidth: preClear.edgeWidth,
+                  opacity: reducedMotion ? 1 : preClearPulse,
+                },
+              ]}
+            />
           ))
         : null}
       {/* Small theme-aware corner accents (P1-3), drawn on top at the four
@@ -371,6 +452,11 @@ const styles = StyleSheet.create({
   badgeAnchor: {
     position: "absolute",
     zIndex: 2,
+  },
+  preClear: {
+    position: "absolute",
+    zIndex: 1,
+    borderRadius: radius.cell,
   },
   // A fine inner-border ring sitting just inside the outer frame, within the
   // gutter — draws structure without touching cell geometry.

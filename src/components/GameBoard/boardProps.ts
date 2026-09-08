@@ -24,6 +24,9 @@ export type GameBoardProps = {
   boardSize?: number;
   preview?: PlacementPreview | null;
   onCellPress?: (position: CellPosition) => void;
+  /** Reports the currently pressed logical anchor. Null means the press ended
+   *  or was cancelled. This is presentation-only; placement remains on press. */
+  onCellPreviewChange?: (position: CellPosition | null) => void;
   /** Reports the computed cell edge length whenever it changes, so the screen
    *  can map finger coordinates to board cells during a drag. */
   onCellSizeChange?: (cellSize: number) => void;

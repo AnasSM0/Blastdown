@@ -23,6 +23,7 @@ type PieceTrayProps = {
   onDragStart?: (handId: string, point: Point) => void;
   onDragMove?: (handId: string, point: Point) => void;
   onDragEnd?: (handId: string, point: Point) => void;
+  onDragCancel?: (handId: string) => void;
   /** True while a piece is being dragged (drives the picked-up slot style). */
   draggingHandId?: string | null;
   /** Effective reduced-motion (OS combined with the persisted override), from
@@ -147,6 +148,7 @@ type TraySlotProps = {
   onDragStart?: (handId: string, point: Point) => void;
   onDragMove?: (handId: string, point: Point) => void;
   onDragEnd?: (handId: string, point: Point) => void;
+  onDragCancel?: (handId: string) => void;
 };
 
 function TraySlot({
@@ -158,6 +160,7 @@ function TraySlot({
   onDragStart,
   onDragMove,
   onDragEnd,
+  onDragCancel,
 }: TraySlotProps) {
   const theme = useTheme();
   const [lift] = useState(() => new Animated.Value(selected ? SELECTED_SCALE : 1));
@@ -227,7 +230,13 @@ function TraySlot({
     .minDistance(DRAG_ACTIVATION_DISTANCE)
     .onStart((event) => onDragStart?.(piece.handId, { x: event.absoluteX, y: event.absoluteY }))
     .onUpdate((event) => onDragMove?.(piece.handId, { x: event.absoluteX, y: event.absoluteY }))
-    .onFinalize((event) => onDragEnd?.(piece.handId, { x: event.absoluteX, y: event.absoluteY }));
+    .onFinalize((event, success) => {
+      if (success) {
+        onDragEnd?.(piece.handId, { x: event.absoluteX, y: event.absoluteY });
+      } else {
+        onDragCancel?.(piece.handId);
+      }
+    });
 
   return (
     <GestureDetector gesture={pan}>
@@ -243,6 +252,7 @@ export function PieceTray({
   onDragStart,
   onDragMove,
   onDragEnd,
+  onDragCancel,
   draggingHandId,
   reducedMotion: reducedMotionProp,
 }: PieceTrayProps) {
@@ -265,6 +275,7 @@ export function PieceTray({
               onDragStart={onDragStart}
               onDragMove={onDragMove}
               onDragEnd={onDragEnd}
+              onDragCancel={onDragCancel}
             />
           ) : (
             <EmptySlot />
