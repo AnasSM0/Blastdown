@@ -43,8 +43,18 @@ describe("EffectsLayer", () => {
 
   it("bursts once per event-provided explosion cell and shows the penalty", async () => {
     const plan = planFor([
-      { type: "explosionStarted", explosionId: "e-1", pieceId: "piece-1" },
-      { type: "explosionStarted", explosionId: "e-2", pieceId: "piece-2" },
+      {
+        type: "explosionStarted",
+        explosionId: "e-1",
+        pieceId: "piece-1",
+        sourceCells: [{ row: 1, column: 1 }],
+      },
+      {
+        type: "explosionStarted",
+        explosionId: "e-2",
+        pieceId: "piece-2",
+        sourceCells: [{ row: 5, column: 5 }],
+      },
       {
         type: "rubbleCreated",
         explosionId: "e-1",
@@ -66,7 +76,12 @@ describe("EffectsLayer", () => {
   it("omits bursts and shake visuals under reduced motion but keeps the penalty", async () => {
     const plan = planFor(
       [
-        { type: "explosionStarted", explosionId: "e-1", pieceId: "piece-1" },
+        {
+          type: "explosionStarted",
+          explosionId: "e-1",
+          pieceId: "piece-1",
+          sourceCells: [{ row: 2, column: 2 }],
+        },
         { type: "rubbleCreated", explosionId: "e-1", cells: [{ row: 2, column: 2 }] },
         { type: "scoreChanged", delta: -50, score: 0 },
       ],
@@ -74,6 +89,46 @@ describe("EffectsLayer", () => {
     );
     const result = await render(<EffectsLayer plan={plan} cellSize={40} reducedMotion />);
     expect(result.queryAllByTestId("burst-cell")).toHaveLength(0);
+    expect(result.getByTestId("explosion-shockwave-e-1")).toBeTruthy();
+    expect(result.getByTestId("rubble-impact-2-2")).toBeTruthy();
     expect(result.getByText("-50")).toBeTruthy();
+  });
+
+  it("renders one shockwave per source and settles each new rubble cell once", async () => {
+    const plan = planFor([
+      {
+        type: "explosionStarted",
+        explosionId: "e-1",
+        pieceId: "piece-1",
+        sourceCells: [{ row: 1, column: 1 }],
+      },
+      {
+        type: "rubbleCreated",
+        explosionId: "e-1",
+        cells: [
+          { row: 1, column: 1 },
+          { row: 2, column: 2 },
+        ],
+      },
+      {
+        type: "explosionStarted",
+        explosionId: "e-2",
+        pieceId: "piece-2",
+        sourceCells: [{ row: 6, column: 6 }],
+      },
+      {
+        type: "rubbleCreated",
+        explosionId: "e-2",
+        cells: [
+          { row: 2, column: 2 },
+          { row: 6, column: 6 },
+        ],
+      },
+    ]);
+    const result = await render(<EffectsLayer plan={plan} cellSize={40} reducedMotion={false} />);
+
+    expect(result.getAllByTestId(/^explosion-shockwave-/)).toHaveLength(2);
+    expect(result.getAllByTestId(/^rubble-impact-/)).toHaveLength(3);
+    expect(result.getAllByTestId("rubble-impact-2-2")).toHaveLength(1);
   });
 });

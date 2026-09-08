@@ -162,7 +162,12 @@ describe("GameBoard", () => {
     grid[4][4] = { kind: "rubble", explosionId: "e-1" };
     const plan = buildEffectPlan(
       [
-        { type: "explosionStarted", explosionId: "e-1", pieceId: "piece-1" },
+        {
+          type: "explosionStarted",
+          explosionId: "e-1",
+          pieceId: "piece-1",
+          sourceCells: [{ row: 0, column: 0 }],
+        },
         { type: "rubbleCreated", explosionId: "e-1", cells: [{ row: 4, column: 4 }] },
         { type: "scoreChanged", delta: -50, score: 0 },
       ],

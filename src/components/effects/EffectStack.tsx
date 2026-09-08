@@ -1,6 +1,7 @@
 import { memo } from "react";
 
 import type { EffectSequence } from "../../ui/effects/effectQueue";
+import { MAX_BOARD_PARTICLES } from "../../ui/effects/eventEffects";
 
 import { EffectsLayer } from "./EffectsLayer";
 
@@ -44,18 +45,29 @@ export const EffectStack = memo(function EffectStack({
     return null;
   }
 
+  let remainingFragments = MAX_BOARD_PARTICLES;
+
   return (
     <>
-      {sequences.map((sequence) => (
-        <EffectsLayer
-          key={sequence.id}
-          plan={sequence.plan}
-          cellSize={cellSize}
-          reducedMotion={reducedMotion}
-          effectId={sequence.id}
-          onStarted={onStarted}
-        />
-      ))}
+      {sequences.map((sequence) => {
+        const fragmentLimit = Math.min(
+          remainingFragments,
+          sequence.explosion?.fragments.length ?? 0,
+        );
+        remainingFragments -= fragmentLimit;
+        return (
+          <EffectsLayer
+            key={sequence.id}
+            plan={sequence.plan}
+            explosion={sequence.explosion}
+            explosionFragmentLimit={fragmentLimit}
+            cellSize={cellSize}
+            reducedMotion={reducedMotion}
+            effectId={sequence.id}
+            onStarted={onStarted}
+          />
+        );
+      })}
     </>
   );
 });

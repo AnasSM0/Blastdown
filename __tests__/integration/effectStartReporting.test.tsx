@@ -37,6 +37,7 @@ function clearPlan(): EffectPlan {
     columns: [],
     clearedCells: Array.from({ length: 8 }, (_, column) => ({ row: 3, column })),
     defuses: [],
+    explosion: null,
     explosions: [],
     rubbleCells: [],
     reviveCells: [],
@@ -120,7 +121,16 @@ describe("the cinematic board reports that it drew", () => {
         grid={grid()}
         badges={[]}
         boardSize={BOARD_SIDE}
-        effectSequences={[{ id: "s1:t7", priority: "high", plan: clearPlan() }]}
+        effectSequences={[
+          {
+            id: "s1:t7",
+            sessionGeneration: 1,
+            turn: 7,
+            priority: "high",
+            plan: clearPlan(),
+            explosion: null,
+          },
+        ]}
         onEffectStarted={(id) => started.push(id)}
       />,
     );
@@ -168,7 +178,16 @@ describe("both renderers report, so the queue behaves the same either way", () =
         grid={grid()}
         badges={[]}
         boardSize={BOARD_SIDE}
-        effectSequences={[{ id: "same", priority: "high", plan: clearPlan() }]}
+        effectSequences={[
+          {
+            id: "same",
+            sessionGeneration: 1,
+            turn: 1,
+            priority: "high",
+            plan: clearPlan(),
+            explosion: null,
+          },
+        ]}
         onEffectStarted={(id) => skia.push(id)}
       />,
     );

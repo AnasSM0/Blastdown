@@ -151,6 +151,7 @@ describe("the effect model caps what a turn can mount", () => {
       columns: [],
       clearedCells: [],
       defuses: [],
+      explosion: null,
       explosions: [],
       rubbleCells: [],
       reviveCells: [],
@@ -211,6 +212,8 @@ describe("the effect model caps what a turn can mount", () => {
       explosions: Array.from({ length: 200 }, (_, index) => ({
         explosionId: `e${index}`,
         pieceId: `p${index}`,
+        sourceCells: [{ row: index % 8, column: 0 }],
+        origin: { row: index % 8, column: 0 },
         cells: Array.from({ length: 64 }, (_, c) => ({ row: c % 8, column: Math.floor(c / 8) })),
       })),
     });
@@ -244,6 +247,8 @@ describe("the effect model caps what a turn can mount", () => {
         {
           explosionId: "e",
           pieceId: "x",
+          sourceCells: [{ row: 0, column: 0 }],
+          origin: { row: 0, column: 0 },
           cells: Array.from({ length: 30 }, (_, c) => ({ row: c % 8, column: Math.floor(c / 8) })),
         },
       ],

@@ -2,23 +2,23 @@ import { useEffect, useRef } from "react";
 import { View, StyleSheet } from "react-native";
 
 import type { CellPosition } from "../../domain/placement";
-import { MAX_BURST_CELLS, type DefuseEffect, type EffectPlan } from "../../ui/effects/eventEffects";
+import {
+  identifyExplosionPresentation,
+  MAX_BOARD_PARTICLES,
+  type DefuseEffect,
+  type EffectPlan,
+  type IdentifiedExplosionPresentation,
+} from "../../ui/effects/eventEffects";
 import { BOARD_CONTENT_INSET } from "../../ui/boardGeometry";
 import { spacing } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
-import { BurstCell } from "./BurstCell";
 import { CellFlash } from "./CellFlash";
 import { FloatingText } from "./FloatingText";
 import { PulseRing } from "./PulseRing";
 import { ClearPresentationLayer } from "./ClearPresentationLayer";
+import { ExplosionPresentationLayer } from "./ExplosionPresentationLayer";
 
 const GUTTER = spacing.gridGutter;
-
-/** Explosion pacing, capped so several simultaneous expiries never stack into
- *  an unbounded overlapping cascade. */
-const BURST_PIECE_STEP_MS = 30;
-const BURST_CELL_STEP_MS = 12;
-const BURST_DELAY_CAP_MS = 120;
 
 /** Revive recovery wave: sweeps top-to-bottom across the restored cells, at a
  *  lower peak than a clear so restoration reads as calm, not as another clear. */
@@ -35,6 +35,8 @@ type EffectsLayerProps = {
   /** Called once when this layer starts drawing `effectId`. See the note on
    *  the effect below for why this exists. */
   onStarted?: (id: string, now: number) => void;
+  explosion?: IdentifiedExplosionPresentation | null;
+  explosionFragmentLimit?: number;
 };
 
 function centroid(cells: readonly CellPosition[]): { row: number; column: number } | null {
@@ -70,6 +72,8 @@ export function EffectsLayer({
   reducedMotion,
   effectId,
   onStarted,
+  explosion: identifiedExplosion,
+  explosionFragmentLimit = MAX_BOARD_PARTICLES,
 }: EffectsLayerProps) {
   const theme = useTheme();
 
@@ -115,6 +119,9 @@ export function EffectsLayer({
 
   const clearCentroid = centroid(plan.clear?.cells ?? []);
   const rubbleCentroid = centroid(plan.rubbleCells);
+  const explosion =
+    identifiedExplosion ??
+    identifyExplosionPresentation(plan.explosion, effectId ?? "standalone", 0, 0);
   return (
     <View pointerEvents="none" style={styles.layer} testID="effects-layer">
       {plan.clear ? (
@@ -185,32 +192,16 @@ export function EffectsLayer({
         />
       ) : null}
 
-      {plan.explosions
-        .flatMap((explosion, explosionIndex) =>
-          explosion.cells.map((cell, cellIndex) => ({
-            explosionId: explosion.explosionId,
-            cell,
-            delay: Math.min(
-              explosionIndex * BURST_PIECE_STEP_MS + cellIndex * BURST_CELL_STEP_MS,
-              BURST_DELAY_CAP_MS,
-            ),
-          })),
-        )
-        // Budgeted across ALL explosions, so several simultaneous expiries can't
-        // multiply the view count — the burst is a cue, not a particle system.
-        .slice(0, MAX_BURST_CELLS)
-        .map(({ explosionId, cell, delay }) => (
-          <BurstCell
-            key={`burst-${explosionId}-${cell.row}-${cell.column}`}
-            left={left(cell.column)}
-            top={top(cell.row)}
-            size={cellSize}
-            reducedMotion={reducedMotion}
-            fillColor={theme.score}
-            borderColor={theme.timerCritical}
-            delay={delay}
-          />
-        ))}
+      {explosion ? (
+        <ExplosionPresentationLayer
+          explosion={explosion}
+          cellSize={cellSize}
+          criticalColor={theme.timerCritical}
+          hotColor={theme.score}
+          reducedMotion={reducedMotion}
+          fragmentLimit={explosionFragmentLimit}
+        />
+      ) : null}
 
       {rubbleCentroid && plan.scoreDelta < 0 ? (
         <FloatingText

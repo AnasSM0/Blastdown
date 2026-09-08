@@ -263,6 +263,7 @@ export function useEventAnimator({
         return admitEffect(current, {
           id,
           sessionId: current.sessionId,
+          turn: null,
           priority: priorityFor(cuePlan),
           plan: cuePlan,
           durationMs: cuePlan.durationMs,
@@ -315,6 +316,7 @@ export function useEventAnimator({
       return admitEffect(current, {
         id,
         sessionId: current.sessionId,
+        turn,
         priority: priorityFor(nextPlan),
         plan: nextPlan,
         durationMs: nextPlan.durationMs,

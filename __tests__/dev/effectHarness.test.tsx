@@ -156,6 +156,12 @@ describe("the harness catalogue", () => {
       "reduced-motion-clear",
       "clear-and-defuse",
       "clear-and-explosion",
+      "single-explosion",
+      "double-explosion",
+      "multi-explosion",
+      "explosion-rubble",
+      "explosion-rapid-next-turn",
+      "reduced-motion-explosion",
       "multiple-explosions",
       "six-rapid",
       "seventh-evicts",
@@ -480,6 +486,20 @@ describe("the harness leaves the production bundle", () => {
 });
 
 describe("the harness screen", () => {
+  it("includes every deterministic B-06 explosion scenario", () => {
+    expect(EFFECT_HARNESS_SCENARIOS.map((scenario) => scenario.id)).toEqual(
+      expect.arrayContaining([
+        "single-explosion",
+        "double-explosion",
+        "multi-explosion",
+        "explosion-rubble",
+        "clear-and-explosion",
+        "explosion-rapid-next-turn",
+        "reduced-motion-explosion",
+      ]),
+    );
+  });
+
   it("plays a scenario end to end from its own button", async () => {
     // The screen itself, not the wiring extracted from it: a harness whose
     // buttons are wired to nothing would pass every test above and be useless

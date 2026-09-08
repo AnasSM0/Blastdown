@@ -107,7 +107,12 @@ export function resolveExpirations(
     adjacentBudget -= pickCount;
 
     // 6-7. One explosion event per expired piece plus its created rubble.
-    events.push({ type: "explosionStarted", explosionId, pieceId: timer.id });
+    events.push({
+      type: "explosionStarted",
+      explosionId,
+      pieceId: timer.id,
+      sourceCells: pieceCells,
+    });
     events.push({ type: "rubbleCreated", explosionId, cells: rubbleCells });
     lastExplosionId = explosionId;
   }

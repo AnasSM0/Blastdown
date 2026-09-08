@@ -156,9 +156,12 @@ describe("effect work is bounded before it reaches the canvas", () => {
         columns: [],
         clearedCells: [],
         defuses: [],
+        explosion: null,
         explosions: Array.from({ length: 6 }, (_, index) => ({
           explosionId: `e${index}`,
           pieceId: `p${index}`,
+          sourceCells: [{ row: index, column: 0 }],
+          origin: { row: index, column: 0 },
           cells: Array.from({ length: 12 }, (_, column) => ({ row: index, column })),
         })),
         rubbleCells: [],

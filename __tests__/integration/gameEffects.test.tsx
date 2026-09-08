@@ -69,6 +69,48 @@ function consecutiveClearState(): GameState {
   };
 }
 
+function explosionThenClearState(): GameState {
+  const grid = makeEmptyGrid(8);
+  grid[7][7] = { kind: "timed", pieceInstanceId: "doomed", colorId: "purple" };
+  for (let column = 1; column < 8; column += 1) {
+    grid[1][column] = { kind: "normal", colorId: "cyan" };
+  }
+  return {
+    ...createInitialGameState("explosion-then-clear", NOW),
+    grid,
+    hand: [
+      { handId: "h-trigger", shapeId: "single", colorId: "amber" },
+      { handId: "h-clear", shapeId: "single", colorId: "cyan" },
+    ],
+    activeTimers: {
+      doomed: {
+        id: "doomed",
+        shapeId: "single",
+        remainingTurns: 1,
+        placedOnTurn: 0,
+        colorId: "purple",
+      },
+    },
+  };
+}
+
+function dangerRecoveryState(): GameState {
+  const state = explosionState();
+  state.grid[6][6] = {
+    kind: "timed",
+    pieceInstanceId: "survivor",
+    colorId: "cyan",
+  };
+  state.activeTimers.survivor = {
+    id: "survivor",
+    shapeId: "single",
+    remainingTurns: 3,
+    placedOnTurn: 0,
+    colorId: "cyan",
+  };
+  return state;
+}
+
 function options(initialState: GameState) {
   return { seed: "effects-seed", now: () => NOW, nextSeed: () => "restart", initialState };
 }
@@ -137,6 +179,41 @@ describe("gameplay effects pipeline", () => {
 
     expect(result.getAllByTestId("effects-layer")).toHaveLength(2);
     expect(result.getAllByTestId(/^clear-flash-/)).toHaveLength(16);
+  });
+
+  it("keeps an explosion alive while the immediate next turn clears a line", async () => {
+    const result = await render(
+      <GameScreenContent controllerOptions={options(explosionThenClearState())} boardSize={328} />,
+    );
+
+    await fireEvent.press(result.getByTestId("tray-piece-h-trigger"));
+    await fireEvent.press(result.getByTestId("cell-4-4"));
+    expect(result.getByTestId("explosion-presentation")).toBeTruthy();
+
+    await fireEvent.press(result.getByTestId("tray-piece-h-clear"));
+    await fireEvent.press(result.getByTestId("cell-1-0"));
+
+    expect(result.queryByTestId("tray-piece-h-clear")).toBeNull();
+    expect(result.getAllByTestId("effects-layer")).toHaveLength(2);
+    expect(result.getByTestId("explosion-presentation")).toBeTruthy();
+    expect(result.getAllByTestId(/^clear-flash-/)).toHaveLength(8);
+  });
+
+  it("shows the post-explosion authoritative danger state while recovery is still active", async () => {
+    const result = await render(
+      <GameScreenContent controllerOptions={options(dangerRecoveryState())} boardSize={328} />,
+    );
+
+    await fireEvent.press(result.getByTestId("tray-piece-h-trigger"));
+    await fireEvent.press(result.getByTestId("cell-0-0"));
+
+    expect(result.getByTestId("explosion-presentation")).toBeTruthy();
+    expect(
+      result.getByTestId("board-danger-warning", { includeHiddenElements: true }),
+    ).toBeTruthy();
+    expect(
+      result.queryByTestId("board-danger-critical", { includeHiddenElements: true }),
+    ).toBeNull();
   });
 
   it("consumes a duplicated native gesture completion exactly once", async () => {

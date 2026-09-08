@@ -103,9 +103,25 @@ function explosion(index: number, cells: readonly CellPosition[]): readonly Game
       type: "explosionStarted",
       explosionId: `harness-x${index}`,
       pieceId: `harness-timed-${index}`,
+      sourceCells: cells.slice(0, Math.min(2, cells.length)),
     },
     { type: "rubbleCreated", explosionId: `harness-x${index}`, cells: [...cells] },
   ];
+}
+
+function explosionTurn(
+  turn: number,
+  blasts: readonly { index: number; cells: readonly CellPosition[] }[],
+): HarnessStep {
+  return {
+    kind: "turn",
+    events: [
+      placed(turn),
+      ...blasts.flatMap((blast) => explosion(blast.index, blast.cells)),
+      scored(-50 * blasts.length, 0),
+      { type: "comboChanged", combo: 0 },
+    ],
+  };
 }
 
 /** Six clears on six consecutive turns, filling the queue exactly to its cap. */
@@ -202,7 +218,7 @@ export const EFFECT_HARNESS_SCENARIOS: readonly HarnessScenario[] = [
   },
   {
     id: "clear-and-explosion",
-    label: "Clear + explosion",
+    label: "CLEAR + EXPLOSION",
     expectation:
       "Row 1 sweeps, then the explosion bursts and the board shakes. Both play; the clear is not replaced by the burst.",
     steps: [
@@ -215,6 +231,92 @@ export const EFFECT_HARNESS_SCENARIOS: readonly HarnessScenario[] = [
           { row: 4, column: 5 },
         ]),
       ),
+    ],
+  },
+  {
+    id: "single-explosion",
+    label: "SINGLE EXPLOSION",
+    expectation:
+      "One critical source flash becomes one localized detonation and shockwave, the board reaches the 8 px impulse tier, new rubble settles, and danger regains control by 800ms.",
+    steps: [
+      explosionTurn(1, [
+        {
+          index: 1,
+          cells: [
+            { row: 3, column: 3 },
+            { row: 3, column: 4 },
+            { row: 4, column: 3 },
+          ],
+        },
+      ]),
+    ],
+  },
+  {
+    id: "double-explosion",
+    label: "DOUBLE EXPLOSION",
+    expectation:
+      "Two distinct origins coordinate two local shockwaves with one 10 px board impulse and one bounded fragment budget.",
+    steps: [
+      explosionTurn(1, [
+        { index: 1, cells: [{ row: 1, column: 1 }] },
+        { index: 2, cells: [{ row: 6, column: 6 }] },
+      ]),
+    ],
+  },
+  {
+    id: "multi-explosion",
+    label: "MULTI EXPLOSION",
+    expectation:
+      "Three distinct origins remain readable while one coordinated impulse reaches, but never exceeds, the 12 px cap.",
+    steps: [
+      explosionTurn(1, [
+        { index: 1, cells: [{ row: 1, column: 1 }] },
+        { index: 2, cells: [{ row: 3, column: 6 }] },
+        { index: 3, cells: [{ row: 6, column: 2 }] },
+      ]),
+    ],
+  },
+  {
+    id: "explosion-rubble",
+    label: "EXPLOSION + RUBBLE",
+    expectation:
+      "Only rubble reported as newly created receives the brief impact/settle cue; existing board rubble stays static.",
+    steps: [
+      explosionTurn(1, [
+        {
+          index: 1,
+          cells: [
+            { row: 4, column: 4 },
+            { row: 4, column: 5 },
+            { row: 5, column: 4 },
+          ],
+        },
+      ]),
+    ],
+  },
+  {
+    id: "explosion-rapid-next-turn",
+    label: "EXPLOSION → RAPID NEXT TURN",
+    expectation:
+      "The explosion keeps recovering while the next committed clear is admitted and starts independently; neither completion resets the other.",
+    steps: [explosionTurn(1, [{ index: 1, cells: [{ row: 3, column: 3 }] }]), clearTurn(2, [6])],
+  },
+  {
+    id: "reduced-motion-explosion",
+    label: "REDUCED MOTION EXPLOSION",
+    expectation:
+      "The critical origin flash and new-rubble impact remain readable in a short beat, with no board shake or travelling fragments.",
+    reducedMotion: true,
+    steps: [
+      explosionTurn(1, [
+        {
+          index: 1,
+          cells: [
+            { row: 2, column: 2 },
+            { row: 2, column: 3 },
+          ],
+        },
+      ]),
     ],
   },
   {

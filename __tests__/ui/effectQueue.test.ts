@@ -26,6 +26,7 @@ function plan(overrides: Partial<EffectPlan> = {}): EffectPlan {
     columns: [],
     clearedCells: [],
     defuses: [],
+    explosion: null,
     explosions: [],
     rubbleCells: [],
     reviveCells: [],
@@ -49,6 +50,7 @@ function effect(
   return {
     id,
     sessionId: 1,
+    turn: 1,
     priority: "standard",
     plan: plan(),
     durationMs: 340,
@@ -57,7 +59,15 @@ function effect(
 }
 
 const explosionPlan = plan({
-  explosions: [{ explosionId: "e1", pieceId: "p1", cells: [{ row: 0, column: 0 }] }],
+  explosions: [
+    {
+      explosionId: "e1",
+      pieceId: "p1",
+      sourceCells: [{ row: 0, column: 0 }],
+      origin: { row: 0, column: 0 },
+      cells: [{ row: 0, column: 0 }],
+    },
+  ],
   hasRequiredSequence: true,
 });
 const clearPlan = plan({ rows: [0], hasRequiredSequence: true });
@@ -344,8 +354,11 @@ describe("priority is derived from what actually happened", () => {
 describe("clock slots are leased by effect id", () => {
   const seq = (id: string, priority: "standard" | "high" | "critical") => ({
     id,
+    sessionGeneration: 1,
+    turn: 1,
     priority,
     plan: {} as never,
+    explosion: null,
   });
 
   it("keeps a survivor's slot when a neighbour before it retires", () => {

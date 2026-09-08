@@ -28,6 +28,7 @@ import { recordClockLeases } from "../../ui/effects/effectDiagnostics";
 import { assignClockSlots } from "../../ui/effects/effectQueue";
 import { PRE_CLEAR_PULSE_MIN, PRE_CLEAR_PULSE_MS } from "../../ui/preClearPreview";
 import { CALM_DANGER_STATE } from "../../ui/dangerState";
+import { MAX_BOARD_PARTICLES } from "../../ui/effects/eventEffects";
 import { BoardDangerLighting } from "../BoardDangerLighting";
 import { cellLabel, placementHintFor } from "../GridCell/cellLabel";
 import type { GameBoardProps } from "../GameBoard/boardProps";
@@ -245,8 +246,21 @@ function CinematicBoardImpl(
   const sequences = useMemo(() => effectSequences ?? [], [effectSequences]);
   const sceneById = useMemo(() => {
     const scenes = new Map<string, EffectScene>();
+    let remainingFragments = MAX_BOARD_PARTICLES;
     for (const sequence of sequences) {
-      scenes.set(sequence.id, buildEffectScene(sequence.plan, geometry, palette, reducedMotion));
+      const fragmentLimit = Math.min(remainingFragments, sequence.explosion?.fragments.length ?? 0);
+      remainingFragments -= fragmentLimit;
+      scenes.set(
+        sequence.id,
+        buildEffectScene(
+          sequence.plan,
+          geometry,
+          palette,
+          reducedMotion,
+          sequence.explosion,
+          fragmentLimit,
+        ),
+      );
     }
     return scenes;
   }, [sequences, geometry, palette, reducedMotion]);

@@ -52,7 +52,14 @@ describe("line-clear presentation contract", () => {
     expect(clearPlan([0, 1, 2, 3]).boardImpulse?.amplitudePx).toBe(6);
 
     const explosion = buildEffectPlan(
-      [{ type: "explosionStarted", explosionId: "x", pieceId: "p" }],
+      [
+        {
+          type: "explosionStarted",
+          explosionId: "x",
+          pieceId: "p",
+          sourceCells: [{ row: 0, column: 0 }],
+        },
+      ],
       false,
     );
     expect(explosion.boardImpulse?.amplitudePx).toBeGreaterThan(6);

@@ -2008,3 +2008,25 @@ six-effect queue continues to own identity, overlap, retirement, and session
 cleanup. Gameplay input, clearing/scoring/timer rules, RNG, praise vocabulary,
 dependencies, and the default-OFF cinematic flag are unchanged. Physical Android
 visual tuning remains `A-DEVICE-PENDING`.
+
+---
+
+## 2026-09-08 — B-06 explosion effects use committed source footprints
+
+`explosionStarted` now carries the expired timed piece's exact source cells. A
+pure presentation contract groups every explosion committed on the turn and
+combines those source footprints with the corresponding `rubbleCreated` cells,
+queue identity, session generation, turn, magnitude, five-phase timing, and a
+presentation-only deterministic fragment seed. Renderers therefore place each
+blast origin and shockwave from authoritative event data instead of inferring
+explosion rules from the post-turn rubble grid.
+
+Single/double/three-or-more explosion groups use one 8/10/12 px board impulse,
+respectively, and one shared clock per admitted effect. Fragments remain capped
+at 24 per effect and 40 across the board; Reduced Motion removes shake and
+travelling fragments while retaining source flash, origin indication, and new
+rubble feedback. Existing rubble never replays because settle presentation is
+limited to the current turn's `rubbleCreated` cells. Gameplay rules, gameplay
+RNG, scoring, timers, queue capacity, dependencies, and the default-OFF
+cinematic flag are unchanged. Physical Android tuning remains
+`A-DEVICE-PENDING`.

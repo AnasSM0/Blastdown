@@ -5,9 +5,11 @@ import { useDerivedValue, type SharedValue } from "react-native-reanimated";
 import type {
   BloomPrimitive,
   BurstPrimitive,
+  DetonationPrimitive,
   EffectScene,
   FlashPrimitive,
   RingPrimitive,
+  ShockwavePrimitive,
   SweepPrimitive,
   TextPrimitive,
 } from "../effects/effectScene";
@@ -236,6 +238,68 @@ function Ring({ primitive, elapsed }: { primitive: RingPrimitive; elapsed: Share
   );
 }
 
+function Detonation({
+  primitive,
+  elapsed,
+}: {
+  primitive: DetonationPrimitive;
+  elapsed: SharedValue<number>;
+}) {
+  const { center, color, delayMs, durationMs, expands, peak, radius } = primitive;
+  const opacity = useDerivedValue(() => {
+    const local = elapsed.value - delayMs;
+    if (local < 0 || local >= durationMs) return 0;
+    return peak * (1 - local / durationMs);
+  });
+  const animatedRadius = useDerivedValue(() => {
+    if (!expands) return radius * 0.62;
+    const local = elapsed.value - delayMs;
+    const progress = Math.max(0, Math.min(1, local / durationMs));
+    return radius * (0.28 + progress * 0.72);
+  });
+  return (
+    <Circle
+      cx={center.x}
+      cy={center.y}
+      r={animatedRadius}
+      color={alpha(lighten(color, 0.38), 0.9)}
+      opacity={opacity}
+    />
+  );
+}
+
+function Shockwave({
+  primitive,
+  elapsed,
+}: {
+  primitive: ShockwavePrimitive;
+  elapsed: SharedValue<number>;
+}) {
+  const { center, color, delayMs, durationMs, expands, peak, radius } = primitive;
+  const opacity = useDerivedValue(() => {
+    const local = elapsed.value - delayMs;
+    if (local < 0 || local >= durationMs) return 0;
+    return peak * (1 - local / durationMs);
+  });
+  const animatedRadius = useDerivedValue(() => {
+    if (!expands) return radius * 0.42;
+    const local = elapsed.value - delayMs;
+    const progress = Math.max(0, Math.min(1, local / durationMs));
+    return radius * (0.18 + progress * 0.82);
+  });
+  return (
+    <Circle
+      cx={center.x}
+      cy={center.y}
+      r={animatedRadius}
+      color={alpha(lighten(color, 0.52), 0.95)}
+      opacity={opacity}
+      style="stroke"
+      strokeWidth={2.5}
+    />
+  );
+}
+
 /** The three debris specks of one burst, thrown together.
  *
  *  Eight derived values became two. Each speck used to animate its own cx and
@@ -387,8 +451,17 @@ function EffectsLayerImpl({
       {scene.rings.map((primitive) => (
         <Ring key={primitive.key} primitive={primitive} elapsed={elapsed} />
       ))}
+      {scene.detonations.map((primitive) => (
+        <Detonation key={primitive.key} primitive={primitive} elapsed={elapsed} />
+      ))}
+      {scene.shockwaves.map((primitive) => (
+        <Shockwave key={primitive.key} primitive={primitive} elapsed={elapsed} />
+      ))}
       {scene.bursts.map((primitive) => (
         <Burst key={primitive.key} primitive={primitive} elapsed={elapsed} />
+      ))}
+      {scene.rubbleImpacts.map((primitive) => (
+        <Flash key={primitive.key} primitive={primitive} elapsed={elapsed} />
       ))}
       {font
         ? scene.texts.map((primitive) => (

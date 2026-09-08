@@ -118,7 +118,12 @@ describe("expiry and rubble", () => {
   it("takes rubble from the authoritative event, grouped per explosion", () => {
     const plan = buildEffectPlan(
       [
-        { type: "explosionStarted", explosionId: "e-1", pieceId: "p-1" },
+        {
+          type: "explosionStarted",
+          explosionId: "e-1",
+          pieceId: "p-1",
+          sourceCells: [{ row: 2, column: 2 }],
+        },
         {
           type: "rubbleCreated",
           explosionId: "e-1",
@@ -127,7 +132,12 @@ describe("expiry and rubble", () => {
             { row: 2, column: 3 },
           ],
         },
-        { type: "explosionStarted", explosionId: "e-2", pieceId: "p-2" },
+        {
+          type: "explosionStarted",
+          explosionId: "e-2",
+          pieceId: "p-2",
+          sourceCells: [{ row: 5, column: 5 }],
+        },
         // A cell shared with the first explosion must be drawn once.
         {
           type: "rubbleCreated",
@@ -151,7 +161,12 @@ describe("expiry and rubble", () => {
     const events: GameEvent[] = [];
     // Six simultaneous expiries, six cells each — far past the budget.
     for (let index = 0; index < 6; index++) {
-      events.push({ type: "explosionStarted", explosionId: `e-${index}`, pieceId: `p-${index}` });
+      events.push({
+        type: "explosionStarted",
+        explosionId: `e-${index}`,
+        pieceId: `p-${index}`,
+        sourceCells: [{ row: index, column: 0 }],
+      });
       events.push({
         type: "rubbleCreated",
         explosionId: `e-${index}`,

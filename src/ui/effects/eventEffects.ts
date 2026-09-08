@@ -9,8 +9,65 @@ import { BOARD_SIZE } from "../../domain/board";
 export type ExplosionEffect = {
   explosionId: string;
   pieceId: string;
+  /** Exact surviving footprint carried by the committed domain event. */
+  sourceCells: CellPosition[];
+  /** Presentation origin at the source footprint's centroid, in board cells. */
+  origin: { row: number; column: number };
+  /** Exact newly created rubble reported for this explosion. */
   cells: CellPosition[];
 };
+
+export type ExplosionMagnitude = "single" | "double" | "multi";
+
+export type ExplosionTiming = Readonly<{
+  criticalFlashEndMs: number;
+  detonationStartMs: number;
+  detonationEndMs: number;
+  fragmentsStartMs: number;
+  fragmentsEndMs: number;
+  rubbleSettleStartMs: number;
+  rubbleSettleEndMs: number;
+  recoveryStartMs: number;
+  recoveryEndMs: number;
+}>;
+
+/** One simultaneous explosion phase derived only from its committed event
+ * group. Renderers consume this contract and never infer blast rules from the
+ * post-turn grid. Queue identity is attached separately by
+ * `identifyExplosionPresentation`. */
+export type ExplosionPresentation = Readonly<{
+  blasts: readonly ExplosionEffect[];
+  sourcePieceIds: readonly string[];
+  origins: readonly { row: number; column: number }[];
+  affectedCells: readonly CellPosition[];
+  newRubbleCells: readonly CellPosition[];
+  simultaneousCount: number;
+  magnitude: ExplosionMagnitude;
+  /** Deliberately exceeds B-05's maximum clear value of 1. */
+  bloomIntensity: number;
+  timing: ExplosionTiming;
+  fragmentCap: number;
+}>;
+
+export type IdentifiedExplosionPresentation = ExplosionPresentation &
+  Readonly<{
+    effectId: string;
+    sessionGeneration: number;
+    turn: number;
+    /** Presentation-only; never reads or advances gameplay RNG. */
+    fragmentSeed: number;
+    fragments: readonly ExplosionFragment[];
+  }>;
+
+export type ExplosionFragment = Readonly<{
+  key: string;
+  explosionId: string;
+  origin: { row: number; column: number };
+  targetCell: CellPosition;
+  angle: number;
+  distanceCells: number;
+  delayMs: number;
+}>;
 
 export type DefuseEffect = {
   pieceId: string;
@@ -78,6 +135,7 @@ export type EffectPlan = {
    *  exactly once), in row-major order. */
   clearedCells: CellPosition[];
   defuses: DefuseEffect[];
+  explosion: ExplosionPresentation | null;
   explosions: ExplosionEffect[];
   /** Deduplicated union of every explosion's rubble cells, row-major. */
   rubbleCells: CellPosition[];
@@ -106,10 +164,37 @@ export type EffectPlan = {
  *  queued — the effect stays readable and the view count stays bounded. */
 export const MAX_CLEAR_CELLS = BOARD_SIZE * BOARD_SIZE;
 export const MAX_BURST_CELLS = 24;
+export const MAX_EXPLOSION_FRAGMENTS = MAX_BURST_CELLS;
+export const MAX_BOARD_PARTICLES = 40;
 export const MAX_REVIVE_CELLS = BOARD_SIZE * BOARD_SIZE;
 
 function cellKey(cell: CellPosition): string {
   return `${cell.row},${cell.column}`;
+}
+
+function uniqueCells(cells: readonly CellPosition[]): CellPosition[] {
+  const seen = new Set<string>();
+  const unique: CellPosition[] = [];
+  for (const cell of cells) {
+    const key = cellKey(cell);
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push({ row: cell.row, column: cell.column });
+    }
+  }
+  unique.sort((a, b) => a.row - b.row || a.column - b.column);
+  return unique;
+}
+
+function centroid(cells: readonly CellPosition[]): { row: number; column: number } {
+  if (cells.length === 0) {
+    return { row: 0, column: 0 };
+  }
+  const total = cells.reduce(
+    (sum, cell) => ({ row: sum.row + cell.row, column: sum.column + cell.column }),
+    { row: 0, column: 0 },
+  );
+  return { row: total.row / cells.length, column: total.column / cells.length };
 }
 
 function clearedCellsFor(rows: number[], columns: number[], size: number): CellPosition[] {
@@ -217,7 +302,6 @@ export function sweepDelaysFor(
 const REDUCED_MS = 120;
 const REDUCED_CLEAR_MS = 180;
 const DEFUSE_MS = 340;
-const EXPLOSION_MS = 440;
 const CUE_MS = 400;
 const CUE_REDUCED_MS = 140;
 
@@ -264,6 +348,127 @@ const CLEAR_PROFILES: Record<ClearTier, ClearProfile> = {
     recoveryEndMs: 880,
   },
 };
+
+const EXPLOSION_TIMING: ExplosionTiming = {
+  criticalFlashEndMs: 70,
+  detonationStartMs: 40,
+  detonationEndMs: 180,
+  fragmentsStartMs: 120,
+  fragmentsEndMs: 450,
+  rubbleSettleStartMs: 250,
+  rubbleSettleEndMs: 550,
+  recoveryStartMs: 500,
+  recoveryEndMs: 800,
+};
+
+const REDUCED_EXPLOSION_TIMING: ExplosionTiming = {
+  criticalFlashEndMs: 55,
+  detonationStartMs: 0,
+  detonationEndMs: 95,
+  fragmentsStartMs: 0,
+  fragmentsEndMs: 0,
+  rubbleSettleStartMs: 70,
+  rubbleSettleEndMs: 150,
+  recoveryStartMs: 120,
+  recoveryEndMs: 180,
+};
+
+function explosionMagnitude(count: number): ExplosionMagnitude {
+  if (count >= 3) return "multi";
+  if (count === 2) return "double";
+  return "single";
+}
+
+export function buildExplosionPresentation(
+  explosions: readonly ExplosionEffect[],
+  reducedMotion: boolean,
+): ExplosionPresentation | null {
+  if (explosions.length === 0) {
+    return null;
+  }
+  const newRubbleCells = uniqueCells(explosions.flatMap((explosion) => explosion.cells));
+  return {
+    blasts: explosions,
+    sourcePieceIds: explosions.map((explosion) => explosion.pieceId),
+    origins: explosions.map((explosion) => explosion.origin),
+    affectedCells: newRubbleCells,
+    newRubbleCells,
+    simultaneousCount: explosions.length,
+    magnitude: explosionMagnitude(explosions.length),
+    bloomIntensity: reducedMotion ? 1.02 : explosions.length === 1 ? 1.18 : 1.28,
+    timing: reducedMotion ? REDUCED_EXPLOSION_TIMING : EXPLOSION_TIMING,
+    fragmentCap: reducedMotion ? 0 : MAX_EXPLOSION_FRAGMENTS,
+  };
+}
+
+/** Stable 32-bit FNV-1a hash for presentation variation. This never imports or
+ * touches the seeded gameplay RNG. */
+export function presentationSeed(identity: string): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < identity.length; index += 1) {
+    hash ^= identity.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+function unitFromSeed(seed: number, salt: string): number {
+  return presentationSeed(`${seed}:${salt}`) / 0xffffffff;
+}
+
+function fragmentsFor(explosion: ExplosionPresentation, fragmentSeed: number): ExplosionFragment[] {
+  const fragments: ExplosionFragment[] = [];
+  const seen = new Set<string>();
+  for (const blast of explosion.blasts) {
+    for (const cell of blast.cells) {
+      if (fragments.length >= explosion.fragmentCap) {
+        return fragments;
+      }
+      const cellIdentity = cellKey(cell);
+      if (seen.has(cellIdentity)) {
+        continue;
+      }
+      seen.add(cellIdentity);
+      const rowDelta = cell.row - blast.origin.row;
+      const columnDelta = cell.column - blast.origin.column;
+      const hasDirection = rowDelta !== 0 || columnDelta !== 0;
+      const salt = `${blast.explosionId}:${cellIdentity}`;
+      const angle = hasDirection
+        ? Math.atan2(rowDelta, columnDelta)
+        : unitFromSeed(fragmentSeed, salt) * Math.PI * 2;
+      fragments.push({
+        key: `fragment-${blast.explosionId}-${cell.row}-${cell.column}`,
+        explosionId: blast.explosionId,
+        origin: blast.origin,
+        targetCell: cell,
+        angle,
+        distanceCells: 0.65 + unitFromSeed(fragmentSeed, `${salt}:distance`) * 0.55,
+        delayMs: Math.min(fragments.length * 9, 96),
+      });
+    }
+  }
+  return fragments;
+}
+
+export function identifyExplosionPresentation(
+  explosion: ExplosionPresentation | null,
+  effectId: string,
+  sessionGeneration: number,
+  turn: number,
+): IdentifiedExplosionPresentation | null {
+  if (!explosion) {
+    return null;
+  }
+  const fragmentSeed = presentationSeed(effectId);
+  return {
+    ...explosion,
+    effectId,
+    sessionGeneration,
+    turn,
+    fragmentSeed,
+    fragments: fragmentsFor(explosion, fragmentSeed),
+  };
+}
 
 function clearTier(lineCount: number): ClearTier {
   if (lineCount >= 4) return 4;
@@ -329,6 +534,7 @@ function emptyPlan(): EffectPlan {
     columns: [],
     clearedCells: [],
     defuses: [],
+    explosion: null,
     explosions: [],
     rubbleCells: [],
     reviveCells: [],
@@ -380,6 +586,8 @@ export function buildEffectPlan(
         const effect: ExplosionEffect = {
           explosionId: event.explosionId,
           pieceId: event.pieceId,
+          sourceCells: uniqueCells(event.sourceCells),
+          origin: centroid(event.sourceCells),
           cells: [],
         };
         explosions.push(effect);
@@ -389,7 +597,7 @@ export function buildEffectPlan(
       case "rubbleCreated": {
         const effect = explosionsById.get(event.explosionId);
         if (effect) {
-          effect.cells = [...event.cells];
+          effect.cells = uniqueCells(event.cells);
         }
         break;
       }
@@ -406,6 +614,7 @@ export function buildEffectPlan(
   }
 
   const clear = clearPresentation(rows, columns, reducedMotion);
+  const explosion = buildExplosionPresentation(explosions, reducedMotion);
   const clearedCells = clear ? [...clear.cells] : [];
 
   const rubbleSeen = new Set<string>();
@@ -426,21 +635,28 @@ export function buildEffectPlan(
   let durationMs = 0;
   if (hasRequiredSequence) {
     if (reducedMotion) {
-      durationMs = clear ? clear.timing.recoveryEndMs : REDUCED_MS;
+      durationMs = Math.max(
+        clear?.timing.recoveryEndMs ?? REDUCED_MS,
+        explosion?.timing.recoveryEndMs ?? 0,
+      );
     } else {
       durationMs = clear?.timing.recoveryEndMs ?? (defuses.length > 0 ? DEFUSE_MS : 0);
-      if (explosions.length > 0) {
-        durationMs += EXPLOSION_MS;
-      }
+      durationMs = Math.max(durationMs, explosion?.timing.recoveryEndMs ?? 0);
     }
   }
 
   let boardImpulse: BoardImpulse | null = null;
-  if (!reducedMotion && explosions.length > 0) {
+  if (!reducedMotion && explosion) {
     // Explosion remains visibly stronger than the maximum normal clear. This
     // preserves the established destructive hierarchy without changing its
     // rules, cells, or timing sequence.
-    boardImpulse = { source: "explosion", amplitudePx: 8, durationMs: 200 };
+    boardImpulse = {
+      source: "explosion",
+      amplitudePx:
+        explosion.magnitude === "single" ? 8 : explosion.magnitude === "double" ? 10 : 12,
+      durationMs:
+        explosion.magnitude === "single" ? 350 : explosion.magnitude === "double" ? 420 : 500,
+    };
   } else if (clear && !reducedMotion) {
     const profile = CLEAR_PROFILES[clear.tier];
     if (profile.impulsePx > 0) {
@@ -460,6 +676,7 @@ export function buildEffectPlan(
     columns,
     clearedCells,
     defuses,
+    explosion,
     explosions,
     rubbleCells,
     scoreDelta,

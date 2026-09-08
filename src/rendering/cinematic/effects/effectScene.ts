@@ -1,5 +1,10 @@
-import type { EffectPlan } from "../../../ui/effects/eventEffects";
-import { MAX_BURST_CELLS } from "../../../ui/effects/eventEffects";
+import {
+  identifyExplosionPresentation,
+  buildExplosionPresentation,
+  MAX_BOARD_PARTICLES,
+  type EffectPlan,
+  type IdentifiedExplosionPresentation,
+} from "../../../ui/effects/eventEffects";
 import { cellRect, laneRect, rectCenter } from "../geometry";
 import type { CinematicPalette, SceneGeometry, SceneRect } from "../types";
 
@@ -82,6 +87,24 @@ export type RingPrimitive = EffectTiming & {
   color: string;
 };
 
+export type DetonationPrimitive = EffectTiming & {
+  key: string;
+  center: { x: number; y: number };
+  radius: number;
+  color: string;
+  peak: number;
+  expands: boolean;
+};
+
+export type ShockwavePrimitive = EffectTiming & {
+  key: string;
+  center: { x: number; y: number };
+  radius: number;
+  color: string;
+  peak: number;
+  expands: boolean;
+};
+
 /** Debris over an authoritative rubble cell. */
 export type BurstPrimitive = EffectTiming & {
   key: string;
@@ -108,6 +131,9 @@ export type EffectScene = {
   sweeps: readonly SweepPrimitive[];
   flashes: readonly FlashPrimitive[];
   rings: readonly RingPrimitive[];
+  detonations: readonly DetonationPrimitive[];
+  shockwaves: readonly ShockwavePrimitive[];
+  rubbleImpacts: readonly FlashPrimitive[];
   bursts: readonly BurstPrimitive[];
   texts: readonly TextPrimitive[];
   /** Board shake amplitude in px; 0 when there is nothing to shake for, or
@@ -125,10 +151,6 @@ const CLEAR_STAGGER_MS = 8;
 const CLEAR_STAGGER_CAP_MS = 56;
 const CLEAR_FLASH_MS = 280;
 const DEFUSE_RING_MS = 320;
-const EXPLOSION_STAGGER_MS = 30;
-const EXPLOSION_CELL_STAGGER_MS = 12;
-const EXPLOSION_STAGGER_CAP_MS = 120;
-const BURST_MS = 360;
 const REVIVE_ROW_STAGGER_MS = 18;
 const REVIVE_STAGGER_CAP_MS = 140;
 const REVIVE_MS = 400;
@@ -137,8 +159,6 @@ const TEXT_MS = 900;
 /** Reduced motion keeps the beat but drops the travel, and shortens it: a
  *  static emphasis that lingers reads as a stall rather than as feedback. */
 const REDUCED_FLASH_MS = 140;
-
-const BURST_DISTANCE = 10;
 
 /** Renderer-side caps.
  *
@@ -152,23 +172,21 @@ const MAX_SWEEPS = 16;
 const MAX_FLASHES = 128;
 const MAX_RINGS = 16;
 
-function debrisAngle(row: number, column: number): number {
-  // Deterministic, not random: the same cell throws debris the same way every
-  // time, so a replayed explosion looks like the same explosion. Two odd
-  // multipliers keep neighbouring cells from throwing in parallel.
-  return (((row * 7 + column * 13) % 12) / 12) * Math.PI * 2;
-}
-
 export function buildEffectScene(
   plan: EffectPlan,
   geometry: SceneGeometry,
   palette: CinematicPalette,
   reducedMotion: boolean,
+  identifiedExplosion?: IdentifiedExplosionPresentation | null,
+  fragmentLimit = MAX_BOARD_PARTICLES,
 ): EffectScene {
   const sweeps: SweepPrimitive[] = [];
   const blooms: BloomPrimitive[] = [];
   const flashes: FlashPrimitive[] = [];
   const rings: RingPrimitive[] = [];
+  const detonations: DetonationPrimitive[] = [];
+  const shockwaves: ShockwavePrimitive[] = [];
+  const rubbleImpacts: FlashPrimitive[] = [];
   const bursts: BurstPrimitive[] = [];
   const texts: TextPrimitive[] = [];
 
@@ -178,6 +196,9 @@ export function buildEffectScene(
       sweeps,
       flashes,
       rings,
+      detonations,
+      shockwaves,
+      rubbleImpacts,
       bursts,
       texts,
       shake: 0,
@@ -316,34 +337,103 @@ export function buildEffectScene(
     }
   }
 
-  // Expiry. The burst plays over the rubble the domain actually created, which
-  // is why it can be capped without lying: the rubble is drawn by the board
-  // regardless, so a dropped burst costs a flourish, not information.
-  let burstBudget = MAX_BURST_CELLS;
-  // Indexed loops rather than forEach, so an exhausted budget stops the whole
-  // traversal. `return` inside a forEach callback only skips one cell, so the
-  // previous version kept walking every remaining cell of every remaining
-  // explosion long after it could emit anything.
-  for (let index = 0; index < plan.explosions.length && burstBudget > 0; index++) {
-    const explosion = plan.explosions[index];
-    const pieceDelay = Math.min(index * EXPLOSION_STAGGER_MS, EXPLOSION_STAGGER_CAP_MS);
-    for (let cellIndex = 0; cellIndex < explosion.cells.length && burstBudget > 0; cellIndex++) {
-      const cell = explosion.cells[cellIndex];
-      burstBudget -= 1;
-      bursts.push({
-        key: `burst-${cell.row}-${cell.column}`,
+  const explosion =
+    identifiedExplosion ??
+    identifyExplosionPresentation(
+      plan.explosion ?? buildExplosionPresentation(plan.explosions, reducedMotion),
+      "standalone",
+      0,
+      0,
+    );
+  if (explosion) {
+    const { timing } = explosion;
+    for (const blast of explosion.blasts) {
+      const sourceRects = blast.sourceCells.map((cell) =>
+        cellRect(geometry, cell.row, cell.column),
+      );
+      for (const [index, rect] of sourceRects.entries()) {
+        flashes.push({
+          key: `explosion-critical-${blast.explosionId}-${index}`,
+          rect,
+          color: palette.danger,
+          delayMs: 0,
+          durationMs: timing.criticalFlashEndMs,
+          settles: false,
+          peak: 1,
+        });
+      }
+      const center = {
+        x: geometry.contentInset + blast.origin.column * geometry.pitch + geometry.cellSize / 2,
+        y: geometry.contentInset + blast.origin.row * geometry.pitch + geometry.cellSize / 2,
+      };
+      detonations.push({
+        key: `explosion-detonation-${blast.explosionId}`,
+        center,
+        radius: geometry.cellSize * 1.4,
+        color: palette.danger,
+        peak: Math.min(1, explosion.bloomIntensity * 0.78),
+        expands: !reducedMotion,
+        delayMs: timing.detonationStartMs,
+        durationMs: Math.max(1, timing.detonationEndMs - timing.detonationStartMs),
+      });
+      shockwaves.push({
+        key: `explosion-shockwave-${blast.explosionId}`,
+        center,
+        radius: geometry.cellSize * 2.15,
+        color: palette.danger,
+        peak: 0.95,
+        expands: !reducedMotion,
+        delayMs: timing.detonationStartMs,
+        durationMs: Math.max(
+          1,
+          (timing.fragmentsEndMs > timing.detonationStartMs
+            ? timing.fragmentsEndMs
+            : timing.recoveryEndMs) - timing.detonationStartMs,
+        ),
+      });
+    }
+
+    for (const cell of explosion.newRubbleCells) {
+      rubbleImpacts.push({
+        key: `rubble-impact-${cell.row}-${cell.column}`,
         rect: cellRect(geometry, cell.row, cell.column),
         color: palette.danger,
-        angle: debrisAngle(cell.row, cell.column),
-        distance: reducedMotion ? 0 : BURST_DISTANCE,
-        delayMs: reducedMotion
-          ? 0
-          : Math.min(
-              pieceDelay + cellIndex * EXPLOSION_CELL_STAGGER_MS,
-              EXPLOSION_STAGGER_CAP_MS + pieceDelay,
-            ),
-        durationMs: reducedMotion ? REDUCED_FLASH_MS : BURST_MS,
+        delayMs: timing.rubbleSettleStartMs,
+        durationMs: Math.max(1, timing.rubbleSettleEndMs - timing.rubbleSettleStartMs),
+        settles: !reducedMotion,
+        peak: reducedMotion ? 0.55 : 0.82,
       });
+    }
+
+    if (!reducedMotion) {
+      for (const fragment of explosion.fragments.slice(0, fragmentLimit)) {
+        const size = Math.max(2, geometry.cellSize * 0.12);
+        bursts.push({
+          key: fragment.key,
+          rect: {
+            x:
+              geometry.contentInset +
+              fragment.origin.column * geometry.pitch +
+              geometry.cellSize / 2 -
+              size / 2,
+            y:
+              geometry.contentInset +
+              fragment.origin.row * geometry.pitch +
+              geometry.cellSize / 2 -
+              size / 2,
+            width: size * 2.2,
+            height: size,
+          },
+          color: palette.danger,
+          angle: fragment.angle,
+          distance: geometry.cellSize * fragment.distanceCells,
+          delayMs: timing.fragmentsStartMs + fragment.delayMs,
+          durationMs: Math.max(
+            1,
+            timing.fragmentsEndMs - timing.fragmentsStartMs - fragment.delayMs,
+          ),
+        });
+      }
     }
   }
 
@@ -388,6 +478,9 @@ export function buildEffectScene(
     sweeps,
     flashes,
     rings,
+    detonations,
+    shockwaves,
+    rubbleImpacts,
     bursts,
     texts,
     // Board-only, and never under reduced motion — a shake is the one beat with

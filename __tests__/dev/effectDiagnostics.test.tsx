@@ -52,6 +52,7 @@ function plan(overrides: Partial<EffectPlan> = {}): EffectPlan {
     columns: [],
     clearedCells: Array.from({ length: 8 }, (_, column) => ({ row: 3, column })),
     defuses: [],
+    explosion: null,
     explosions: [],
     rubbleCells: [],
     reviveCells: [],
@@ -73,6 +74,7 @@ function admit(queue: EffectQueue, id: string, overrides: Partial<EffectPlan> = 
   return admitEffect(queue, {
     id,
     sessionId: queue.sessionId,
+    turn: 1,
     priority: built.explosions.length > 0 || built.cue !== null ? "critical" : "high",
     plan: built,
     durationMs: built.durationMs,
@@ -231,7 +233,15 @@ describe("the diagnostics recorder counts what happened", () => {
     step(before, clear, 0);
     recordEffectEnqueue("s1:t2", 1, 1);
     const boom = admit(clear, "s1:t2", {
-      explosions: [{ explosionId: "x1", pieceId: "p1", cells: [{ row: 0, column: 0 }] }],
+      explosions: [
+        {
+          explosionId: "x1",
+          pieceId: "p1",
+          sourceCells: [{ row: 0, column: 0 }],
+          origin: { row: 0, column: 0 },
+          cells: [{ row: 0, column: 0 }],
+        },
+      ],
       rubbleCells: [{ row: 0, column: 0 }],
     });
     step(clear, boom, 1);

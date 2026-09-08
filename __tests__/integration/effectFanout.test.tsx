@@ -34,6 +34,7 @@ function plan(overrides: Partial<EffectPlan> = {}): EffectPlan {
     columns: [],
     clearedCells: Array.from({ length: 8 }, (_, column) => ({ row: 3, column })),
     defuses: [],
+    explosion: null,
     explosions: [],
     rubbleCells: [],
     reviveCells: [],
@@ -51,7 +52,14 @@ function plan(overrides: Partial<EffectPlan> = {}): EffectPlan {
 }
 
 function sequence(id: string, priority: EffectSequence["priority"]): EffectSequence {
-  return { id, priority, plan: plan() };
+  return {
+    id,
+    sessionGeneration: 1,
+    turn: 1,
+    priority,
+    plan: plan(),
+    explosion: null,
+  };
 }
 
 describe("the fallback renderer draws every queued effect", () => {

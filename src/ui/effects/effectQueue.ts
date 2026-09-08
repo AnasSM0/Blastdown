@@ -1,4 +1,8 @@
-import type { EffectPlan } from "./eventEffects";
+import {
+  identifyExplosionPresentation,
+  type EffectPlan,
+  type IdentifiedExplosionPresentation,
+} from "./eventEffects";
 
 /** Deterministic delivery for gameplay effects.
  *
@@ -78,6 +82,8 @@ export type LiveEffect = {
   /** The run generation this belongs to. Anything from an older generation is
    *  ignored rather than cleaned up — see the module note. */
   sessionId: number;
+  /** Committed gameplay turn; null only for out-of-turn rewarded cues. */
+  turn: number | null;
   priority: EffectPriority;
   plan: EffectPlan;
   durationMs: number;
@@ -97,8 +103,11 @@ export type LiveEffect = {
  *  testable against a single contract. */
 export type EffectSequence = {
   id: string;
+  sessionGeneration: number;
+  turn: number | null;
   priority: EffectPriority;
   plan: EffectPlan;
+  explosion: IdentifiedExplosionPresentation | null;
 };
 
 /** Drawing order: standard underneath, then high, critical on top.
@@ -119,7 +128,15 @@ const DRAW_ORDER: Record<EffectPriority, number> = {
 export function drawOrder(queue: EffectQueue): EffectSequence[] {
   return [...queue.effects]
     .sort((a, b) => DRAW_ORDER[a.priority] - DRAW_ORDER[b.priority] || a.sequence - b.sequence)
-    .map(({ id, priority, plan }) => ({ id, priority, plan }));
+    .map(({ id, sessionId, turn, priority, plan }) => ({
+      id,
+      sessionGeneration: sessionId,
+      turn,
+      priority,
+      plan,
+      explosion:
+        turn === null ? null : identifyExplosionPresentation(plan.explosion, id, sessionId, turn),
+    }));
 }
 
 export type EffectQueue = {

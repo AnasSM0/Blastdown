@@ -40,6 +40,7 @@ function plan(overrides: Partial<EffectPlan> = {}, reducedMotion = false): Effec
     columns: [],
     clearedCells: [],
     defuses: [],
+    explosion: null,
     explosions: [],
     rubbleCells: [],
     reviveCells: [],
@@ -106,6 +107,8 @@ describe("expiry bursts stay within budget", () => {
     const explosions = Array.from({ length: 4 }, (_, index) => ({
       explosionId: `e${index}`,
       pieceId: `p${index}`,
+      sourceCells: [{ row: index, column: 0 }],
+      origin: { row: index, column: 0 },
       cells: cells(10, index),
     }));
 
@@ -118,13 +121,33 @@ describe("expiry bursts stay within budget", () => {
 
   it("throws debris deterministically, so a repeat looks like the same explosion", () => {
     const once = buildEffectScene(
-      plan({ explosions: [{ explosionId: "e", pieceId: "p", cells: cells(4) }] }),
+      plan({
+        explosions: [
+          {
+            explosionId: "e",
+            pieceId: "p",
+            sourceCells: [{ row: 0, column: 0 }],
+            origin: { row: 0, column: 0 },
+            cells: cells(4),
+          },
+        ],
+      }),
       geometry,
       palette,
       false,
     );
     const twice = buildEffectScene(
-      plan({ explosions: [{ explosionId: "e", pieceId: "p", cells: cells(4) }] }),
+      plan({
+        explosions: [
+          {
+            explosionId: "e",
+            pieceId: "p",
+            sourceCells: [{ row: 0, column: 0 }],
+            origin: { row: 0, column: 0 },
+            cells: cells(4),
+          },
+        ],
+      }),
       geometry,
       palette,
       false,
@@ -136,13 +159,87 @@ describe("expiry bursts stay within budget", () => {
   it("shakes the board once for an explosion turn and never otherwise", () => {
     expect(
       buildEffectScene(
-        plan({ explosions: [{ explosionId: "e", pieceId: "p", cells: cells(1) }] }),
+        plan({
+          explosions: [
+            {
+              explosionId: "e",
+              pieceId: "p",
+              sourceCells: [{ row: 0, column: 0 }],
+              origin: { row: 0, column: 0 },
+              cells: cells(1),
+            },
+          ],
+        }),
         geometry,
         palette,
         false,
       ).shake,
     ).toBeGreaterThan(0);
     expect(buildEffectScene(plan({ rows: [0] }), geometry, palette, false).shake).toBe(0);
+  });
+});
+
+describe("B-06 explosion sequence", () => {
+  const events = [
+    {
+      type: "explosionStarted" as const,
+      explosionId: "e-left",
+      pieceId: "p-left",
+      sourceCells: [{ row: 2, column: 2 }],
+    },
+    {
+      type: "rubbleCreated" as const,
+      explosionId: "e-left",
+      cells: [
+        { row: 2, column: 2 },
+        { row: 2, column: 3 },
+      ],
+    },
+    {
+      type: "explosionStarted" as const,
+      explosionId: "e-right",
+      pieceId: "p-right",
+      sourceCells: [{ row: 6, column: 6 }],
+    },
+    {
+      type: "rubbleCreated" as const,
+      explosionId: "e-right",
+      cells: [
+        { row: 2, column: 3 },
+        { row: 6, column: 6 },
+      ],
+    },
+  ];
+
+  it("draws one distinct shockwave per committed blast origin", () => {
+    const scene = buildEffectScene(buildEffectPlan(events, false), geometry, palette, false);
+
+    expect(scene.shockwaves).toHaveLength(2);
+    expect(new Set(scene.shockwaves.map((wave) => `${wave.center.x},${wave.center.y}`)).size).toBe(
+      2,
+    );
+    expect(scene.detonations).toHaveLength(2);
+  });
+
+  it("settles only the deduplicated new rubble cells", () => {
+    const scene = buildEffectScene(buildEffectPlan(events, false), geometry, palette, false);
+
+    expect(scene.rubbleImpacts.map((impact) => impact.key)).toEqual([
+      "rubble-impact-2-2",
+      "rubble-impact-2-3",
+      "rubble-impact-6-6",
+    ]);
+  });
+
+  it("removes shake and travelling fragments under Reduced Motion but keeps origin and rubble cues", () => {
+    const scene = buildEffectScene(buildEffectPlan(events, true), geometry, palette, true);
+
+    expect(scene.shake).toBe(0);
+    expect(scene.bursts).toEqual([]);
+    expect(scene.detonations).toHaveLength(2);
+    expect(scene.shockwaves).toHaveLength(2);
+    expect(scene.rubbleImpacts).toHaveLength(3);
+    expect(scene.shockwaves.every((wave) => !wave.expands)).toBe(true);
   });
 });
 
@@ -191,7 +288,15 @@ describe("reduced motion removes movement, not meaning", () => {
   const busyOverrides: Partial<EffectPlan> = {
     rows: [0],
     clearedCells: cells(8),
-    explosions: [{ explosionId: "e", pieceId: "p", cells: cells(3, 4) }],
+    explosions: [
+      {
+        explosionId: "e",
+        pieceId: "p",
+        sourceCells: [{ row: 4, column: 0 }],
+        origin: { row: 4, column: 0 },
+        cells: cells(3, 4),
+      },
+    ],
     reviveCells: cells(2, 6),
     scoreDelta: 150,
     defuses: [{ pieceId: "p1", bonus: 25, cells: [{ row: 1, column: 1 }] }],
@@ -206,7 +311,10 @@ describe("reduced motion removes movement, not meaning", () => {
     // Removing the signal — rather than the movement — would make the board
     // less legible for the players the setting exists to help.
     expect(reduced.flashes.length).toBeGreaterThan(0);
-    expect(reduced.bursts.length).toBeGreaterThan(0);
+    expect(reduced.bursts).toEqual([]);
+    expect(reduced.detonations.length).toBeGreaterThan(0);
+    expect(reduced.shockwaves.length).toBeGreaterThan(0);
+    expect(reduced.rubbleImpacts.length).toBeGreaterThan(0);
     expect(reduced.rings.length).toBeGreaterThan(0);
     expect(reduced.texts.length).toBeGreaterThan(0);
   });
@@ -266,6 +374,9 @@ describe("an unmeasured board draws nothing", () => {
       blooms: [],
       flashes: [],
       rings: [],
+      detonations: [],
+      shockwaves: [],
+      rubbleImpacts: [],
       bursts: [],
       texts: [],
       shake: 0,
@@ -282,7 +393,15 @@ describe("every primitive carries a stable, unique key", () => {
         rows: [0],
         columns: [0],
         clearedCells: [...cells(8), { row: 1, column: 0 }],
-        explosions: [{ explosionId: "e", pieceId: "p", cells: cells(3, 5) }],
+        explosions: [
+          {
+            explosionId: "e",
+            pieceId: "p",
+            sourceCells: [{ row: 5, column: 0 }],
+            origin: { row: 5, column: 0 },
+            cells: cells(3, 5),
+          },
+        ],
         reviveCells: cells(2, 6),
         scoreDelta: 50,
       }),
@@ -296,6 +415,9 @@ describe("every primitive carries a stable, unique key", () => {
       ...scene.blooms.map((p) => p.key),
       ...scene.flashes.map((p) => p.key),
       ...scene.rings.map((p) => p.key),
+      ...scene.detonations.map((p) => p.key),
+      ...scene.shockwaves.map((p) => p.key),
+      ...scene.rubbleImpacts.map((p) => p.key),
       ...scene.bursts.map((p) => p.key),
       ...scene.texts.map((p) => p.key),
     ];
