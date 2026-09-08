@@ -38,7 +38,8 @@ function ThemePreview({ theme }: { theme: ThemePalette }) {
   );
 }
 
-/** Themes screen (BUILD_SPEC.md §10.6). Owned themes select immediately; locked
+/** @deprecated Dormant post-V1 component with no Expo Router entry.
+ * Themes screen (historical BUILD_SPEC.md §10.6). Owned themes select immediately; locked
  *  themes open a Bolt purchase confirmation. Prices/ownership come from the
  *  authoritative catalog + profile, never hardcoded here. Every control is at
  *  least 44x44 with an accessibility label. */

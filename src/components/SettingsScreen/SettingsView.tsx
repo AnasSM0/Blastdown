@@ -8,12 +8,15 @@ type ToggleKey = "soundEnabled" | "musicEnabled" | "hapticsEnabled" | "reducedMo
 
 type SettingsViewProps = {
   settings: PersistedSettings;
-  /** Display name of the active theme, shown on the Themes row. */
-  themeName: string;
   onToggle: (key: ToggleKey, value: boolean) => void;
-  onThemes: () => void;
   onReplayTutorial: () => void;
   onBack: () => void;
+  /** Opens the development-only effect delivery harness.
+   *
+   *  Optional, and absent is the normal case: the route supplies it only in a
+   *  development build, so the row does not exist in a preview or store build
+   *  rather than existing and being disabled. */
+  onEffectHarness?: () => void;
 };
 
 const ROWS: { key: ToggleKey; label: string }[] = [
@@ -23,17 +26,16 @@ const ROWS: { key: ToggleKey; label: string }[] = [
   { key: "reducedMotion", label: "REDUCED MOTION" },
 ];
 
-/** Settings screen (BUILD_SPEC.md §10.7). Every toggle is wired to persisted
+/** V1 Settings screen. Every toggle is wired to persisted
  *  settings and survives restart. Reduced motion is an explicit override once
- *  touched (null = follow OS until then). Also the hub for Themes navigation
- *  and replaying the tutorial. All controls are at least 44x44. */
+ *  touched (null = follow OS until then). It also replays the tutorial. All
+ *  controls are at least 44x44. */
 export function SettingsView({
   settings,
-  themeName,
   onToggle,
-  onThemes,
   onReplayTutorial,
   onBack,
+  onEffectHarness,
 }: SettingsViewProps) {
   const valueFor = (key: ToggleKey): boolean =>
     key === "reducedMotion" ? settings.reducedMotionOverride === true : settings[key];
@@ -72,19 +74,6 @@ export function SettingsView({
       <View style={styles.card}>
         <Pressable
           style={styles.navRow}
-          onPress={onThemes}
-          accessibilityRole="button"
-          accessibilityLabel={`Themes, currently ${themeName}`}
-          testID="settings-themes-button"
-        >
-          <Text style={styles.label}>THEMES</Text>
-          <View style={styles.navValue}>
-            <Text style={styles.navValueText}>{themeName}</Text>
-            <Text style={styles.chevron}>›</Text>
-          </View>
-        </Pressable>
-        <Pressable
-          style={styles.navRow}
           onPress={onReplayTutorial}
           accessibilityRole="button"
           accessibilityLabel="Replay tutorial"
@@ -94,6 +83,19 @@ export function SettingsView({
           <Text style={styles.label}>REPLAY TUTORIAL</Text>
           <Text style={styles.chevron}>›</Text>
         </Pressable>
+        {onEffectHarness ? (
+          <Pressable
+            style={styles.navRow}
+            onPress={onEffectHarness}
+            accessibilityRole="button"
+            accessibilityLabel="Effect harness"
+            accessibilityHint="Opens the development-only effect delivery harness"
+            testID="settings-effect-harness-button"
+          >
+            <Text style={styles.label}>EFFECT HARNESS (DEV)</Text>
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -148,15 +150,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-  navValue: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  navValueText: {
-    ...typography.buttonText,
-    color: colors.onSurfaceVariant,
   },
   chevron: {
     ...typography.numericValue,

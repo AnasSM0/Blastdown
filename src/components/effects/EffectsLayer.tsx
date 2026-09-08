@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { View, StyleSheet } from "react-native";
 
 import type { CellPosition } from "../../domain/placement";
@@ -40,6 +41,11 @@ type EffectsLayerProps = {
   plan: EffectPlan;
   cellSize: number;
   reducedMotion: boolean;
+  /** Identity of the effect being drawn, from the effect queue. */
+  effectId?: string | null;
+  /** Called once when this layer starts drawing `effectId`. See the note on
+   *  the effect below for why this exists. */
+  onStarted?: (id: string, now: number) => void;
 };
 
 function centroid(cells: readonly CellPosition[]): { row: number; column: number } | null {
@@ -69,8 +75,46 @@ function defuseAnchor(
  *  gameplay: clears, defuses, explosions/rubble, and the revive recovery wave.
  *  Rendered as a SIBLING of the board rather than a child, so a change of plan
  *  never re-renders the 64 cells. */
-export function EffectsLayer({ plan, cellSize, reducedMotion }: EffectsLayerProps) {
+export function EffectsLayer({
+  plan,
+  cellSize,
+  reducedMotion,
+  effectId,
+  onStarted,
+}: EffectsLayerProps) {
   const theme = useTheme();
+
+  // Report to the animator that this layer has begun drawing an effect.
+  //
+  // This call is what makes the renderer-owned start time real. Without it
+  // `startedDrawing` was never invoked in production: `startedAt` stayed null
+  // forever, every effect retired on the watchdog rather than on its own clock,
+  // and the "wait for a slow renderer" branch was unreachable. The unit tests
+  // passed because they called it by hand.
+  //
+  // Mount is the right moment: React has committed the layer, so it paints on
+  // the next frame. Reporting earlier would be a lie about drawing; reporting
+  // later would need a frame callback per effect, which is the per-frame cost
+  // this renderer exists to avoid.
+  // Reported once per effect id, tracked in a ref rather than by effect
+  // dependencies. The callback and the scene both change identity across
+  // ordinary re-renders, so a dependency list would re-report the same effect
+  // repeatedly. The animator ignores a second start, but a renderer that keeps
+  // announcing the same draw is lying about what it did, and the next thing
+  // built on top of it would inherit that.
+  const startedRef = useRef<string | null>(null);
+  const onStartedRef = useRef(onStarted);
+  useEffect(() => {
+    onStartedRef.current = onStarted;
+  });
+  useEffect(() => {
+    if (effectId == null || cellSize <= 0 || startedRef.current === effectId) {
+      return;
+    }
+    startedRef.current = effectId;
+    onStartedRef.current?.(effectId, Date.now());
+  }, [effectId, cellSize]);
+
   if (cellSize <= 0) {
     return null;
   }

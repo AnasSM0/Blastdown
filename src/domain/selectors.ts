@@ -1,8 +1,10 @@
 import { MAX_REWARDED_DEFUSES_PER_RUN, MAX_REWARDED_FREEZES_PER_RUN } from "../config/balance";
 import type { ActiveTimedPiece, GameState } from "./gameTypes";
 import type { CellPosition } from "./placement";
+import { applyPlacement, isValidPlacement } from "./placement";
 import { getShapeById } from "./shapes";
-import { BOARD_SIZE } from "./board";
+import type { ShapeDefinition } from "./shapes";
+import { detectCompletedLines } from "./lineClearing";
 
 export type TimerBadgePlacement = {
   pieceId: string;
@@ -47,7 +49,84 @@ export type PlacementPreview = {
   cells: CellPosition[];
   /** In-bounds ghost cells overlapping an occupied or rubble cell. */
   conflictCells: CellPosition[];
+  /** Lines that the authoritative placement would clear, without resolving the
+   *  turn or changing any gameplay state. */
+  clear: PlacementClearPrediction;
 };
+
+export type PlacementClearPrediction = {
+  rows: number[];
+  columns: number[];
+  /** Deduplicated union of every cell in the completed rows and columns. */
+  cells: CellPosition[];
+  /** Cells where a predicted row and column cross. */
+  intersections: CellPosition[];
+};
+
+function emptyClearPrediction(): PlacementClearPrediction {
+  return { rows: [], columns: [], cells: [], intersections: [] };
+}
+
+function invalidPlacementPreview(): PlacementPreview {
+  return { valid: false, cells: [], conflictCells: [], clear: emptyClearPrediction() };
+}
+
+function predictForShape(
+  state: GameState,
+  shape: ShapeDefinition,
+  colorId: string,
+  origin: CellPosition,
+): PlacementPreview {
+  const cells: CellPosition[] = [];
+  const conflictCells: CellPosition[] = [];
+
+  for (const shapeCell of shape.cells) {
+    const row = origin.row + shapeCell.row;
+    const column = origin.column + shapeCell.column;
+    if (row < 0 || row >= state.grid.length || column < 0 || column >= state.grid.length) {
+      continue;
+    }
+    const position = { row, column };
+    cells.push(position);
+    if (state.grid[row][column].kind !== "empty") {
+      conflictCells.push(position);
+    }
+  }
+
+  // This is the same legality authority used by the real domain transaction.
+  // The loops above only collect presentation cells and do not decide validity.
+  const valid = isValidPlacement(state.grid, shape, origin);
+  if (!valid) {
+    return { valid, cells, conflictCells, clear: emptyClearPrediction() };
+  }
+
+  // Applying to a cloned grid and running the authoritative detector predicts
+  // the pre-clear result without advancing RNG, timers, score, events, or turn.
+  const placedGrid = applyPlacement(state.grid, shape, origin, colorId);
+  const { rows, columns } = detectCompletedLines(placedGrid);
+  const rowSet = new Set(rows);
+  const columnSet = new Set(columns);
+  const clearCells: CellPosition[] = [];
+  const intersections: CellPosition[] = [];
+
+  for (let row = 0; row < placedGrid.length; row++) {
+    for (let column = 0; column < placedGrid[row].length; column++) {
+      if (rowSet.has(row) || columnSet.has(column)) {
+        clearCells.push({ row, column });
+      }
+      if (rowSet.has(row) && columnSet.has(column)) {
+        intersections.push({ row, column });
+      }
+    }
+  }
+
+  return {
+    valid,
+    cells,
+    conflictCells,
+    clear: { rows, columns, cells: clearCells, intersections },
+  };
+}
 
 /** Preview of placing `shapeId` at `origin` — presentation data only; the
  *  validity rule itself stays in src/domain/placement.ts semantics. */
@@ -58,29 +137,31 @@ export function getPlacementPreview(
 ): PlacementPreview {
   const shape = getShapeById(shapeId);
   if (!shape) {
-    return { valid: false, cells: [], conflictCells: [] };
+    return invalidPlacementPreview();
   }
+  return predictForShape(state, shape, "preview", origin);
+}
 
-  const cells: CellPosition[] = [];
-  const conflictCells: CellPosition[] = [];
-  let valid = true;
-
-  for (const shapeCell of shape.cells) {
-    const row = origin.row + shapeCell.row;
-    const column = origin.column + shapeCell.column;
-    if (row < 0 || row >= BOARD_SIZE || column < 0 || column >= BOARD_SIZE) {
-      valid = false;
-      continue;
-    }
-    const position = { row, column };
-    cells.push(position);
-    if (state.grid[row][column].kind !== "empty") {
-      valid = false;
-      conflictCells.push(position);
-    }
+/** Predict a placement for the exact hand identity the user is manipulating.
+ *  This is the UI's canonical pre-clear contract: it delegates both legality
+ *  and completed-line detection to the same pure domain functions as placement. */
+export function getPlacementPrediction(
+  state: GameState,
+  handId: string,
+  origin: CellPosition,
+): PlacementPreview {
+  if (state.status !== "playing") {
+    return invalidPlacementPreview();
   }
-
-  return { valid, cells, conflictCells };
+  const handPiece = state.hand.find((piece) => piece.handId === handId);
+  if (!handPiece) {
+    return invalidPlacementPreview();
+  }
+  const shape = getShapeById(handPiece.shapeId);
+  if (!shape) {
+    return invalidPlacementPreview();
+  }
+  return predictForShape(state, shape, handPiece.colorId, origin);
 }
 
 /** The active timed piece a rewarded defuse would target: lowest remaining
@@ -121,7 +202,8 @@ export function canApplyRewardedDefuse(state: GameState): boolean {
   );
 }
 
-/** True when the one-per-run rewarded revive is still available from the
+/** @deprecated Dormant legacy selector; V1 has no Revive offer.
+ * True when the one-per-run rewarded revive is still available from the
  *  game-over state. Mirrors `applyRevive`'s precondition. */
 export function canRevive(state: GameState): boolean {
   return state.status === "gameOver" && !state.reviveUsed;

@@ -2,7 +2,8 @@ import { BOLTS_SCORE_DIVISOR } from "../../config/balance";
 import type { GameState } from "../../domain/gameTypes";
 import type { PersistedProfile } from "../storage/schemas";
 
-/** Bolts earned by a finished run (BUILD_SPEC.md §8.1):
+/** @deprecated Dormant post-V1 economy helper; production settlement ignores it.
+ * Bolts earned by a finished run (historical BUILD_SPEC.md §8.1):
  *  floor(score / 250) + successfully defused pieces. Pure — safe to call for
  *  display without settling. */
 export function computeBoltsEarned(state: GameState): number {
@@ -11,37 +12,33 @@ export function computeBoltsEarned(state: GameState): number {
 
 export type SettlementResult = {
   profile: PersistedProfile;
-  boltsEarned: number;
 };
 
-/** Fold a finished run into the profile: bank Bolts, raise best score/combo,
- *  accumulate lifetime stats, and count the run. Pure and total — the caller
- *  guarantees each run is settled exactly once (idempotency lives in the hook,
- *  not here). Reads the finished GameState; profile/Bolts never live on it. */
+/** Fold a finished run into the V1 profile statistics. Deprecated progression
+ *  fields are preserved byte-for-byte for backward compatibility but are not
+ *  earned, consumed, or required by current product behavior. */
 export function settleRun(
   profile: PersistedProfile,
   state: GameState,
   now: number,
 ): SettlementResult {
-  const boltsEarned = computeBoltsEarned(state);
   const nextProfile: PersistedProfile = {
     ...profile,
     bestScore: Math.max(profile.bestScore, state.score),
     bestCombo: Math.max(profile.bestCombo, state.bestCombo),
-    bolts: profile.bolts + boltsEarned,
     totalRuns: profile.totalRuns + 1,
     piecesPlaced: profile.piecesPlaced + state.piecesPlaced,
     linesCleared: profile.linesCleared + state.linesCleared,
     piecesDefused: profile.piecesDefused + state.piecesDefused,
     explosions: profile.explosions + state.explosions,
     rubbleCleared: profile.rubbleCleared + state.rubbleCleared,
-    revivesUsed: profile.revivesUsed + (state.reviveUsed ? 1 : 0),
     updatedAt: now,
   };
-  return { profile: nextProfile, boltsEarned };
+  return { profile: nextProfile };
 }
 
-/** Apply a mock "double Bolts" reward to a profile: bank the run's Bolts a
+/** @deprecated Dormant post-V1 economy helper; no V1 session calls it.
+ * Apply a mock "double Bolts" reward to a profile: bank the run's Bolts a
  *  second time (the base amount was already banked by `settleRun`). Pure and
  *  total; `boltsEarned` is clamped at 0 so it can never reduce a balance. The
  *  once-per-run guarantee (no repeated doubling) lives in the session, not

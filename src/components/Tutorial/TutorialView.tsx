@@ -30,7 +30,12 @@ function highlightPreview(cells: readonly CellPosition[]): PlacementPreview | nu
   if (cells.length === 0) {
     return null;
   }
-  return { valid: true, cells: [...cells], conflictCells: [] };
+  return {
+    valid: true,
+    cells: [...cells],
+    conflictCells: [],
+    clear: { rows: [], columns: [], cells: [], intersections: [] },
+  };
 }
 
 /** First-run onboarding over the real board and components (never screenshots).

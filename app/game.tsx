@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import { BackHandler, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
-import { GameBoard, BOARD_CONTENT_INSET } from "../src/components/GameBoard";
-import { EffectsLayer } from "../src/components/effects/EffectsLayer";
+import { BOARD_CONTENT_INSET } from "../src/components/GameBoard";
+import { EffectStack } from "../src/components/effects/EffectStack";
 import { PieceTray } from "../src/components/PieceTray";
 import { ReactorBackground } from "../src/components/ReactorBackground";
 import { ScoreHeader } from "../src/components/ScoreHeader";
 import { GameOverOverlay } from "../src/components/modals/GameOverOverlay";
 import { DefuseConfirmCard } from "../src/components/modals/DefuseConfirmCard";
-import { SecondChanceBanner } from "../src/components/modals/SecondChanceBanner";
 import { PauseOverlay } from "../src/components/modals/PauseOverlay";
+import { RunConfirmationCard } from "../src/components/modals/RunConfirmationCard";
 import { RewardedActionBar } from "../src/components/RewardedActionButton";
 import { DragGhost, DRAG_LIFT, type DragGhostHandle } from "../src/components/DragGhost";
 import { BOARD_SIZE } from "../src/domain/board";
@@ -20,16 +20,19 @@ import { getShapeById } from "../src/domain/shapes";
 import {
   canActivateFreeze,
   canApplyRewardedDefuse,
-  canRevive,
   getRewardedDefuseTarget,
   getTimerBadgePlacements,
 } from "../src/domain/selectors";
+// Resolved behind the build-time flag, so a build with the cinematic renderer
+// off never evaluates Skia at all. See the module's own comment.
+import { BoardRenderer, CINEMATIC_RENDERER } from "../src/rendering/boardRenderer";
 import { dragOriginFromFinger, type BoardLayout, type Point } from "../src/ui/boardGeometry";
-import { cellsOfPiece, rubbleCellsOf } from "../src/ui/effects/eventEffects";
+import { cellsOfPiece } from "../src/ui/effects/eventEffects";
 import {
   useGameController,
   type GameController,
   type GameControllerOptions,
+  type PlacementIntent,
 } from "../src/hooks/useGameController";
 import { useHaptics } from "../src/hooks/useHaptics";
 import { useEffectiveReducedMotion } from "../src/hooks/useEffectiveReducedMotion";
@@ -55,21 +58,51 @@ import { useTheme } from "../src/ui/ThemeProvider";
 
 type DragState = {
   handId: string;
+  intent: PlacementIntent;
   shapeId: string;
   colorId: string;
   startX: number;
   startY: number;
 };
 
-function shapeBoundsFor(shapeId: string): { maxRow: number; maxColumn: number } | null {
-  const shape = getShapeById(shapeId);
-  if (!shape) {
-    return null;
+type ShapeBounds = { maxRow: number; maxColumn: number };
+
+/** Cached shape bounds.
+ *
+ *  A shape's bounds never change — the catalogue is static — but this ran on
+ *  every pointer move of every drag, allocating two intermediate arrays (from
+ *  the two `map`s) plus the bounds object each time, and spreading them into
+ *  `Math.max`. That is roughly sixty allocations a second of values that were
+ *  identical every time, on the one code path that has to stay ahead of a
+ *  finger. There are about twelve shapes, so the cache is bounded by the
+ *  catalogue and never needs clearing.
+ *
+ *  A plain loop rather than `map` + spread: no intermediate arrays, and no
+ *  argument-count limit if a larger shape is ever added. */
+const shapeBoundsCache = new Map<string, ShapeBounds | null>();
+
+function shapeBoundsFor(shapeId: string): ShapeBounds | null {
+  const cached = shapeBoundsCache.get(shapeId);
+  if (cached !== undefined) {
+    return cached;
   }
-  return {
-    maxRow: Math.max(...shape.cells.map((cell) => cell.row)),
-    maxColumn: Math.max(...shape.cells.map((cell) => cell.column)),
-  };
+  const shape = getShapeById(shapeId);
+  let bounds: ShapeBounds | null = null;
+  if (shape) {
+    let maxRow = 0;
+    let maxColumn = 0;
+    for (const cell of shape.cells) {
+      if (cell.row > maxRow) {
+        maxRow = cell.row;
+      }
+      if (cell.column > maxColumn) {
+        maxColumn = cell.column;
+      }
+    }
+    bounds = { maxRow, maxColumn };
+  }
+  shapeBoundsCache.set(shapeId, bounds);
+  return bounds;
 }
 
 type GameViewProps = {
@@ -84,10 +117,13 @@ type GameViewProps = {
   onExit?: () => void;
   /** Invoked to open the end-of-run results screen. */
   onResults?: () => void;
+  /** Replaces the active session with a fresh generation. The real route uses
+   * GameSession; isolated tests fall back to the controller restart seam. */
+  onRestart?: () => void;
+  /** Persistence boundary supplied by the real session. Isolated component
+   * tests default to an already-resolved no-op. */
+  flushActiveRun?: () => Promise<void>;
 };
-
-const SECOND_CHANCE_MS = 1500;
-const SECOND_CHANCE_REDUCED_MS = 800;
 
 /** Upper bound on the board's edge so it never balloons on tablets/wide screens
  *  (mirrors GameBoard's own maxWidth). */
@@ -116,7 +152,17 @@ export function computeBoardSide(content: { width: number; height: number }): nu
 
 /** Presentational gameplay screen over a supplied controller. Holds no
  *  gameplay rules — every decision is delegated to the domain controller. */
-export function GameView({ controller, best = 0, boardSize, onExit, onResults }: GameViewProps) {
+const resolvedFlush = (): Promise<void> => Promise.resolve();
+
+export function GameView({
+  controller,
+  best = 0,
+  boardSize,
+  onExit,
+  onResults,
+  onRestart,
+  flushActiveRun = resolvedFlush,
+}: GameViewProps) {
   const { state } = controller;
   const haptics = useHaptics();
   const reducedMotion = useEffectiveReducedMotion();
@@ -139,15 +185,14 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
   // logged once per turn from the domain event stream.
   useGameAnalytics({ turn: state.turn, events: controller.lastEvents });
   const { track } = useAnalytics();
-  const reward = useRewardedAction();
+  const reward = useRewardedAction({ beforeShow: flushActiveRun });
   const theme = useTheme();
 
   const [paused, setPaused] = useState(false);
-  // Input is locked during a required effect sequence, while a rewarded ad is
-  // in flight, and while paused, so a reward can't overlap a placement or
-  // another reward and no move lands behind the pause menu.
-  const inputLocked = animator.isAnimating || reward.pending || paused;
-
+  const [restartConfirmation, setRestartConfirmation] = useState<"closed" | "open">("closed");
+  const restartTransitionRef = useRef(false);
+  const homeTransitionRef = useRef(false);
+  const resultsTransitionRef = useRef(false);
   // Measured gameplay content box; drives a responsive square board that fits
   // both the available width and a height budget. A caller-supplied `boardSize`
   // (test seam) overrides measurement, since onLayout doesn't fire under jest.
@@ -168,30 +213,40 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
   }, []);
 
   const [defuseConfirmOpen, setDefuseConfirmOpen] = useState(false);
-  const [secondChance, setSecondChance] = useState(false);
-  const secondChanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Transient per-action reward feedback (pending while the ad is in flight,
   // then a brief success/failure/cancelled outcome). One shared hook per action
-  // so Freeze, Defuse, and Revive — and Double Bolts on the results screen —
-  // present, sound, and time out identically. Presentation only.
+  // so Freeze and Defuse present, sound, and time out identically.
   const freezeOutcome = useRewardOutcome(reducedMotion);
   const defuseOutcome = useRewardOutcome(reducedMotion);
-  const reviveOutcome = useRewardOutcome(reducedMotion);
   const [previewOrigin, setPreviewOrigin] = useState<CellPosition | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dragOrigin, setDragOrigin] = useState<CellPosition | null>(null);
   const [returning, setReturning] = useState(false);
   const [cellSize, setCellSize] = useState(boardSize ? boardSizeToCell(boardSize) : 0);
 
+  // Only authoritative interaction states block a new action. Presentation
+  // effects intentionally do not participate: their queue can remain active
+  // across later turns. A live drag blocks every new action except its own
+  // move/finalize callbacks.
+  const inputLocked =
+    reward.pending ||
+    paused ||
+    defuseConfirmOpen ||
+    restartConfirmation === "open" ||
+    state.status !== "playing" ||
+    drag !== null;
+
   const boardRef = useRef<View>(null);
   const ghostRef = useRef<DragGhostHandle>(null);
   const boardLayoutRef = useRef<BoardLayout | null>(null);
   const cellSizeRef = useRef(cellSize);
   const lastDragOriginRef = useRef<CellPosition | null>(null);
+  const dragRef = useRef<DragState | null>(null);
+  const dragFinalizedRef = useRef(false);
   // The board's press handler must keep a stable identity: `controller` is a
-  // fresh object every render and `inputLocked` flips on every animation,
-  // pause, and reward transition — depending on either would change the prop on
-  // each of those and re-render all 64 cells for something purely cosmetic.
+  // fresh object every render and `inputLocked` flips on pause, modal, drag,
+  // and reward transitions — depending on either would change the prop on each
+  // of those and re-render all 64 cells for unrelated screen state.
   // Both are read through refs written in an effect, so the handler stays
   // referentially stable while still seeing current values when it runs.
   const controllerRef = useRef(controller);
@@ -211,7 +266,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
       : { cells: [] as CellPosition[], nonce: 0 };
   }, [controller.lastEvents, state.turn]);
 
-  const dragPreview = drag && dragOrigin ? controller.previewFor(drag.handId, dragOrigin) : null;
+  const dragPreview = drag && dragOrigin ? controller.previewFor(drag.intent, dragOrigin) : null;
   const tapPreview = previewOrigin ? controller.previewAt(previewOrigin) : null;
   const preview = dragPreview ?? tapPreview;
 
@@ -281,8 +336,17 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
     [audio, haptics, track],
   );
 
+  const handleCellPreviewChange = useCallback((position: CellPosition | null) => {
+    const activeController = controllerRef.current;
+    if (position === null || inputLockedRef.current || activeController.selectedHandId === null) {
+      setPreviewOrigin(null);
+      return;
+    }
+    setPreviewOrigin(position);
+  }, []);
+
   const measureBoard = useCallback(() => {
-    boardRef.current?.measureInWindow((x, y, _width, _height) => {
+    const captureLayout = (x: number, y: number) => {
       const size = cellSizeRef.current;
       if (size <= 0) {
         boardLayoutRef.current = null;
@@ -295,8 +359,16 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
         pitch: size + spacing.gridGutter,
         size: BOARD_SIZE,
       };
-    });
-  }, []);
+    };
+    // A fixed board size is the existing isolated-test seam. Jest has no native
+    // window measurement, so anchor that synthetic board at the window origin;
+    // production always takes the measured branch below.
+    if (boardSize !== undefined) {
+      captureLayout(0, 0);
+      return;
+    }
+    boardRef.current?.measureInWindow((x, y, _width, _height) => captureLayout(x, y));
+  }, [boardSize]);
 
   const originForPoint = useCallback((shapeId: string, point: Point): CellPosition | null => {
     const layout = boardLayoutRef.current;
@@ -309,35 +381,47 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
 
   const handleDragStart = useCallback(
     (handId: string, point: Point) => {
-      const piece = state.hand.find((candidate) => candidate.handId === handId);
-      if (inputLocked || !piece || cellSizeRef.current <= 0) {
+      const activeController = controllerRef.current;
+      const piece = activeController.state.hand.find((candidate) => candidate.handId === handId);
+      const intent = activeController.createPlacementIntent(handId);
+      if (
+        inputLocked ||
+        dragRef.current !== null ||
+        !piece ||
+        !intent ||
+        cellSizeRef.current <= 0
+      ) {
         return;
       }
-      controller.clearSelection();
+      activeController.clearSelection();
       setPreviewOrigin(null);
       measureBoard();
       lastDragOriginRef.current = null;
       setDragOrigin(null);
-      setDrag({
+      dragFinalizedRef.current = false;
+      const nextDrag: DragState = {
         handId,
+        intent,
         shapeId: piece.shapeId,
         colorId: piece.colorId,
         startX: point.x,
         startY: point.y,
-      });
+      };
+      dragRef.current = nextDrag;
+      setDrag(nextDrag);
       haptics.selection();
     },
-    [controller, haptics, inputLocked, measureBoard, state.hand],
+    [haptics, inputLocked, measureBoard],
   );
 
   const handleDragMove = useCallback(
     (handId: string, point: Point) => {
       ghostRef.current?.moveTo(point.x, point.y);
-      const piece = state.hand.find((candidate) => candidate.handId === handId);
-      if (!piece) {
+      const activeDrag = dragRef.current;
+      if (!activeDrag || activeDrag.handId !== handId || dragFinalizedRef.current) {
         return;
       }
-      const origin = originForPoint(piece.shapeId, point);
+      const origin = originForPoint(activeDrag.shapeId, point);
       const last = lastDragOriginRef.current;
       const changed =
         (origin === null) !== (last === null) ||
@@ -349,10 +433,12 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
         setDragOrigin(origin);
       }
     },
-    [originForPoint, state.hand],
+    [originForPoint],
   );
 
   const clearDrag = useCallback(() => {
+    dragRef.current = null;
+    dragFinalizedRef.current = false;
     setDrag(null);
     setDragOrigin(null);
     setReturning(false);
@@ -361,11 +447,21 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
 
   const handleDragEnd = useCallback(
     (handId: string, point: Point) => {
-      const piece = state.hand.find((candidate) => candidate.handId === handId);
-      const origin = piece ? originForPoint(piece.shapeId, point) : null;
-      // A duplicated finalize is a no-op: the piece is already gone from the
-      // hand, so the domain rejects the second attempt.
-      const placed = origin ? controller.place(handId, origin) : false;
+      const activeDrag = dragRef.current;
+      // Native gesture completion can be delivered twice around cancellation /
+      // unmount edges. Consume the logical finalize synchronously so the second
+      // delivery produces neither a turn nor duplicate imperative feedback.
+      if (!activeDrag || activeDrag.handId !== handId || dragFinalizedRef.current) {
+        return;
+      }
+      dragFinalizedRef.current = true;
+      const origin = originForPoint(activeDrag.shapeId, point);
+      // The pre-clear state ends with the gesture. Any following clear visuals
+      // belong to the committed effect system, including while a rejected
+      // piece animates back to its tray.
+      lastDragOriginRef.current = null;
+      setDragOrigin(null);
+      const placed = origin ? controllerRef.current.place(activeDrag.intent, origin) : false;
       if (placed) {
         haptics.success();
         clearDrag();
@@ -381,7 +477,19 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
         }
       }
     },
-    [audio, clearDrag, controller, haptics, originForPoint, state.hand, track],
+    [audio, clearDrag, haptics, originForPoint, track],
+  );
+
+  const handleDragCancel = useCallback(
+    (handId: string) => {
+      const activeDrag = dragRef.current;
+      if (!activeDrag || activeDrag.handId !== handId || dragFinalizedRef.current) {
+        return;
+      }
+      dragFinalizedRef.current = true;
+      clearDrag();
+    },
+    [clearDrag],
   );
 
   const handleFreeze = useCallback(() => {
@@ -450,8 +558,8 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
           haptics.success();
           audio.playSfx("defuse");
           // A rewarded defuse advances no turn, so the turn-keyed animator never
-          // sees it — play it explicitly. It holds no input lock: the board is
-          // already updated and must stay usable.
+          // sees it — play it explicitly. The board is already updated and stays
+          // usable while this presentation runs.
           animator.playCue("rewardedDefuse", targetCells);
         }
       })
@@ -464,63 +572,14 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
       });
   }, [animator, audio, controller, defuseOutcome, haptics, reward, state, track]);
 
-  const clearSecondChance = useCallback(() => {
-    if (secondChanceTimer.current !== null) {
-      clearTimeout(secondChanceTimer.current);
-      secondChanceTimer.current = null;
-    }
-    setSecondChance(false);
-  }, []);
-
-  const handleRevive = useCallback(() => {
-    if (reward.pending || !canRevive(state)) {
-      return;
-    }
-    audio.playSfx("button");
-    track({ name: "revive_offer" });
-    reviveOutcome.begin();
-    // The rubble the revive is about to clear, read before it is applied — the
-    // recovery wave then covers exactly the cells that were restored.
-    const restoredCells = rubbleCellsOf(state.grid);
-    let applied = false;
-    void reward
-      .run(REWARD_PLACEMENTS.revive, () => {
-        if (controller.revive()) {
-          applied = true;
-          haptics.success();
-          audio.playSfx("revive");
-          // Revive advances no turn either, so the wave is played explicitly and
-          // holds no input lock — play resumes the moment the domain allows it.
-          animator.playCue("revive", restoredCells);
-          // "SECOND CHANCE" banner over the repaired board (Stitch 10), then
-          // auto-dismiss. Reduced motion shortens the hold and skips the fade.
-          setSecondChance(true);
-          if (secondChanceTimer.current !== null) {
-            clearTimeout(secondChanceTimer.current);
-          }
-          secondChanceTimer.current = setTimeout(
-            () => {
-              secondChanceTimer.current = null;
-              setSecondChance(false);
-            },
-            reducedMotion ? SECOND_CHANCE_REDUCED_MS : SECOND_CHANCE_MS,
-          );
-        }
-      })
-      .then((result) => {
-        track({ name: "revive_result", result: rewardOutcome(result) });
-        reviveOutcome.settle(result, applied);
-      });
-  }, [animator, audio, controller, haptics, reducedMotion, reward, reviveOutcome, state, track]);
-
   const handleEndRun = useCallback(() => {
-    if (reward.pending) {
+    if (reward.pending || resultsTransitionRef.current) {
       return;
     }
+    resultsTransitionRef.current = true;
     audio.playSfx("button");
-    clearSecondChance();
     onResults?.();
-  }, [audio, clearSecondChance, onResults, reward.pending]);
+  }, [audio, onResults, reward.pending]);
 
   const handlePause = useCallback(() => {
     // Pausing mid-reward is disallowed so the confirm/overlay stack stays sane.
@@ -529,10 +588,12 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
     }
     audio.playSfx("button");
     setPaused(true);
-  }, [audio, reward.pending]);
+    void flushActiveRun();
+  }, [audio, flushActiveRun, reward.pending]);
 
   const handleResume = useCallback(() => {
     audio.playSfx("button");
+    setRestartConfirmation("closed");
     setPaused(false);
   }, [audio]);
 
@@ -540,34 +601,85 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
   // by Restart (pause menu) and leaving to Home.
   const clearPendingUi = useCallback(() => {
     setPaused(false);
+    setRestartConfirmation("closed");
     setDefuseConfirmOpen(false);
     setPreviewOrigin(null);
-    clearSecondChance();
     clearDrag();
     freezeOutcome.reset();
     defuseOutcome.reset();
-    reviveOutcome.reset();
     animator.reset();
-  }, [animator, clearDrag, clearSecondChance, defuseOutcome, freezeOutcome, reviveOutcome]);
+  }, [animator, clearDrag, defuseOutcome, freezeOutcome]);
 
   const handleRestart = useCallback(() => {
     audio.playSfx("button");
-    clearPendingUi();
-    controller.restart();
-  }, [audio, clearPendingUi, controller]);
+    // A previous confirmed restart deliberately leaves its latch closed to
+    // reject stale duplicate events. Reaching this button again proves the new
+    // run is active and the player has opened a new confirmation cycle.
+    restartTransitionRef.current = false;
+    setRestartConfirmation("open");
+  }, [audio]);
 
-  const handleHome = useCallback(() => {
+  const handleRestartCancel = useCallback(() => {
+    audio.playSfx("button");
+    setRestartConfirmation("closed");
+  }, [audio]);
+
+  const handleRestartConfirm = useCallback(() => {
+    if (restartTransitionRef.current) {
+      return;
+    }
+    restartTransitionRef.current = true;
     audio.playSfx("button");
     clearPendingUi();
-    onExit?.();
-  }, [audio, clearPendingUi, onExit]);
+    (onRestart ?? controller.restart)();
+  }, [audio, clearPendingUi, controller.restart, onRestart]);
 
-  // Cancel a pending second-chance timer on unmount. Each reward outcome clears
-  // its own timer (useRewardOutcome), and the animator clears its sequence.
-  useEffect(() => () => clearSecondChance(), [clearSecondChance]);
+  const handleHome = useCallback(() => {
+    if (homeTransitionRef.current) {
+      return;
+    }
+    homeTransitionRef.current = true;
+    audio.playSfx("button");
+    // Stay paused/input-locked until the durability boundary completes so no
+    // move can land after the snapshot we intend Home to resume.
+    void flushActiveRun().then(() => {
+      clearPendingUi();
+      onExit?.();
+    });
+  }, [audio, clearPendingUi, flushActiveRun, onExit]);
+
+  // Android Back is a screen-state action, never a route-pop action. Gameplay
+  // opens Pause; Pause closes back to the exact run. A nested restart confirm
+  // first cancels back to Pause, matching the explicit Cancel action.
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (restartConfirmation === "open") {
+        setRestartConfirmation("closed");
+        return true;
+      }
+      if (paused) {
+        handleResume();
+        return true;
+      }
+      if (state.status === "playing") {
+        audio.playSfx("button");
+        setPaused(true);
+        void flushActiveRun();
+      }
+      return true;
+    });
+    return () => subscription.remove();
+  }, [audio, flushActiveRun, handleResume, paused, restartConfirmation, state.status]);
 
   const freezeActive = state.freezeTurnsRemaining > 0;
   const defuseTarget = defuseConfirmOpen ? getRewardedDefuseTarget(state) : null;
+
+  // Which board draws is decided at module scope (see `BoardRenderer` above),
+  // because deciding it here would mean importing both renderers and so
+  // initialising Skia even when the flag is off. Both accept the same props, so
+  // the screen hands over one set of values and never learns which it got — the
+  // flag switches a component, not a data path.
+  const cinematic = CINEMATIC_RENDERER;
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.appBackground }]} testID="game-screen">
@@ -590,13 +702,14 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
           <View style={styles.boardZone}>
             {boardSide > 0 ? (
               <View style={[styles.boardWrapper, { width: boardSide, height: boardSide }]}>
-                <GameBoard
+                <BoardRenderer
                   ref={boardRef}
                   grid={state.grid}
                   badges={badges}
                   boardSize={boardSide}
                   preview={preview}
                   onCellPress={handleCellPress}
+                  onCellPreviewChange={handleCellPreviewChange}
                   onCellSizeChange={handleCellSizeChange}
                   placedCells={placement.cells}
                   placementNonce={placement.nonce}
@@ -606,17 +719,23 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
                   reducedMotion={reducedMotion}
                   frozen={freezeActive}
                   placementHints={placementHints}
+                  // Only the cinematic renderer reads this: it draws effects
+                  // inside its own canvas, so the sibling overlay below is
+                  // suppressed for it. Handing the sequences to both renderers
+                  // would play every beat twice.
+                  effectSequences={cinematic ? animator.sequences : undefined}
+                  onEffectStarted={animator.startedDrawing}
                 />
                 {/* Cosmetic overlay, a SIBLING of the board rather than a child:
-                    a new effect plan re-renders only this layer, never the 64
-                    cells. Remounted per sequence so two turns' effects never
-                    interpolate into each other. */}
-                {animator.plan && cellSize > 0 ? (
-                  <EffectsLayer
-                    key={animator.effectKey}
-                    plan={animator.plan}
+                    a new effect re-renders only this stack, never the 64 cells.
+                    One layer per live effect, each keyed by its own id, so
+                    effects animate and retire independently of each other. */}
+                {!cinematic ? (
+                  <EffectStack
+                    sequences={animator.sequences}
                     cellSize={cellSize}
                     reducedMotion={reducedMotion}
+                    onStarted={animator.startedDrawing}
                   />
                 ) : null}
               </View>
@@ -630,6 +749,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
               onDragStart={handleDragStart}
               onDragMove={handleDragMove}
               onDragEnd={handleDragEnd}
+              onDragCancel={handleDragCancel}
               draggingHandId={drag?.handId ?? null}
               reducedMotion={reducedMotion}
             />
@@ -673,7 +793,6 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
             reducedMotion={reducedMotion}
           />
         ) : null}
-        {secondChance ? <SecondChanceBanner reducedMotion={reducedMotion} /> : null}
         {paused ? (
           <PauseOverlay
             onResume={handleResume}
@@ -682,14 +801,21 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
             reducedMotion={reducedMotion}
           />
         ) : null}
+        {restartConfirmation === "open" ? (
+          <RunConfirmationCard
+            kind="restart"
+            title="RESTART THIS RUN?"
+            message="Your current run will be replaced."
+            confirmLabel="RESTART"
+            onConfirm={handleRestartConfirm}
+            onCancel={handleRestartCancel}
+            reducedMotion={reducedMotion}
+          />
+        ) : null}
         {state.status === "gameOver" ? (
           <GameOverOverlay
             score={state.score}
-            reviveAvailable={canRevive(state)}
-            onRevive={handleRevive}
             onEndRun={handleEndRun}
-            busy={reward.pending}
-            revivePhase={reviveOutcome.phase}
             reducedMotion={reducedMotion}
           />
         ) : null}
@@ -725,6 +851,7 @@ type GameScreenContentProps = {
   analytics?: AnalyticsService;
   onExit?: () => void;
   onResults?: () => void;
+  onRestart?: () => void;
 };
 
 /** Test entry point: builds a controller from injected options so a crafted
@@ -739,6 +866,7 @@ export function GameScreenContent({
   analytics,
   onExit,
   onResults,
+  onRestart,
 }: GameScreenContentProps) {
   const controller = useGameController(controllerOptions);
   const storage = useMemo(() => createMemoryStorageService(), []);
@@ -754,6 +882,7 @@ export function GameScreenContent({
                 boardSize={boardSize}
                 onExit={onExit}
                 onResults={onResults}
+                onRestart={onRestart}
               />
             </AdServiceProvider>
           </AudioServiceProvider>
@@ -772,24 +901,23 @@ function boardSizeToCell(outerSize: number): number {
 
 export default function GameScreen() {
   const router = useRouter();
-  const { controller } = useGameSession();
+  const { controller, startNewRun, clearActiveRun, flushActiveRun } = useGameSession();
   // Single profile read path for the HUD best score; before load this is the
   // default profile (bestScore 0), which is a safe value to display.
   const { profile } = useProfile();
   const handleExit = useCallback(() => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/");
-    }
+    router.replace("/");
   }, [router]);
   const handleResults = useCallback(() => {
-    router.push("/results");
-  }, [router]);
+    clearActiveRun();
+    router.replace("/results");
+  }, [clearActiveRun, router]);
   return (
     <GameView
       controller={controller}
       best={profile.bestScore}
+      flushActiveRun={flushActiveRun}
+      onRestart={startNewRun}
       onExit={handleExit}
       onResults={handleResults}
     />

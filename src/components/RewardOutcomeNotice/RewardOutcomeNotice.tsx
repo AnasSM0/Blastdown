@@ -50,7 +50,8 @@ function colorFor(phase: RewardActionPhase, unavailable: boolean): string {
   }
 }
 
-/** The shared success / cancelled / failure / unavailable line for the reward
+/** @deprecated Dormant legacy presentation with no V1 production caller.
+ * The shared success / cancelled / failure / unavailable line for the reward
  *  surfaces that have no dock button of their own (game-over Revive, results
  *  Double Bolts). Static text — the outcome is conveyed by words, never by
  *  color or motion alone, and it stays legible under reduced motion because it

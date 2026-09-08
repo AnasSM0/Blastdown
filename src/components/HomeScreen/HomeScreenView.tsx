@@ -6,12 +6,12 @@ import { PressableFeedback } from "../PressableFeedback";
 
 type HomeScreenViewProps = {
   bestScore: number;
-  bolts: number;
+  /** New-run/resume decisions are disabled until active-run hydration settles. */
+  actionsEnabled?: boolean;
   /** Show the Continue button only when an in-memory run is resumable. */
   canContinue: boolean;
   onPlay: () => void;
   onContinue: () => void;
-  onThemes: () => void;
   onSettings: () => void;
   onHowToPlay: () => void;
   onPrivacy: () => void;
@@ -32,11 +32,10 @@ function formatNumber(value: number): string {
  *  navigation logic lives here. */
 export function HomeScreenView({
   bestScore,
-  bolts,
+  actionsEnabled = true,
   canContinue,
   onPlay,
   onContinue,
-  onThemes,
   onSettings,
   onHowToPlay,
   onPrivacy,
@@ -55,10 +54,6 @@ export function HomeScreenView({
         >
           <Text style={styles.iconGlyph}>⚙</Text>
         </PressableFeedback>
-        <View style={styles.boltsPill} testID="bolts-balance">
-          <Text style={styles.boltsText}>{formatNumber(bolts)}</Text>
-          <Text style={styles.boltsGlyph}> ⚡</Text>
-        </View>
       </View>
 
       <View style={styles.hero}>
@@ -71,42 +66,35 @@ export function HomeScreenView({
         <PressableFeedback
           reducedMotion={reducedMotion}
           style={[styles.playButton, neonGlow(colors.scoreOrange, "high")]}
-          onPress={onPlay}
+          onPress={canContinue ? onContinue : onPlay}
+          disabled={!actionsEnabled}
           accessibilityRole="button"
-          accessibilityLabel="Play a new game"
-          testID="play-button"
+          accessibilityLabel={canContinue ? "Continue your current game" : "Play a new game"}
+          accessibilityState={{ disabled: !actionsEnabled }}
+          testID={canContinue ? "continue-button" : "play-button"}
         >
           <Text style={styles.playGlyph}>▶</Text>
-          <Text style={styles.playText}>PLAY</Text>
+          <Text style={styles.playText}>{canContinue ? "CONTINUE" : "PLAY"}</Text>
         </PressableFeedback>
 
         {canContinue ? (
           <PressableFeedback
             reducedMotion={reducedMotion}
             style={styles.continueButton}
-            onPress={onContinue}
+            onPress={onPlay}
+            disabled={!actionsEnabled}
             accessibilityRole="button"
-            accessibilityLabel="Continue your current game"
-            testID="continue-button"
+            accessibilityLabel="Start a new game"
+            accessibilityState={{ disabled: !actionsEnabled }}
+            testID="play-button"
           >
-            <Text style={styles.continueText}>CONTINUE</Text>
+            <Text style={styles.continueText}>NEW GAME</Text>
           </PressableFeedback>
         ) : null}
       </View>
 
       <View style={styles.footer}>
         <View style={styles.menuRow}>
-          <PressableFeedback
-            reducedMotion={reducedMotion}
-            style={styles.menuButton}
-            onPress={onThemes}
-            accessibilityRole="button"
-            accessibilityLabel="Themes"
-            testID="themes-button"
-          >
-            <Text style={styles.menuGlyph}>◑</Text>
-            <Text style={styles.menuLabel}>THEMES</Text>
-          </PressableFeedback>
           <PressableFeedback
             reducedMotion={reducedMotion}
             style={styles.menuButton}
@@ -142,7 +130,7 @@ const styles = StyleSheet.create({
   },
   topRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     alignItems: "center",
     paddingTop: spacing.md,
   },
@@ -159,24 +147,6 @@ const styles = StyleSheet.create({
   iconGlyph: {
     fontSize: 20,
     color: colors.onSurfaceVariant,
-  },
-  boltsPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.cyanBlock,
-    backgroundColor: `${colors.cyanBlock}14`,
-  },
-  boltsText: {
-    ...typography.numericValue,
-    color: colors.cyanBlock,
-  },
-  boltsGlyph: {
-    ...typography.numericValue,
-    color: colors.amberBlock,
   },
   hero: {
     alignItems: "center",

@@ -54,13 +54,10 @@ export type EffectPlan = {
   /** Set when this plan came from an out-of-turn cue rather than the event
    *  stream; null for a normal placement turn. */
   cue: EffectCueKind | null;
-  /** True when a clear, defuse, or explosion occurred — the beats that must
-   *  lock input until they finish. Plain placements have none. Cues never set
-   *  this: a rewarded defuse and a revive must leave the board usable at once. */
+  /** True when a clear, defuse, or explosion produced a sequence worth
+   *  presenting. Plain placements have none. This never controls input. */
   hasRequiredSequence: boolean;
-  /** How long the sequence should play, in ms. For a turn sequence this is also
-   *  how long input stays locked; for a cue it is only how long the overlay
-   *  lives. */
+  /** How long the presentation sequence should remain live, in ms. */
   durationMs: number;
 };
 
@@ -308,8 +305,9 @@ export function buildEffectPlan(
 
 /** Build the plan for an out-of-turn cue (rewarded defuse / revive). The cells
  *  come from the caller's read of authoritative state before the action was
- *  applied. `hasRequiredSequence` stays false: neither action may hold input,
- *  so the overlay plays over a board that is already interactive again. */
+ *  applied. `hasRequiredSequence` stays false because neither action has a
+ *  turn-sequenced presentation, so the overlay plays over a board that is
+ *  already interactive. */
 export function buildCuePlan(
   kind: EffectCueKind,
   cells: readonly CellPosition[],

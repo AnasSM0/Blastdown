@@ -28,8 +28,8 @@ export type RewardOutcome = {
   reset: () => void;
 };
 
-/** One rewarded action's transient outcome feedback, shared by Freeze, Defuse,
- *  Revive, and Double Bolts so all four look and sound the same.
+/** One rewarded action's transient outcome feedback, shared by the V1 Freeze
+ *  and Defuse surfaces.
  *
  *  Success feedback stays with the caller — only it knows which cue the earned
  *  reward deserves — but the *non-success* outcomes are handled here so no

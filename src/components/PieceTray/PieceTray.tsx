@@ -11,6 +11,7 @@ import { radius, spacing } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import { blockColor } from "../../ui/themes";
 import { blockSurface } from "../../ui/blockSurface";
+import { motionKey } from "../../ui/motionKey";
 
 type PieceTrayProps = {
   hand: readonly HandPiece[];
@@ -22,6 +23,7 @@ type PieceTrayProps = {
   onDragStart?: (handId: string, point: Point) => void;
   onDragMove?: (handId: string, point: Point) => void;
   onDragEnd?: (handId: string, point: Point) => void;
+  onDragCancel?: (handId: string) => void;
   /** True while a piece is being dragged (drives the picked-up slot style). */
   draggingHandId?: string | null;
   /** Effective reduced-motion (OS combined with the persisted override), from
@@ -146,6 +148,7 @@ type TraySlotProps = {
   onDragStart?: (handId: string, point: Point) => void;
   onDragMove?: (handId: string, point: Point) => void;
   onDragEnd?: (handId: string, point: Point) => void;
+  onDragCancel?: (handId: string) => void;
 };
 
 function TraySlot({
@@ -157,6 +160,7 @@ function TraySlot({
   onDragStart,
   onDragMove,
   onDragEnd,
+  onDragCancel,
 }: TraySlotProps) {
   const theme = useTheme();
   const [lift] = useState(() => new Animated.Value(selected ? SELECTED_SCALE : 1));
@@ -190,6 +194,7 @@ function TraySlot({
   const liftTransform = reducedMotion ? undefined : { transform: [{ scale: lift }] };
   const slot = (
     <AnimatedPressable
+      key={motionKey(reducedMotion)}
       onPress={() => onSelect(piece.handId)}
       style={[
         styles.slot,
@@ -220,11 +225,18 @@ function TraySlot({
   }
 
   const pan = Gesture.Pan()
+    .withTestId(`tray-drag-${piece.handId}`)
     .runOnJS(true)
     .minDistance(DRAG_ACTIVATION_DISTANCE)
     .onStart((event) => onDragStart?.(piece.handId, { x: event.absoluteX, y: event.absoluteY }))
     .onUpdate((event) => onDragMove?.(piece.handId, { x: event.absoluteX, y: event.absoluteY }))
-    .onFinalize((event) => onDragEnd?.(piece.handId, { x: event.absoluteX, y: event.absoluteY }));
+    .onFinalize((event, success) => {
+      if (success) {
+        onDragEnd?.(piece.handId, { x: event.absoluteX, y: event.absoluteY });
+      } else {
+        onDragCancel?.(piece.handId);
+      }
+    });
 
   return (
     <GestureDetector gesture={pan}>
@@ -240,6 +252,7 @@ export function PieceTray({
   onDragStart,
   onDragMove,
   onDragEnd,
+  onDragCancel,
   draggingHandId,
   reducedMotion: reducedMotionProp,
 }: PieceTrayProps) {
@@ -262,6 +275,7 @@ export function PieceTray({
               onDragStart={onDragStart}
               onDragMove={onDragMove}
               onDragEnd={onDragEnd}
+              onDragCancel={onDragCancel}
             />
           ) : (
             <EmptySlot />

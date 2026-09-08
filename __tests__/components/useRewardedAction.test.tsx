@@ -58,8 +58,6 @@ describe("useRewardedAction", () => {
         new Promise((resolve) => {
           resolveShow = () => resolve("earned");
         }),
-      preloadInterstitial: async () => {},
-      showInterstitial: async () => "shown",
     };
     const onEarned = jest.fn();
     const { result } = await renderHook(() => useRewardedAction(), {
@@ -81,5 +79,43 @@ describe("useRewardedAction", () => {
     });
     // Only the first, genuine earn fired the callback.
     expect(onEarned).toHaveBeenCalledTimes(1);
+  });
+
+  it("awaits the active-run flush before opening rewarded native UI", async () => {
+    let releaseFlush: (() => void) | undefined;
+    const flushGate = new Promise<void>((resolve) => {
+      releaseFlush = resolve;
+    });
+    const order: string[] = [];
+    const service: AdService = {
+      preloadRewarded: async () => {},
+      showRewarded: async () => {
+        order.push("show");
+        return "earned";
+      },
+    };
+    const beforeShow = jest.fn(async () => {
+      order.push("flush-start");
+      await flushGate;
+      order.push("flush-end");
+    });
+    const { result } = await renderHook(() => useRewardedAction({ beforeShow }), {
+      wrapper: wrapperFor(service),
+    });
+
+    let outcome: Promise<string> | undefined;
+    await act(async () => {
+      outcome = result.current.run("rewarded_freeze", jest.fn());
+      await Promise.resolve();
+    });
+    expect(order).toEqual(["flush-start"]);
+
+    await act(async () => {
+      releaseFlush?.();
+      await outcome;
+    });
+
+    expect(beforeShow).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(["flush-start", "flush-end", "show"]);
   });
 });

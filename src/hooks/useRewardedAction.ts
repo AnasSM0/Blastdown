@@ -16,12 +16,19 @@ export type RewardedAction = {
   pending: boolean;
 };
 
+export type RewardedActionOptions = {
+  /** Optional critical persistence boundary. The game session supplies an
+   * active-run flush so native ad UI never opens ahead of the latest snapshot. */
+  beforeShow?: () => Promise<void>;
+};
+
 /** Wraps the injected `AdService` with the state-safety the run lifecycle
  *  needs: a single-flight guard (no overlapping or duplicate requests), and a
  *  once-only success callback that never fires on cancel/failure/unavailable.
  *  It applies no game rules — `onEarned` calls the pure domain API. */
-export function useRewardedAction(): RewardedAction {
+export function useRewardedAction(options: RewardedActionOptions = {}): RewardedAction {
   const adService = useAdService();
+  const { beforeShow } = options;
   const [pending, setPending] = useState(false);
   // The single-flight gate. A ref (not `pending`) so back-to-back synchronous
   // calls in the same tick still see the guard before React re-renders.
@@ -43,6 +50,7 @@ export function useRewardedAction(): RewardedAction {
       setPending(true);
       let result: RewardedResult = "error";
       try {
+        await beforeShow?.();
         result = await adService.showRewarded(placement);
         // Only a genuine earn mutates, and only if we're still mounted so a
         // reward that resolves after navigation can't touch a dead tree.
@@ -61,7 +69,7 @@ export function useRewardedAction(): RewardedAction {
       }
       return result;
     },
-    [adService],
+    [adService, beforeShow],
   );
 
   return { run, pending };

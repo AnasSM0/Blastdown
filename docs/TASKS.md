@@ -1,9 +1,15 @@
 # Tasks
 
-Numbered, checkable tasks per phase, derived from `BUILD_SPEC.md` section 25.
-Each phase's acceptance criteria must pass before the next phase starts.
-"Owner" is who implements; Claude Code reviews and integrates everything
-regardless of owner (see `CLAUDE.md`).
+> **Historical execution ledger after A-04 (2026-08-28).** Owner/reviewer
+> labels and legacy feature tasks below record how earlier work was organized;
+> they are not current instructions. Codex is now the sole engineering agent,
+> and current scope/planning follows `AGENTS.md` plus the approved product
+> document hierarchy.
+
+Numbered, checkable historical tasks per phase, originally derived from `BUILD_SPEC.md` section 25.
+Each phase's acceptance criteria was intended to pass before the next phase.
+All owner/reviewer labels below are historical records and have no current
+governance effect.
 
 Checkbox convention: `[ ]` pending, `[x]` done, `[~]` in progress.
 
@@ -1223,3 +1229,93 @@ before/after comparison approved. Then Phase 2 (motion polish), Phase 3
     board shake during an explosion both render correctly on hardware.
   - Merged to master and tagged `v0.9-ui-event-effects` on the strength of that
     pass. Phase 6B (production ads/consent) may now begin.
+
+## Cinematic board renderer (in progress, 2026-07-28)
+
+Branch `feature-cinematic-board-renderer`. One consolidated pass, not subphases.
+Full detail in `docs/CINEMATIC_RENDERER.md`.
+
+- **Foundation** — `@shopify/react-native-skia` 2.6.2 (the version
+  `npx expo install` pins for SDK 57; Reanimated 4.5.0 and worklets 0.10.0 were
+  already direct dependencies). Feature flag, scene contract, pure adapter,
+  geometry, palette, jest mock. DONE.
+- **Board and block materials** — recessed frame cached as one Skia `Picture`,
+  luminous beveled blocks, rubble, previews, timer numerals, and the React
+  Native touch/accessibility overlay. DONE.
+- **Gameplay effects** — pure `effectScene` model (sweeps, flashes, rings,
+  bursts, floating score; capped; reduced-motion aware) plus its Skia drawing
+  layer. DONE.
+- **Renderer parity and cleanup tests** — accessibility tree, press surface,
+  cell size, geometry round trip, effect budgets, mock drift. DONE.
+- **Device QA — NOT DONE, and blocking.** No Android device, SDK or JDK on this
+  build machine. Nothing visual has been verified: not the look, not the frame
+  rate, not drag responsiveness, not Skia's runtime behaviour on Android, not
+  the font path, not memory over a session. Needs a development build and a
+  release/profile build on a physical phone, both reduced-motion states, a
+  10-minute session with slow and fast dragging, a full board, multiple clears,
+  timers, expiry, rubble, defuse and revive.
+- **Merge — NOT DONE.** The flag stays off and the branch stays unmerged until
+  the device pass above is reported. Ads work is untouched and Phase 6B remains
+  on its own branch.
+
+## Cinematic renderer performance pass (2026-07-28)
+
+Branch `fix-cinematic-renderer-performance`, from `feature-cinematic-board-renderer`.
+Full detail in `docs/CINEMATIC_PERFORMANCE.md`.
+
+- **Profiling** — static analysis only. No device, so no frame times. Findings
+  are counts of render passes, worklet evaluations and allocations. DONE, with
+  that caveat.
+- **GPU cost** — per-cell blur masks removed. Block and badge halos grouped
+  behind one mask each; effects use none. ~80 offscreen passes per frame during
+  a full-board clear became 2. DONE.
+- **UI-thread cost** — effect primitives reduced from 4-8 derived values each to
+  1-2 by animating group transform/opacity. ~470 callbacks per frame became
+  ~160 primitives at 1-2 each. DONE.
+- **Redraw scope** — the shake transform binds only while shaking, so effects
+  that do not shake no longer re-composite the whole board every frame. DONE.
+- **Drag cost** — preview split out of the board scene, every layer memoized,
+  64 unused empty-cell objects removed per rebuild, shape bounds cached. DONE.
+- **Caps and lifecycle** — sweeps, defuse flashes and rings capped; the debris
+  budget now stops the traversal rather than one cell. DONE.
+- **Guards** — `cinematicGpuBudget.test.ts` pins every invariant above. DONE.
+- **Bug inventory — NOT STARTED.** "Several bugs remain" was reported with no
+  reproduction steps, device details or symptoms. Nothing was claimed or fixed
+  without evidence, per the brief's own rule.
+- **Device QA — NOT DONE, and blocking.** No before/after measurement exists.
+  The acceptance list is in `docs/CINEMATIC_PERFORMANCE.md`.
+- **Merge — NOT DONE.** Flag stays off by default; the fallback renderer is
+  untouched and still never imports Skia.
+- **Flag excludes the bundle, not just the runtime** — the require is gated on a
+  direct comparison of the inlined `EXPO_PUBLIC_CINEMATIC_BOARD` literal and sits
+  inside the branch Metro folds away. A disabled Android bundle is 3.839 MB
+  against 4.422 MB enabled, with `CinematicBoard`, the canvas layers and
+  `@shopify/react-native-skia` all absent. The flag now accepts exactly `1`,
+  `true` or `skia`. DONE (2026-07-31).
+
+### Effect delivery (Priority 1, 2026-07-31)
+
+- **Multi-effect rendering contract** — both renderers take
+  `readonly EffectSequence[]`, effects have stable ids, render independently and
+  in priority order, and cinematic clock slots are leased by id so retiring one
+  effect cannot restart another. DONE.
+- **Development-only effect harness** — `src/dev/`, route `/dev-effects`,
+  reachable from Settings in a development build only. Thirteen fixed scenarios
+  driven through the same event pipeline gameplay uses; a test forbids the
+  harness from naming any queue or renderer internal. DONE.
+- **Harness excluded from production bundles** — the require sits inside
+  `if (__DEV__)` so Metro removes it. Two earlier gates returned `null` correctly
+  and shipped the harness anyway; caught by a stop-time review, then confirmed by
+  grepping the exported Android bundle (4.437 MB → 4.422 MB, every harness marker
+  gone). Guarded by a test that runs Metro's own inline and constant-folding
+  passes, not a source-pattern match. DONE.
+- **Development-only diagnostics overlay** — queue depth, drawn, accepted,
+  started, completed, evicted, dropped, session generation, renderer flag,
+  oldest waiting age, enqueue-to-first-draw latency, and per-effect id, type,
+  priority and leased clock slot. Polls a plain-JavaScript ledger every 250 ms;
+  structured logging is off by default and limited to six lifecycle kinds. DONE.
+- **Coverage** — 88.4% lines / 80.7% branches overall (was 87.5% / 79.4%).
+  `src/dev/**` is 93–100% lines; `effectDiagnostics.ts` is 93.4%. DONE.
+- **Device QA procedure — WRITTEN, NOT RUN.** The exact steps, the thirteen
+  scenarios with what each must show, and how to read the overlay are in
+  `docs/CINEMATIC_PERFORMANCE.md`. Still no phone, so still no frame time.

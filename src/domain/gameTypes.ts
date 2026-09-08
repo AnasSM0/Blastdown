@@ -33,7 +33,14 @@ export type HandPiece = {
 };
 
 export type GameStatus =
-  "ready" | "playing" | "paused" | "resolving" | "gameOver" | "awaitingRevive" | "finished";
+  | "ready"
+  | "playing"
+  | "paused"
+  | "resolving"
+  | "gameOver"
+  /** @deprecated Parse-only legacy status; no V1 route enters it. */
+  | "awaitingRevive"
+  | "finished";
 
 export type GameState = {
   version: number;
@@ -54,6 +61,7 @@ export type GameState = {
   freezeTurnsRemaining: number;
   rewardedFreezeUses: number;
   rewardedDefuseUses: number;
+  /** @deprecated Retained so older active-run payloads remain valid. */
   reviveUsed: boolean;
   /** Count of hands generated so far; also the next refill's unique-id prefix. */
   handRefills: number;

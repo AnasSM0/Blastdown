@@ -1473,3 +1473,487 @@ captured or fabricated here. The `RubbleSurface` clip change and the board shake
 during an explosion — the two hazards that only hardware could settle — are
 confirmed good. Phase 3 merged to master and tagged `v0.9-ui-event-effects`, and
 Phase 6B (production ads/consent) is unpaused as of this entry.
+
+## 2026-07-28 — a second board renderer, on a Skia canvas, behind a flag
+
+The board is being rebuilt to draw into one Skia canvas rather than into 64
+`GridCell` views and their children. Four decisions are worth recording because
+each of them could reasonably have gone the other way.
+
+**Two renderers, not a replacement.** `EXPO_PUBLIC_CINEMATIC_BOARD` selects
+between them and defaults to the React Native one. The canvas has never run on a
+phone, and this repository has now shipped two device-only faults that no local
+check could have caught — a Kotlin metadata mismatch that broke the native build
+outright, and a Fabric prop assertion that crashed every launch. A renderer is
+exactly the kind of change where a build machine's opinion is worth little.
+
+The flag is deliberately not "on in development, off in production". A renderer
+that differs between the build you test and the build you ship is how an
+unverified path reaches a player; device QA sets the variable and rebuilds, so it
+tests the same code a store build would run.
+
+**Interaction stays on React Native views.** A canvas is a single view to the
+platform: one accessibility node, one touch target. 64 transparent `Pressable`s
+sit over it carrying the same labels, hints, roles and testIDs `GridCell`
+exposes, plus one node per timer badge. This is not a compromise —
+`docs/GAME_RULES.md` makes tap-to-place the accessibility fallback for placement
+and `docs/ACCESSIBILITY.md` treats the per-cell hints as shipped behaviour, so
+dropping them for a better-looking board would be a straight regression, and an
+invisible one from here. The badge nodes were missed in the first implementation
+and found by the CIN-A audit, which is a fair illustration of how quietly this
+kind of thing goes wrong.
+
+**Parity is structural, not aspirational.** The scene adapter calls the same
+helpers `GameBoard` calls — `blockSurface`, `getBadgeVisual`,
+`getRubbleGeometry`, `contourMaskOf`, `getTimerVisualState` — so there is no
+second definition of a block material that could drift. Geometry is reproduced
+from `src/ui/boardGeometry.ts` rather than reinvented, because dragging maps
+finger coordinates to cells through those constants: a canvas on a different
+lattice would turn a rendering change into a gameplay bug. The tests assert the
+round trip rather than pixel values.
+
+**The drag ghost stays a React Native view, against the brief.** The brief lists
+it among the things to move into the canvas. It cannot go into the _board_
+canvas: the ghost travels from the tray, across the screen, to the board and
+back, and Skia cannot draw outside its own view bounds, so the ghost would be
+clipped the moment it left the board. Two workable alternatives exist — a second
+root-level canvas, or one viewport-sized canvas with the board translated into
+it — and choosing between them without a device measurement would be guessing.
+The existing `DragGhost` runs under both renderers meanwhile.
+
+**Deviation from the branching instruction.** The brief said to branch from
+master and also to maintain the structural guards from the Fabric crash fix.
+Master predates that fix; all five of its commits live only on
+`phase-6b-production-ads-consent`. The crash is a rendering defect, not an ads
+one, so its rendering half was ported to the renderer branch (`1b816ad`) with no
+ads or consent code. Both branches now carry byte-identical versions of every
+file involved and will merge without conflict.
+
+**Nothing visual is verified.** Skia draws nothing under jest, so no local test
+has seen a pixel of this renderer. "Faster than 64 views" is an argument from
+structure, not a benchmark. `docs/CINEMATIC_RENDERER.md` lists what remains
+unverified; the flag stays off and the branch does not merge until a physical
+Android phone has run both a development and a release/profile build.
+
+## Two defects found in review
+
+Both were caught by the stop-time review, not by any test here, and both are
+worth recording because of what they say about where this renderer's blind
+spots are.
+
+**The shake never shook.** The board-shake worklet mutated one module-level
+array in place and returned it every frame, to avoid allocating. But
+`useDerivedValue` assigns its result to a shared value, and assigning the same
+object identity emits no change — so the board jumped to the first frame's
+offset and froze there for the rest of the sequence. Nothing local noticed:
+Skia draws nothing under jest, the component still rendered, and every other
+test stayed green. The allocation being avoided was one two-field array per
+frame; the cost of avoiding it was the whole effect.
+
+Fixed by returning a fresh array, and by pulling the curve out into an exported
+pure function (`shakeOffset`) so the part that can be wrong is the part that can
+be checked. `cinematicShake.test.ts` now pins that it starts still, moves,
+swings both ways, decays, stays within amplitude, ends well before the sequence
+it rides on, and is exactly zero at every instant under reduced motion.
+
+**The flag did not isolate Skia's initialisation.** `app/game.tsx` imported the
+cinematic board at module scope, and `@shopify/react-native-skia` installs its
+native JSI bindings when the module is EVALUATED — which is why importing the
+real package under jest throws rather than failing later. So Skia initialised at
+app startup even with the flag off.
+
+That is precisely the job the flag exists to do. The fallback renderer is meant
+to be the thing that rescues a build when the new path is broken; if Skia cannot
+initialise on some device, turning the renderer off has to actually help, and it
+would not have. The flag isolated rendering while leaving initialisation
+unconditional — a safety net with a hole in exactly the shape of the accident it
+was meant to catch.
+
+Fixed by resolving the renderer in `src/rendering/boardRenderer.ts` through a
+require guarded by the build-time flag. With the flag off the cinematic graph —
+Skia, Reanimated, the canvas layers — is never evaluated at all, and the app
+runs the same code it ran before this renderer existed.
+`rendererIsolation.test.ts` exercises both branches of the resolver at runtime
+and enforces the structural rules that keep Skia out of the startup path: no
+static cinematic import in the screen, no Skia or Reanimated import there, and
+no Skia import anywhere in `src/` outside the two directories the flag gates.
+
+## 2026-07-28 — the cinematic renderer was slow, and mostly for one reason
+
+Device testing reported the Skia board as visually correct but noticeably laggy.
+The causes are recorded in `docs/CINEMATIC_PERFORMANCE.md`; what belongs here is
+the decision each one forced.
+
+**Single-pass bloom instead of per-cell blur.** Every block carried its own
+`BlurMask`, which is an offscreen render pass each — up to 64 per frame, plus 64
+more from the clear flashes, plus the sweeps. All halos now composite into one
+`saveLayer` and the blur applies once.
+
+Two intermediate attempts are worth recording because both were wrong in
+instructive ways, and both were certified by a passing test.
+
+Moving the masks into a shared parent `<Group>` looks like grouping and is not:
+a mask filter on a Group is inherited by each child draw, so the cost was
+identical. Then putting a mask filter on the `saveLayer` paint looked like the
+real fix and was worse — Skia composites a layer using only alpha, colour
+filter, image filter and blend mode, so the mask was ignored and the renderer
+paid for an offscreen surface while drawing crisp halos.
+
+What ships is an **image** filter on the layer paint, which is one of the four
+things that survive the composite.
+
+The through-line: each attempt was confirmed by a guard that matched source
+patterns, and a test that checks the shape of the code will always agree with
+the code. The guard now constructs the paint and asks what it carries. The visual cost is that halos blend where blocks touch, which
+for a piece made of adjacent cells reads better than separate glows. The
+alternative — keeping per-cell softness — is not affordable on a mobile GPU at
+this count, and no amount of tuning changes that.
+
+Worth recording plainly: the comment above the original code claimed the halo
+was "a blurred copy of the block rather than a per-cell blur filter". That was
+not a distinction. And commit `d652236`, labelled a performance improvement,
+replaced two stacked flash rects with one rect plus a `BlurMask` — trading 64
+cheap draws for 64 render passes. A confident comment and a plausible
+justification made both look considered.
+
+**Two worklets per effect primitive, not eight.** Each primitive animates a
+group's transform and opacity rather than its own edges or circle centres. For
+debris this is visually indistinguishable and costs a quarter as much with 24
+live. The general rule: animate the container, not the contents.
+
+**The shake binds only while shaking.** It was bound whenever any effect clock
+ran, so a line clear re-composited the whole board — including the cached static
+picture — every frame for its whole sequence. The `Group` stays in the tree
+unconditionally; conditionally wrapping would remount every layer and rebuild
+the cached picture when a shake starts.
+
+**The preview is built separately from the board.** A drag crossing one cell
+boundary rebuilt all 64 cells and handed every layer new array identities, for a
+change affecting about four cells. `buildPreviewCells` is its own pure function
+and every layer is memoized, so the board's arrays keep identity across a drag.
+
+**Renderer-side caps on effects.** Authoritative play already bounds sweeps,
+defuses and rings — an 8x8 board cannot clear 40 rows. The renderer no longer
+relies on that: a duplicated or malformed event must not mount an unbounded
+number of animated components on the busiest frame of a turn.
+
+**No measurement was taken.** Every number in the performance document is a
+count of passes, callbacks or allocations derived from the source, not a frame
+time. This machine has no Android device. The direction is not in doubt; the
+magnitude is unverified, and the branch does not merge until a phone says so.
+
+**No bug inventory was produced.** The brief asked for one and also said not to
+claim a bug without reproduction evidence. "Several bugs remain" is not a bug
+report, so the inventory is empty rather than invented.
+
+## Effect delivery harness and diagnostics (2026-07-31)
+
+**A harness, because the acceptance list was not a procedure.** The
+multi-effect contract's claims — six live effects, deterministic eviction, a
+survivor that does not restart when the effect beneath it retires — were each
+covered by a test that hands a renderer a hand-built `EffectSequence[]`. None of
+them could be reached on a phone without waiting for the board to produce a
+double clear plus two expiring timers on the same turn, and two of them cannot
+be judged by eye even when it does. `src/dev/` now scripts thirteen fixed
+scenarios through the real pipeline.
+
+**The harness gets no privileged access, and that is enforced.** It drives
+`useEventAnimator` with a turn counter and a `GameEvent[]`, `playCue`, and
+`reset` — nothing else. A test forbids the harness sources from naming
+`admitEffect`, `startEffect`, `retireEffect`, `assignClockSlots`,
+`EffectsLayer` or the canvas. A harness that could fabricate a live effect would
+prove only that the harness works.
+
+**Steps are scheduled a frame apart rather than looped or drained per commit.**
+A loop is batched into one commit, so six turn steps become one turn and one
+effect. Draining one per commit fixes that and introduces a subtler fault: the
+runner's effect and the animator's turn effect land in the same flush, and which
+runs first is decided by the order the two hooks happen to be called in — a cue
+scripted to follow a clear was admitted before it. One step per timer gives each
+step a whole task, and one frame is an honest reading of "rapid".
+
+**Diagnostics are derived from committed queue transitions, never from inside
+the state updater.** The updater is where admission and eviction happen and is
+the obvious place to count them. It is also re-invoked on a rebase and twice
+under StrictMode, so every counter would inflate under re-render — and an
+inflated counter lies in the direction of "everything is fine", which is the
+most expensive way for a diagnostic to be wrong. Observing a committed
+before/after pair is idempotent, and a test pins that by observing the same pair
+twice.
+
+**`dropped` is counted at the call site because a refused admission leaves no
+trace.** Nothing is added to the queue, so the transition is empty. Attempts are
+counted in `useEventAnimator` outside the updater and `dropped` is the
+difference between attempts and acceptances — no duplication of `admitEffect`'s
+refusal logic.
+
+**Eviction is distinguished from retirement by replaying the queue's own rule.**
+The count is arithmetic (whatever the cap could not hold); which effect went is
+`evict()`'s ordering — lowest priority, then oldest — applied to the removals
+rather than guessed from `startedAt`. Guessing would misreport a watchdog
+retirement as an eviction, and the two have different fixes.
+
+**Clock leases are published by the board, not derived by the overlay.**
+Deriving a slot from draw order is exactly the positional assignment the leases
+replaced. A diagnostic built that way would report the arrangement that caused
+the bug instead of the one in force.
+
+**The overlay polls at 250 ms and never subscribes per effect.** It exists to
+diagnose dropped frames; an overlay driven by an animation frame, or one that
+re-rendered on every recorded transition, would add React work to precisely the
+frames it is measuring and report a problem it was partly causing.
+
+**Structured logging is off by default and limited to six kinds.** `enqueue`,
+`accepted`, `startedDrawing`, `completed`, `evicted`, `sessionCleared`. Reading
+a snapshot never logs — a log per read is a log per refresh, which on a device
+is a log per frame in everything but name.
+
+**Development-only means absent, not disabled.** `resolveEffectHarness()`
+returns `null` outside a development build, and the screen is behind a require
+Metro removes. A screen that shipped and rendered "not available" would still be
+a surface nobody tests in a release build. The settings entry is an optional
+callback the route supplies only in development, so the row does not exist
+rather than existing and refusing to work.
+
+**The exclusion was claimed before it was true, twice.** Recorded because both
+wrong versions returned `null` correctly in production and passed every
+behavioural test, and because the claim was written into four documents and a
+commit message on the strength of reasoning rather than a check.
+
+1. `if (!isDevelopmentBuild()) return null;` then the require.
+   `isDevelopmentBuild()` reads `globalThis.__DEV__` at runtime so a test can
+   flip it — deliberately, so the production branch stays observable. A runtime
+   read is not a constant, so Metro folds nothing and `collectDependencies`
+   pulls in the harness screen and everything behind it.
+2. `if (!__DEV__) return null;` then the require. The bare identifier is inlined
+   and the `if` does fold — to its consequent, leaving the require in the body
+   underneath. Still collected. The trap is that the constant is real and the
+   folding happens, so the reasoning that produced version 2 was sound right up
+   to the part that mattered.
+
+What ships puts the require **inside** `if (__DEV__)`, so the branch folds away
+whole. The exported Android bundle went from 4.437 MB to 4.422 MB and every
+harness marker string disappeared from it.
+
+**The guard runs Metro's transform rather than matching source text.** A
+source-pattern guard is what certified two broken blur implementations earlier
+on this branch — "a test that checks the shape of the code will always agree
+with the code", already recorded above. So the test applies `inlinePlugin` and
+`constantFoldingPlugin` to the module and asserts the require is gone at
+`dev: false`, and in the same suite asserts both wrong gates still retain it.
+A guard that cannot demonstrate it distinguishes the failure is not a guard.
+
+**`isDevelopmentBuild()` survives for the two places that are not module
+gates**: the settings row callback and the diagnostics recorder's no-op. Both
+are runtime decisions where a `globalThis` read is correct and testable, and
+neither controls whether a module enters the graph.
+
+**`boardRenderer.ts` had the version-1 shape too.** Recorded here when the
+harness was fixed, and fixed in its own commit rather than quietly inside one
+about the harness — see the next section.
+
+**The recorder no-ops outside a development build.** It is cheap — a few map
+operations per turn boundary, never per frame — but it is a diagnostic, and a
+diagnostic that runs in a store build is a cost users pay for nothing.
+
+**Still no frame time.** The harness proves delivery: that six effects exist,
+draw once each, and retire independently. It says nothing about what they cost.
+The branch does not merge on this evidence alone.
+
+## The renderer flag excludes the bundle (2026-07-31)
+
+**The flag claimed two guarantees and delivered one.** With the flag off the
+require never executed, so Skia never installed its JSI bindings — the defect the
+flag was built for, genuinely fixed, pinned by `rendererIsolation.test.ts`. But
+the require was gated on `isCinematicRendererEnabled()`, and a function call is
+not a constant. Metro folded nothing, `collectDependencies` walked into the
+require, and the cinematic renderer, Skia, Reanimated and every canvas layer
+shipped inside builds that would never draw one frame with them. **597 KB**, in a
+bundle whose whole point was not to contain them.
+
+**The runtime guarantee is what hid it.** Every behavioural test passed, because
+the behaviour was right: the correct renderer mounted, Skia never initialised.
+Nothing about the observable app was wrong. Only the bundle was, and nothing was
+looking at the bundle.
+
+**Three properties are load-bearing, and each restores the bug alone.** The
+condition compares `process.env.EXPO_PUBLIC_CINEMATIC_BOARD` directly against
+literals — no function call, no local, no `.trim()`, all of which turn the
+inlined literal back into a runtime computation. The require sits inside the
+branch that folds away, not after an inverted one, which folds to its consequent
+and leaves the require underneath (the near-miss made in `effectHarnessEntry.ts`
+one commit earlier). And `CINEMATIC_RENDERER` is derived from whether the require
+actually happened rather than from re-reading the flag, so a build that excluded
+the module reports `false` and mounts `GameBoard` instead of disagreeing with
+itself.
+
+**The flag stopped accepting `"SKIA"`, `"True"` and `" true "`.** It normalised
+case and whitespace before; that normalisation is a runtime computation on a
+literal Expo inlines at build time, so those spellings are unreachable to the
+bundler by construction. Keeping them would mean `resolveBoardRenderer()` — and
+the diagnostics overlay reading it — answering `skia` for a build whose bundle
+does not contain the renderer, while the app silently mounted the fallback. A
+diagnostic that disagrees with what is on screen is worse than a strict flag.
+`src/config/renderer.ts` now uses character-for-character the comparison
+`boardRenderer.ts` folds on, so the two cannot drift. Falling back is the
+direction this flag is supposed to fail in, and it is a deploy-time switch in EAS
+config rather than something typed under pressure.
+
+**The guard runs the real toolchain over the real file.** Expo's own
+`expoInlineEnvVars` plugin plus Metro's `constantFoldingPlugin`, with a
+production caller — `isDev: false` is what makes Expo emit a literal at all; in
+development it rewrites to a member access on a virtual module, which folds
+nowhere. The suite asserts exclusion when disabled, retention when enabled, that
+`GameBoard` survives both, and that the old function-call gate and the
+inverted-`if` gate both still retain the require. Confirmed independently against
+the exported Android bundle: 4,025,319 bytes with the flag off against 4,636,872
+with it on, and `CinematicBoard`, `CinematicBoardCanvas`, `buildBoardScene`,
+`sceneGeometry`, `cinematicPalette`, `buildEffectScene` and
+`@shopify/react-native-skia` all absent from the disabled one.
+
+**`rendererIsolation.test.ts` stopped pinning the gate's shape.** It asserted the
+source matched `CINEMATIC_RENDERER ? … require(` — and that ternary was the bug.
+A guard that pins a shape certifies whatever shape is there. It keeps the
+assertions source text can honestly make (a require exists, no static import, no
+Skia import outside the two gated directories) and defers the gating claim to the
+suite that transforms the file.
+
+**Three of these in a row, from the same root.** The harness gate, its inverted
+near-miss, and now the renderer flag: each was a correct runtime decision
+mistaken for a build-time one, and each was reasoned about rather than measured.
+The rule this leaves: **a claim about what is in a bundle is only ever settled by
+looking in the bundle.**
+
+---
+
+## 2026-08-28 — A-04 locked V1 scope and repository governance
+
+The Product Requirements Document is now the primary product source, followed
+by Technical Design, App Flow, UI/UX Brief, Backend Design, Engineering Plan,
+Game Rules, and this decision log. `BUILD_SPEC.md` remains historical context
+only where those sources do not supersede it. Codex is the sole engineering
+agent; product direction comes from the approved documents. Architecture-
+affecting changes must be surfaced and recorded rather than applied silently.
+
+V1 includes the endless 8×8 game, three-piece hand, move-based timers, natural
+defuse, explosions/rubble, score/combo/best score, active-run persistence,
+tutorial, Home/Game/Pause/Results/Settings, rewarded Freeze/Defuse,
+audio/music/haptics, accessibility/reduced motion, consent/privacy, production
+rewarded-ad support, analytics/crash reporting, and Android-first release work.
+
+V1 excludes Bolts, Themes/economy, Double Bolts, rewarded Revive,
+interstitials, accounts/cloud/leaderboards/missions/achievements/daily systems,
+levels, special hazards, and progression. Production routes and offers for the
+legacy features were removed; the rewarded catalog and analytics/settlement
+contracts no longer require them. Deprecated stored fields and isolated pure
+helpers remain where needed for backward compatibility and future reuse, but
+they cannot drive current UI or product behavior. Real AdMob integration stays
+deferred to G-01 through G-03.
+
+---
+
+## 2026-08-28 — A-05 aligned the Expo SDK 57 runtime patch baseline
+
+BlastDown remains on Expo SDK 57 and React 19.2.3. Expo moved from 57.0.7 to
+57.0.17 and React Native from 0.86.0 to 0.86.3; the latter moves Hermes V1 from
+`250829098.0.14` to `250829098.0.17`. Expo identifies `.16` as the first Hermes
+build containing the memory-regression fix and explicitly recommends
+`expo@57.0.9` or later with React Native 0.86.2 or later for applications that
+import Reanimated or Worklets.
+
+The remaining Expo-managed packages reported by `npx expo install --check` were
+aligned to the current SDK 57 compatibility map: expo-asset 57.0.6 → 57.0.15,
+expo-audio 57.0.2 → 57.0.4, expo-constants 57.0.6 → 57.0.15, expo-dev-client
+57.0.7 → 57.0.16, expo-haptics 57.0.1 → 57.0.2, expo-linking 57.0.3 → 57.0.8,
+expo-router 57.0.7 → 57.0.17, expo-splash-screen 57.0.4 → 57.0.8,
+expo-system-ui 57.0.1 → 57.0.3, Reanimated 4.5.0 → 4.5.1, Screens 4.25.2 →
+4.26.2, Worklets 0.10.0 → 0.10.1, eslint-config-expo 57.0.0 → 57.0.2, and
+jest-expo 57.0.2 → 57.0.5. The authority is Expo's SDK 57 release note and the
+SDK 57 bundled-native-module map surfaced by Expo CLI/Doctor, not package
+freshness alone.
+
+Skia 2.6.2, Gesture Handler 2.32.0, React 19.2.3, AsyncStorage 2.2.0, and Google
+Mobile Ads 16.3.4 were already compatible and were intentionally not changed.
+The known risk is native rather than behavioral: every development client must
+be rebuilt after the native dependency update, the still-open Hermes
+development-startup regression is not a production regression, and physical
+Android launch/memory/performance acceptance remains an A-06 gate.
+
+---
+
+## 2026-09-07 — A-06B freeze the Android qualification baseline
+
+Under the A-06B reproducibility decision rule, retain A-05's exact lockfile:
+Expo 57.0.17, React Native 0.86.3, Hermes V1 `250829098.0.17`, React 19.2.3,
+Reanimated 4.5.1, Worklets 0.10.1, and Skia 2.6.2. Package manifests and the
+lockfile are unchanged from `e3aadc96541eade966c23a2997cda0c857f81f97`.
+
+The installed Expo CLI fetches `sdks/57.0.0/native-modules` and
+`versions/latest` from the Expo API, preferring those results over installed
+`expo/bundledNativeModules.json`. The live map now recommends Expo 57.0.20,
+Asset 57.0.16, Constants 57.0.17, Dev Client 57.0.18, Font 57.0.3,
+Linking 57.0.9, and Router 57.0.19. This accounts for Doctor's 20/21 result
+without any lockfile change. Reviewed SDK-57 changelogs identify no Android
+build/runtime fix requiring these seven updates: functional changes in this
+interval concern iOS Expo reloads and web font handling. Sources:
+[Expo changelog](https://github.com/expo/expo/blob/sdk-57/packages/expo/CHANGELOG.md),
+[Font changelog](https://github.com/expo/expo/blob/sdk-57/packages/expo-font/CHANGELOG.md),
+and the other five package changelogs linked in the qualification baseline.
+This accepts a specific Android qualification graph, not a guarantee that all
+future advisories are harmless. The npm audit findings remain recorded and
+require separate security triage; no exclusions or offline settings suppress
+the live Doctor check.
+
+The two explicit qualification profiles use the same development environment,
+APK configuration, Node 22.23.1 and SDK-57 EAS image, differing only in the
+cinematic flag. EAS CLI 23.2.0 and `requireCommit: true` make source provenance
+mandatory for future uploads. Earlier A-06 `EAS_NO_VCS` jobs have no EAS Git
+commit metadata; retain their results but qualify the new named profiles from
+one clean commit. No dependency, renderer, gameplay, identifier, signing, or
+AdMob integration change is part of this decision. Physical validation remains
+pending even after cloud success.
+
+---
+
+## 2026-09-08 — B-01 made effect playback nonblocking and placement commits synchronous
+
+Required presentation sequences remain observable and continue through the
+existing bounded queue, but they no longer participate in gameplay input
+eligibility. Input is blocked only by authoritative screen/action states:
+Pause, a confirmation modal, Game Over/results transition, a pending rewarded
+flow, an unfinished drag, or the synchronous domain transaction itself.
+
+Placement handlers now mirror the authoritative state in refs before scheduling
+React updates. A drag captures an immutable intent containing session generation,
+state revision, and hand-piece identity; a stale generation/revision/piece is
+rejected synchronously. The transaction latch is released immediately after the
+pure domain result is committed, so a new legal action needs no debounce or
+animation wait. Duplicate native gesture finalization is also consumed once at
+the screen boundary to avoid duplicate imperative feedback.
+
+The effect cap remains six, and effect IDs, priority, renderer contracts,
+independent clocks, durations, and session cleanup are unchanged. Automated
+tests prove consecutive-turn admission and fallback/cinematic contract parity;
+physical Android responsiveness and smoothness remain `A-DEVICE-PENDING`.
+
+---
+
+## 2026-09-08 — B-02 uses one pure pre-clear prediction contract
+
+Pre-clear presentation is derived from the exact hand identity, authoritative
+GameState, and candidate anchor. The selector delegates legality to
+`isValidPlacement`, applies the shape only to a cloned grid, and delegates line
+detection to `detectCompletedLines`; it does not dispatch a turn, create events,
+advance timers/RNG, or mutate score/state. Its shared result identifies completed
+rows, columns, their deduplicated cell union, and intersections.
+
+Both board renderers consume that same result. They draw at most eight row lanes
+and eight column lanes with one shared pulse, so intersections strengthen by
+ordinary translucent overlap and no per-cell animation graph is introduced.
+Reduced Motion uses the same static treatment. Prediction updates only when the
+logical anchor changes and is discarded on invalid/stale identity, press end,
+gesture cancellation, drop, placement, restart, or session replacement. The
+committed effect queue remains the sole owner of post-placement celebration;
+gameplay, scoring, audio, haptics, and the default-OFF cinematic flag are
+unchanged. Physical Android latency and visual acceptance remain
+`A-DEVICE-PENDING`.

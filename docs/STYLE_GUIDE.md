@@ -220,3 +220,44 @@ floating decorative blocks) do. **Flagged in the audit:** the real
 implementation must gate _every_ Reanimated effect behind the app's reduced-
 motion setting uniformly, not just the defuse effect — this is a
 `BUILD_SPEC.md` §19 requirement, not optional per-effect behavior.
+
+## Cinematic renderer — canvas surfaces (2026-07-28)
+
+The Skia board renderer (`docs/CINEMATIC_RENDERER.md`) draws the same visual
+system with more depth. It does not introduce a second design language, and it
+adds **no new colour tokens**: every cinematic tone is derived from the active
+theme's own colours (`src/rendering/cinematic/palette.ts`).
+
+That derivation is the point. Lifting a theme's frame colour toward white
+produces the rim; sinking it toward black produces the recess shadow. So
+Reactor, Arctic, Magma, Void and Solar all gain the recessed frame, rim
+lighting, ambience and vignette without any of them needing an entry in a table
+— and a sixth theme added later is correct by default rather than correct only
+if someone remembers to extend this file.
+
+| Surface     | Canvas treatment                                                                                       |
+| ----------- | ------------------------------------------------------------------------------------------------------ |
+| Board frame | recessed: lit rim on the top inner edge, sunk shadow on the bottom, corner brackets as before          |
+| Grid        | etched hairline down each gutter, beneath the cells so a cell border always wins where they meet       |
+| Ambience    | scanlines across the playable area only, alpha-only, never crossing the frame                          |
+| Block       | glow halo, solid body, the existing 45%/0.22 sheen, top-left bevel, bottom-right depth, saturated edge |
+| Rubble      | no accent, no glow, no bevel — distinguished by material, not by hue                                   |
+| Preview     | valid: solid accent edge. Invalid and conflict: danger hue **and** a dashed edge                       |
+| Timer badge | opaque disc, ring per `getBadgeVisual`, numeral always drawn                                           |
+
+**Light direction is one decision, applied everywhere.** The board's recess and
+the blocks' bevels are lit from the same top-left, which is what makes blocks
+read as sitting _inside_ the board rather than floating over an unrelated
+surface. Reversing either one breaks the illusion for both.
+
+**Colour is never the only channel.** An invalid preview is dashed as well as
+red; a frozen badge is dashed as well as icy; an urgent badge is larger as well
+as hotter; rubble differs by material as well as by tone. This is the same rule
+the React Native renderer follows, and the parity tests check the spoken
+equivalents survive the move to a canvas — where, unlike a view, nothing is
+announced unless something outside the canvas announces it.
+
+**No per-cell blur.** The block halo is a blurred copy of the block, not a blur
+filter over the cell. `docs/UI_REFERENCE_AUDIT.md` item 9 already ruled out
+per-cell blur for the React Native renderer; a canvas makes it cheap enough to
+attempt and no less wasteful.

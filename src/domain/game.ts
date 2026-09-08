@@ -317,7 +317,8 @@ export function applyRewardedDefuse(state: GameState, now: number): TurnResult {
   };
 }
 
-/** Rewarded revive: one per run, only from the game-over state
+/** @deprecated Dormant legacy rule; no V1 route or ad placement invokes it.
+ * Rewarded revive: one per run, only from the game-over state
  *  (BUILD_SPEC.md §6.15). A failed or cancelled reward must simply never
  *  call this — rejected calls return the input state untouched. */
 export function applyRevive(state: GameState, now: number): TurnResult {

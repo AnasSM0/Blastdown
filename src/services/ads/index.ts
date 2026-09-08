@@ -5,4 +5,4 @@ export {
   type MockRewardedScript,
 } from "./MockAdService";
 export { REWARD_PLACEMENTS, type RewardPlacementKey } from "./placements";
-export type { AdService, InterstitialResult, RewardedPlacement, RewardedResult } from "./types";
+export type { AdService, RewardedPlacement, RewardedResult } from "./types";

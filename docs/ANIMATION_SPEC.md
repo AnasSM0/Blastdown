@@ -229,3 +229,80 @@ responsiveness unchanged from Phase 2; no duplicate audio or haptics; no
 lingering effects after restart or Home. Both Android hazards above are settled
 on device. The finding is the user's, recorded here — the build machine has no
 Android device and captured nothing.
+
+## Cinematic renderer — motion on a canvas (implemented, not device-verified, 2026-07-28)
+
+A second board renderer draws the playfield into one Skia canvas
+(`docs/CINEMATIC_RENDERER.md`). It ships behind `EXPO_PUBLIC_CINEMATIC_BOARD`,
+default off, and nothing below has been seen on a phone.
+
+Every beat above is preserved in intent and in **duration**, so switching
+renderers does not change how long a turn takes to read. What changes is how
+motion is expressed: React Native `Animated` drives view props; the canvas
+advances one clock over a pure list of timed primitives
+(`src/rendering/cinematic/effects/effectScene.ts`).
+
+| Event          | Canvas beat                                                        | Reduced motion                        |
+| -------------- | ------------------------------------------------------------------ | ------------------------------------- |
+| Line clear     | directional gradient sweep along each lane, plus staggered flashes | flashes only, no stagger, no settle   |
+| Defuse         | the piece's own cells flash; one ring on their centroid            | brief fade, contained ring, no growth |
+| Timer expiry   | debris thrown from each authoritative rubble cell; one board shake | contained flash, no throw, no shake   |
+| Revive         | restoration wave down the restored rows                            | low-peak fade, no stagger             |
+| Score          | floating `+N` rising from the event's own anchor                   | static, no rise                       |
+| Board ambience | very subtle light breathing; no continuous motion while dragging   | omitted                               |
+
+**Stagger and cap parity.** Clear stagger is 14 ms per cell capped at 112 ms;
+explosion stagger is 30 ms per piece plus 12 ms per cell capped at 120 ms; revive
+is 18 ms per row capped at 140 ms. Debris shares one budget of `MAX_BURST_CELLS`
+across every explosion in the turn — capped globally rather than per explosion,
+because four pieces expiring at once is a legal turn and a per-explosion cap
+would let legal play multiply past the budget.
+
+**Intersections.** A cell in both a cleared row and a cleared column takes the
+EARLIER of the two delays and flashes once. Flashing twice would double its
+brightness; taking the later delay would make it lag its own row.
+
+**Determinism.** Debris direction is derived from the cell's coordinates, not
+randomised, so a repeated explosion looks like the same explosion and a board of
+rubble does not shimmer as it redraws.
+
+**Reduced motion removes movement, never meaning.** Travelling sweeps, staggers,
+debris throw, text rise and the board shake all go to zero, and each beat is
+shortened — a static emphasis that lingers reads as a stall rather than as
+feedback. The event itself always still plays. This is decided once, in the
+model, so the canvas has no second reduced-motion branch to get wrong.
+
+**Board-only shake.** The shake moves the board drawing, never the screen. It is
+the one beat with a real vestibular cost and no informational content the drawn
+rubble does not already carry, so it is also the first thing reduced motion
+drops.
+
+## Exercising these beats on a phone (2026-07-31)
+
+Every timing above is decided in the pure model and covered by unit tests, which
+answers "is the plan right" and not "did the plan reach the screen". The second
+question needs a device, and most of the interesting cases cannot be produced by
+playing on demand: a row and a column clearing together, a clear plus a defuse
+plus two explosions on one turn, seven effects arriving faster than any of them
+can finish.
+
+`src/dev/effectHarness.ts` holds a fixed catalogue of thirteen scenarios that
+produce exactly those cases, played through the same event pipeline gameplay
+uses. The catalogue is data, not behaviour: the same button produces the same
+events in the same order on every device and every run, so a tester comparing
+two phones is comparing the phones.
+
+Durations the scenarios lean on, all from this document:
+
+- a clear or defuse sequence is **340 ms** (120 ms reduced),
+- an explosion adds **440 ms** on top,
+- a rewarded cue is **400 ms** (140 ms reduced) and holds **no** input lock.
+
+The "lower effect retires first" scenario exists because of the first and third:
+a 340 ms clear and a 400 ms cue overlap, the clear ends first, and the cue must
+not restart when it does. That is the visible symptom of clock slots assigned by
+draw position instead of leased by effect id, and it is not something an unaided
+eye catches during ordinary play.
+
+Development builds only, and absent rather than disabled elsewhere. Access and
+the diagnostics readout are documented in `docs/CINEMATIC_PERFORMANCE.md`.
