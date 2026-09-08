@@ -1967,3 +1967,23 @@ unchanged. Physical Android latency and visual acceptance remain
   that value from already-updated board state or placement prediction.
 - **Impact:** This extends the in-memory domain event contract only. Gameplay,
   scoring, timer order, persistence, and deterministic RNG are unchanged.
+
+---
+
+## 2026-09-08 — B-04 feedback uses shared semantic presentation contracts
+
+Board danger is derived once from the lowest authoritative active timer and is
+passed through the common board props to both renderers. A single shared
+board-level rim owns the ambient pulse, avoiding per-cell animation drivers and
+renderer-specific timer thresholds. Timer badges retain their existing semantic
+states while warning and critical treatments become progressively heavier and
+faster; Reduced Motion keeps the same hierarchy without looping transforms.
+
+Score impact is derived only from committed `GameEvent` outcomes and their
+resolved `scoreChanged.delta`. The HUD does not recalculate scoring: ordinary
+placements remain quiet, while clear/defuse magnitude selects one of three short
+impulses. The score animation has no completion-owned presentation state, so a
+stale completion cannot reset a newer turn or interfere with B-03 praise. These
+contracts are presentation-only; gameplay, scoring, timers, effect capacity,
+RNG, persistence, and the default-OFF cinematic flag are unchanged. Physical
+Android visual tuning remains `A-DEVICE-PENDING`.

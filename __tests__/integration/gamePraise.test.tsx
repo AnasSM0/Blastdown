@@ -49,12 +49,22 @@ describe("game praise integration", () => {
     await fireEvent.press(result.getByTestId("cell-0-0"));
     expect(result.getAllByTestId("praise-overlay")).toHaveLength(1);
     expect(result.getByText("CLEAR")).toBeTruthy();
+    expect(
+      result.getByTestId("board-danger-safe", { includeHiddenElements: true }).props.pointerEvents,
+    ).toBe("none");
+    const firstScoreHint = result.getByTestId("score-value").props.accessibilityHint;
+    expect(firstScoreHint).toMatch(/^Increased by /);
 
     await fireEvent.press(result.getByTestId("tray-piece-h-second"));
     await fireEvent.press(result.getByTestId("cell-2-1"));
     expect(result.queryByTestId("tray-piece-h-second")).toBeNull();
     expect(result.getAllByTestId("praise-overlay")).toHaveLength(1);
     expect(result.getByText("NICE")).toBeTruthy();
+    expect(
+      result.getByTestId("board-danger-safe", { includeHiddenElements: true }).props.pointerEvents,
+    ).toBe("none");
+    expect(result.getByTestId("score-value").props.accessibilityHint).toMatch(/^Increased by /);
+    expect(result.getByTestId("score-value").props.accessibilityHint).not.toBe(firstScoreHint);
   });
 
   it("clears praise when restart replaces the session", async () => {

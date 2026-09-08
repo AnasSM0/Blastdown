@@ -57,6 +57,8 @@ import { useGameSession } from "../src/state/GameSessionProvider";
 import { useProfile } from "../src/state/ProfileProvider";
 import { spacing } from "../src/ui/theme";
 import { useTheme } from "../src/ui/ThemeProvider";
+import { resolveDangerState } from "../src/ui/dangerState";
+import { resolveScoreImpactForTurn } from "../src/ui/scoreImpact";
 
 type DragState = {
   handId: string;
@@ -194,6 +196,14 @@ export function GameView({
   const { track } = useAnalytics();
   const reward = useRewardedAction({ beforeShow: flushActiveRun });
   const theme = useTheme();
+  const danger = useMemo(
+    () => resolveDangerState({ activeTimers: state.activeTimers }),
+    [state.activeTimers],
+  );
+  const scoreImpact = useMemo(
+    () => resolveScoreImpactForTurn(controller.lastEvents, state.turn),
+    [controller.lastEvents, state.turn],
+  );
 
   const [paused, setPaused] = useState(false);
   const [restartConfirmation, setRestartConfirmation] = useState<"closed" | "open">("closed");
@@ -700,6 +710,7 @@ export function GameView({
           score={state.score}
           best={best}
           combo={state.combo}
+          impact={scoreImpact}
           onPause={handlePause}
           reducedMotion={reducedMotion}
         />
@@ -714,6 +725,7 @@ export function GameView({
                   ref={boardRef}
                   grid={state.grid}
                   badges={badges}
+                  danger={danger}
                   boardSize={boardSide}
                   preview={preview}
                   onCellPress={handleCellPress}

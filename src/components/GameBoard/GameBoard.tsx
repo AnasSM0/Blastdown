@@ -9,6 +9,8 @@ import { radius, spacing } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import { GridCell, contourMaskOf, type CellEdges, type CellPreviewState } from "../GridCell";
 import { TimerBadge } from "../TimerBadge";
+import { BoardDangerLighting } from "../BoardDangerLighting";
+import { CALM_DANGER_STATE } from "../../ui/dangerState";
 import { motionKey } from "../../ui/motionKey";
 import { PRE_CLEAR_PULSE_MIN, PRE_CLEAR_PULSE_MS, preClearVisual } from "../../ui/preClearPreview";
 import type { GameBoardProps } from "./boardProps";
@@ -55,6 +57,7 @@ function GameBoardImpl(
   {
     grid,
     badges,
+    danger = CALM_DANGER_STATE,
     boardSize,
     preview,
     onCellPress,
@@ -424,6 +427,7 @@ function GameBoardImpl(
             </View>
           ))
         : null}
+      <BoardDangerLighting danger={danger} reducedMotion={reducedMotion} />
     </Animated.View>
   );
 }

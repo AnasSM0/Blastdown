@@ -27,6 +27,8 @@ import { getTimerVisualState } from "../../ui/timerStates";
 import { recordClockLeases } from "../../ui/effects/effectDiagnostics";
 import { assignClockSlots } from "../../ui/effects/effectQueue";
 import { PRE_CLEAR_PULSE_MIN, PRE_CLEAR_PULSE_MS } from "../../ui/preClearPreview";
+import { CALM_DANGER_STATE } from "../../ui/dangerState";
+import { BoardDangerLighting } from "../BoardDangerLighting";
 import { cellLabel, placementHintFor } from "../GridCell/cellLabel";
 import type { GameBoardProps } from "../GameBoard/boardProps";
 
@@ -135,6 +137,7 @@ function CinematicBoardImpl(
   {
     grid,
     badges,
+    danger = CALM_DANGER_STATE,
     boardSize,
     preview,
     onCellPress,
@@ -497,6 +500,7 @@ function CinematicBoardImpl(
             </View>
           ))
         : null}
+      <BoardDangerLighting danger={danger} reducedMotion={reducedMotion} />
     </View>
   );
 }

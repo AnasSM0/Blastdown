@@ -1,6 +1,7 @@
 import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
 import type { CellPosition } from "../../domain/placement";
 import type { PlacementPreview, TimerBadgePlacement } from "../../domain/selectors";
+import type { DangerState } from "../../ui/dangerState";
 
 /** The board renderer contract.
  *
@@ -20,6 +21,8 @@ import type { PlacementPreview, TimerBadgePlacement } from "../../domain/selecto
 export type GameBoardProps = {
   grid: readonly (readonly DomainGridCell[])[];
   badges: readonly TimerBadgePlacement[];
+  /** Shared presentation-only ambient state derived from active timers. */
+  danger?: DangerState;
   /** Optional fixed content size (mostly for tests); defaults to measuring. */
   boardSize?: number;
   preview?: PlacementPreview | null;

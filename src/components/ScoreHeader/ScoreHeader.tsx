@@ -7,11 +7,13 @@ import { glowFor } from "../../ui/themes";
 import { ComboIndicator } from "../ComboIndicator";
 import { PressableFeedback } from "../PressableFeedback";
 import { motionKey } from "../../ui/motionKey";
+import type { ScoreImpact, ScoreImpactLevel } from "../../ui/scoreImpact";
 
 type ScoreHeaderProps = {
   score: number;
   best: number;
   combo: number;
+  impact?: ScoreImpact | null;
   onPause: () => void;
   /** Effective reduced-motion, for the pause control's press feedback, the
    *  score bump, and the combo emphasis. */
@@ -29,32 +31,78 @@ function formatNumber(value: number): string {
 const SCORE_MAX_SCALE = 1.4;
 const LABEL_MAX_SCALE = 1.6;
 
-/** A short bump on the score digits when the score GOES UP, so a gain is
- *  readable at the HUD as well as at the event that caused it. Never on mount
- *  and never on a decrease (an explosion penalty already has its own board
- *  feedback and shouldn't be celebrated here). */
-const BUMP_SCALE = 1.08;
-const BUMP_IN_MS = 90;
-const BUMP_OUT_MS = 150;
+/** A short magnitude-aware impulse for a meaningful committed outcome. It is
+ * never inferred from score alone: ordinary placement and explosion changes
+ * have no impact contract, and therefore receive no celebratory motion. */
+type ScoreMotion = { scaleTo: number; lift: number; inMs: number };
 
-export function ScoreHeader({ score, best, combo, onPause, reducedMotion }: ScoreHeaderProps) {
+const SCORE_MOTION: Record<ScoreImpactLevel, ScoreMotion> = {
+  1: { scaleTo: 1.12, lift: -2, inMs: 90 },
+  2: { scaleTo: 1.21, lift: -4, inMs: 105 },
+  3: { scaleTo: 1.3, lift: -7, inMs: 120 },
+};
+
+export function scoreMotionForImpact(level: ScoreImpactLevel): ScoreMotion {
+  return SCORE_MOTION[level];
+}
+
+export function ScoreHeader({
+  score,
+  best,
+  combo,
+  impact,
+  onPause,
+  reducedMotion,
+}: ScoreHeaderProps) {
   const theme = useTheme();
-  const [bump] = useState(() => new Animated.Value(1));
+  const [slam] = useState(() => new Animated.Value(1));
+  const [lift] = useState(() => new Animated.Value(0));
   const previousScore = useRef(score);
 
   useEffect(() => {
     const rose = score > previousScore.current;
     previousScore.current = score;
-    if (!rose || reducedMotion) {
+    slam.stopAnimation();
+    lift.stopAnimation();
+    slam.setValue(1);
+    lift.setValue(0);
+    if (!rose || reducedMotion || !impact) {
       return;
     }
-    const animation = Animated.sequence([
-      Animated.timing(bump, { toValue: BUMP_SCALE, duration: BUMP_IN_MS, useNativeDriver: true }),
-      Animated.timing(bump, { toValue: 1, duration: BUMP_OUT_MS, useNativeDriver: true }),
+    const motion = scoreMotionForImpact(impact.level);
+    const animation = Animated.parallel([
+      Animated.sequence([
+        Animated.timing(slam, {
+          toValue: motion.scaleTo,
+          duration: motion.inMs,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slam, {
+          toValue: 1,
+          damping: 12,
+          stiffness: 210,
+          mass: 0.7,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.sequence([
+        Animated.timing(lift, {
+          toValue: motion.lift,
+          duration: motion.inMs,
+          useNativeDriver: true,
+        }),
+        Animated.spring(lift, {
+          toValue: 0,
+          damping: 14,
+          stiffness: 220,
+          mass: 0.7,
+          useNativeDriver: true,
+        }),
+      ]),
     ]);
     animation.start();
     return () => animation.stop();
-  }, [bump, reducedMotion, score]);
+  }, [impact, lift, reducedMotion, score, slam]);
 
   return (
     <View style={styles.row} testID="score-header">
@@ -87,12 +135,13 @@ export function ScoreHeader({ score, best, combo, onPause, reducedMotion }: Scor
             glowFor(theme, theme.score, "low"),
             // The glow carries Android elevation, so no identity transform is
             // bound here under reduced motion.
-            reducedMotion ? null : { transform: [{ scale: bump }] },
+            reducedMotion ? null : { transform: [{ translateY: lift }, { scale: slam }] },
           ]}
           numberOfLines={1}
           adjustsFontSizeToFit
           maxFontSizeMultiplier={SCORE_MAX_SCALE}
           accessibilityLabel={`Score ${formatNumber(score)}`}
+          accessibilityHint={impact ? `Increased by ${formatNumber(impact.delta)}` : undefined}
           testID="score-value"
         >
           {formatNumber(score)}

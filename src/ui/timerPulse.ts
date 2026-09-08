@@ -21,10 +21,10 @@ export function getPulseConfig(
     return null;
   }
   if (visualState === "urgent") {
-    return { scaleTo: 1.14, halfCycleMs: 550 };
+    return { scaleTo: 1.18, halfCycleMs: 250 };
   }
   if (visualState === "warning") {
-    return { scaleTo: 1.06, halfCycleMs: 1000 };
+    return { scaleTo: 1.1, halfCycleMs: 400 };
   }
   return null;
 }
