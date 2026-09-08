@@ -37,6 +37,8 @@ function plan(overrides: Partial<EffectPlan> = {}): EffectPlan {
     hasRequiredSequence: false,
     durationMs: 340,
     ...overrides,
+    clear: overrides.clear ?? null,
+    boardImpulse: overrides.boardImpulse ?? null,
   };
 }
 

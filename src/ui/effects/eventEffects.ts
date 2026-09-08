@@ -29,11 +29,49 @@ export type DefuseEffect = {
  *  state. */
 export type EffectCueKind = "rewardedDefuse" | "revive";
 
+export type ClearTier = 1 | 2 | 3 | 4;
+
+export type ClearTiming = Readonly<{
+  impactStartMs: 0;
+  impactEndMs: number;
+  sweepStartMs: number;
+  sweepEndMs: number;
+  releaseStartMs: number;
+  releaseEndMs: number;
+  recoveryEndMs: number;
+}>;
+
+/** Renderer-independent line-clear presentation derived only from the
+ * committed `linesCleared` event. Identity and session generation wrap this
+ * contract in `LiveEffect`; renderers never invent either value. */
+export type ClearPresentation = Readonly<{
+  rows: readonly number[];
+  columns: readonly number[];
+  /** Deduplicated union of all participating cells, row-major. */
+  cells: readonly CellPosition[];
+  /** Row/column crossings, each emitted exactly once, row-major. */
+  intersections: readonly CellPosition[];
+  lineCount: number;
+  tier: ClearTier;
+  bloomIntensity: number;
+  timing: ClearTiming;
+}>;
+
+export type BoardImpulse = Readonly<{
+  source: "clear" | "explosion";
+  amplitudePx: number;
+  durationMs: number;
+}>;
+
 /** A presentation-only translation of one turn's domain events into the visual
  *  beats to play. It never recomputes gameplay — it only reshapes what the
  *  engine already decided (cleared lines, defuses, explosions, rubble, score,
- *  combo) into cells/among durations for the overlays. */
+ *  combo) into cells and durations for the overlays. */
 export type EffectPlan = {
+  /** The canonical committed-clear presentation contract. */
+  clear: ClearPresentation | null;
+  /** One group-level impulse for this whole effect, never per-cell. */
+  boardImpulse: BoardImpulse | null;
   rows: number[];
   columns: number[];
   /** Deduplicated cells of every cleared row/column (intersections appear
@@ -93,6 +131,20 @@ function clearedCellsFor(rows: number[], columns: number[], size: number): CellP
     }
   }
   return cells;
+}
+
+function intersectionsFor(rows: readonly number[], columns: readonly number[]): CellPosition[] {
+  const rowSet = new Set(rows);
+  const columnSet = new Set(columns);
+  const intersections: CellPosition[] = [];
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    for (let column = 0; column < BOARD_SIZE; column++) {
+      if (rowSet.has(row) && columnSet.has(column)) {
+        intersections.push({ row, column });
+      }
+    }
+  }
+  return intersections;
 }
 
 type Grid = readonly (readonly GridCell[])[];
@@ -163,10 +215,104 @@ export function sweepDelaysFor(
 }
 
 const REDUCED_MS = 120;
-const LINE_CLEAR_MS = 340;
+const REDUCED_CLEAR_MS = 180;
+const DEFUSE_MS = 340;
 const EXPLOSION_MS = 440;
 const CUE_MS = 400;
 const CUE_REDUCED_MS = 140;
+
+type ClearProfile = Readonly<{
+  bloomIntensity: number;
+  impulsePx: number;
+  impulseDurationMs: number;
+  sweepEndMs: number;
+  releaseEndMs: number;
+  recoveryEndMs: number;
+}>;
+
+const CLEAR_PROFILES: Record<ClearTier, ClearProfile> = {
+  1: {
+    bloomIntensity: 0.46,
+    impulsePx: 0,
+    impulseDurationMs: 0,
+    sweepEndMs: 280,
+    releaseEndMs: 440,
+    recoveryEndMs: 450,
+  },
+  2: {
+    bloomIntensity: 0.64,
+    impulsePx: 2,
+    impulseDurationMs: 150,
+    sweepEndMs: 310,
+    releaseEndMs: 500,
+    recoveryEndMs: 560,
+  },
+  3: {
+    bloomIntensity: 0.82,
+    impulsePx: 4,
+    impulseDurationMs: 250,
+    sweepEndMs: 340,
+    releaseEndMs: 580,
+    recoveryEndMs: 680,
+  },
+  4: {
+    bloomIntensity: 1,
+    impulsePx: 6,
+    impulseDurationMs: 350,
+    sweepEndMs: 400,
+    releaseEndMs: 720,
+    recoveryEndMs: 880,
+  },
+};
+
+function clearTier(lineCount: number): ClearTier {
+  if (lineCount >= 4) return 4;
+  if (lineCount === 3) return 3;
+  if (lineCount === 2) return 2;
+  return 1;
+}
+
+function clearPresentation(
+  rows: number[],
+  columns: number[],
+  reducedMotion: boolean,
+): ClearPresentation | null {
+  const lineCount = rows.length + columns.length;
+  if (lineCount === 0) {
+    return null;
+  }
+  const tier = clearTier(lineCount);
+  const profile = CLEAR_PROFILES[tier];
+  const timing: ClearTiming = reducedMotion
+    ? {
+        impactStartMs: 0,
+        impactEndMs: 60,
+        sweepStartMs: 0,
+        sweepEndMs: 160,
+        releaseStartMs: 80,
+        releaseEndMs: 150,
+        recoveryEndMs: REDUCED_CLEAR_MS,
+      }
+    : {
+        impactStartMs: 0,
+        impactEndMs: 80,
+        sweepStartMs: 80,
+        sweepEndMs: profile.sweepEndMs,
+        releaseStartMs: 220,
+        releaseEndMs: profile.releaseEndMs,
+        recoveryEndMs: profile.recoveryEndMs,
+      };
+  return {
+    rows: [...rows],
+    columns: [...columns],
+    cells: clearedCellsFor(rows, columns, BOARD_SIZE),
+    intersections: intersectionsFor(rows, columns),
+    lineCount,
+    tier,
+    bloomIntensity: profile.bloomIntensity,
+    timing,
+  };
+}
 
 /** Read-only context the plan needs but the event stream doesn't carry. */
 export type EffectPlanContext = {
@@ -177,6 +323,8 @@ export type EffectPlanContext = {
 
 function emptyPlan(): EffectPlan {
   return {
+    clear: null,
+    boardImpulse: null,
     rows: [],
     columns: [],
     clearedCells: [],
@@ -257,7 +405,8 @@ export function buildEffectPlan(
     }
   }
 
-  const clearedCells = clearedCellsFor(rows, columns, BOARD_SIZE);
+  const clear = clearPresentation(rows, columns, reducedMotion);
+  const clearedCells = clear ? [...clear.cells] : [];
 
   const rubbleSeen = new Set<string>();
   const rubbleCells: CellPosition[] = [];
@@ -277,17 +426,36 @@ export function buildEffectPlan(
   let durationMs = 0;
   if (hasRequiredSequence) {
     if (reducedMotion) {
-      durationMs = REDUCED_MS;
+      durationMs = clear ? clear.timing.recoveryEndMs : REDUCED_MS;
     } else {
-      durationMs = clearedCells.length > 0 || defuses.length > 0 ? LINE_CLEAR_MS : 0;
+      durationMs = clear?.timing.recoveryEndMs ?? (defuses.length > 0 ? DEFUSE_MS : 0);
       if (explosions.length > 0) {
         durationMs += EXPLOSION_MS;
       }
     }
   }
 
+  let boardImpulse: BoardImpulse | null = null;
+  if (!reducedMotion && explosions.length > 0) {
+    // Explosion remains visibly stronger than the maximum normal clear. This
+    // preserves the established destructive hierarchy without changing its
+    // rules, cells, or timing sequence.
+    boardImpulse = { source: "explosion", amplitudePx: 8, durationMs: 200 };
+  } else if (clear && !reducedMotion) {
+    const profile = CLEAR_PROFILES[clear.tier];
+    if (profile.impulsePx > 0) {
+      boardImpulse = {
+        source: "clear",
+        amplitudePx: profile.impulsePx,
+        durationMs: profile.impulseDurationMs,
+      };
+    }
+  }
+
   return {
     ...emptyPlan(),
+    clear,
+    boardImpulse,
     rows,
     columns,
     clearedCells,

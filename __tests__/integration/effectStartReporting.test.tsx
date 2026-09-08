@@ -31,6 +31,8 @@ function grid(): DomainGridCell[][] {
 
 function clearPlan(): EffectPlan {
   return {
+    clear: null,
+    boardImpulse: null,
     rows: [3],
     columns: [],
     clearedCells: Array.from({ length: 8 }, (_, column) => ({ row: 3, column })),

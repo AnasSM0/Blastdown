@@ -22,6 +22,11 @@ const PLAIN_TURN: GameEvent[] = [
   { type: "scoreChanged", delta: 4, score: 4 },
 ];
 
+const DOUBLE_CLEAR_TURN: GameEvent[] = [
+  { type: "linesCleared", rows: [0, 1], columns: [] },
+  { type: "scoreChanged", delta: 200, score: 200 },
+];
+
 describe("useEventAnimator", () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(async () => {
@@ -53,7 +58,7 @@ describe("useEventAnimator", () => {
     await act(async () => {
       // Nothing draws under jest, so the admission watchdog retires this rather
       // than the precise renderer-reported timer: duration plus the grace.
-      jest.advanceTimersByTime(340 + 400);
+      jest.advanceTimersByTime(450 + 400);
     });
     expect(result.current.isAnimating).toBe(false);
     expect(result.current.plan).toBeNull();
@@ -141,6 +146,26 @@ describe("useEventAnimator", () => {
     expect(result.current.plan?.cue).toBe("revive");
   });
 
+  it("does not let a non-impulse cue mask a live multi-clear board impulse", async () => {
+    const { result, rerender } = await renderHook(
+      (props: { turn: number; events: GameEvent[]; reducedMotion: boolean }) =>
+        useEventAnimator({ ...props, grid: EMPTY_GRID }),
+      { initialProps: { turn: 0, events: [] as GameEvent[], reducedMotion: false } },
+    );
+    await act(async () => {
+      rerender({ turn: 1, events: DOUBLE_CLEAR_TURN, reducedMotion: false });
+    });
+    const impulse = result.current.boardImpulse;
+    expect(impulse).toMatchObject({ id: "s1:t1", source: "clear", amplitudePx: 2 });
+
+    await act(async () => {
+      result.current.playCue("revive", [{ row: 4, column: 4 }]);
+    });
+
+    expect(result.current.plan?.cue).toBe("revive");
+    expect(result.current.boardImpulse).toEqual(impulse);
+  });
+
   it("keeps both effects when a turn lands while a cue is playing", async () => {
     const { result, rerender } = await renderHook(
       (props: { turn: number; events: GameEvent[]; reducedMotion: boolean }) =>
@@ -202,7 +227,7 @@ describe("useEventAnimator", () => {
       result.current.startedDrawing(result.current.effects[0].id, 0);
     });
     await act(async () => {
-      jest.advanceTimersByTime(340);
+      jest.advanceTimersByTime(450);
     });
     expect(result.current.effects).toHaveLength(0);
 
@@ -214,7 +239,7 @@ describe("useEventAnimator", () => {
     expect(stalled.startedAt).toBeNull();
 
     await act(async () => {
-      jest.advanceTimersByTime(340 + 400 + 50);
+      jest.advanceTimersByTime(450 + 400 + 50);
     });
 
     // Still live: the renderer participates, so it gets waited for.
@@ -242,7 +267,7 @@ describe("useEventAnimator", () => {
     expect(result.current.isAnimating).toBe(true);
 
     await act(async () => {
-      jest.advanceTimersByTime(340 + 400);
+      jest.advanceTimersByTime(450 + 400);
     });
 
     expect(result.current.effects).toHaveLength(0);
@@ -264,7 +289,7 @@ describe("useEventAnimator", () => {
       result.current.startedDrawing(result.current.effects[0].id, 0);
     });
     await act(async () => {
-      jest.advanceTimersByTime(340);
+      jest.advanceTimersByTime(450);
     });
 
     await act(async () => {
@@ -274,7 +299,7 @@ describe("useEventAnimator", () => {
 
     // Never drawn. Four windows (the first plus three extensions) and it goes.
     await act(async () => {
-      jest.advanceTimersByTime((340 + 400) * 5);
+      jest.advanceTimersByTime((450 + 400) * 5);
     });
 
     expect(result.current.effects).toHaveLength(0);

@@ -5,7 +5,7 @@ import { useBloomPaint } from "../../src/rendering/cinematic/layers/BlocksLayer"
 import { sceneGeometry } from "../../src/rendering/cinematic/geometry";
 import { cinematicPalette } from "../../src/rendering/cinematic/palette";
 import { resolveTheme } from "../../src/ui/themes";
-import type { EffectPlan } from "../../src/ui/effects/eventEffects";
+import { buildEffectPlan, type EffectPlan } from "../../src/ui/effects/eventEffects";
 import type { RecordedPaint } from "../../test-utils/skiaMock";
 
 /** GPU and UI-thread budget guards.
@@ -138,6 +138,14 @@ describe("the effect model caps what a turn can mount", () => {
   const palette = cinematicPalette(resolveTheme(undefined));
 
   function plan(overrides: Partial<EffectPlan> = {}): EffectPlan {
+    const rows = overrides.rows ?? [];
+    const columns = overrides.columns ?? [];
+    const generated = buildEffectPlan(
+      rows.length > 0 || columns.length > 0
+        ? [{ type: "linesCleared", rows: [...rows], columns: [...columns] }]
+        : [],
+      false,
+    );
     return {
       rows: [],
       columns: [],
@@ -154,6 +162,8 @@ describe("the effect model caps what a turn can mount", () => {
       hasRequiredSequence: false,
       durationMs: 780,
       ...overrides,
+      clear: overrides.clear ?? generated.clear,
+      boardImpulse: overrides.boardImpulse ?? generated.boardImpulse,
     };
   }
 

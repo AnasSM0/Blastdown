@@ -94,7 +94,7 @@ type Driver = {
  *  each scripted step lands in its own task exactly as it does on a device —
  *  which is what makes "six rapid effects" six distinct turns rather than one
  *  batched jump from turn 0 to turn 6. Nothing here advances far enough to reach
- *  a 340ms retirement, so a scenario always finishes before its effects do. */
+ *  a 450ms single-clear retirement, so a scenario always finishes before its effects do. */
 async function mountPipeline(): Promise<Driver> {
   let latest: EventAnimator | null = null;
   let handle: RunnerHandle | null = null;
@@ -126,7 +126,7 @@ async function mountPipeline(): Promise<Driver> {
 }
 
 // Fake timers throughout: the harness schedules its steps, and a frozen clock
-// also stops a slow machine letting a 340ms clear retire itself between the
+// also stops a slow machine letting a 450ms clear retire itself between the
 // last step and the assertion.
 beforeEach(() => {
   // The ledger is a module singleton, so a counter left behind by one test
@@ -147,8 +147,13 @@ describe("the harness catalogue", () => {
     expect(ids).toEqual([
       "placement",
       "line-clear",
+      "double-clear",
+      "triple-clear",
+      "overload-clear",
       "row-and-column",
       "two-clears",
+      "rapid-clear-3",
+      "reduced-motion-clear",
       "clear-and-defuse",
       "clear-and-explosion",
       "multiple-explosions",
@@ -304,6 +309,18 @@ describe("the harness uses the public pipeline", () => {
     const effects = driver.animator().effects;
     expect(effects.map((effect) => effect.id)).toEqual(["s1:t1", "s1:t2"]);
     expect(new Set(effects.map((effect) => effect.startedAt)).size).toBeGreaterThan(0);
+
+    await driver.unmount();
+  });
+
+  it("keeps three rapid clearing turns independently identified and live", async () => {
+    const driver = await mountPipeline();
+
+    await driver.run("rapid-clear-3");
+
+    const effects = driver.animator().effects;
+    expect(effects.map((effect) => effect.id)).toEqual(["s1:t1", "s1:t2", "s1:t3"]);
+    expect(effects.every((effect) => effect.startedAt !== null)).toBe(true);
 
     await driver.unmount();
   });
@@ -581,21 +598,21 @@ describe("the harness exercises retirement and session change", () => {
     await driver.run("retire-lower");
 
     expect(driver.animator().effects.map((effect) => effect.id)).toEqual(["s1:t1", "s1:c1"]);
-    const cueStartedAt = driver
+    const clearStartedAt = driver
       .animator()
-      .effects.find((effect) => effect.id === "s1:c1")?.startedAt;
-    expect(cueStartedAt).not.toBeNull();
+      .effects.find((effect) => effect.id === "s1:t1")?.startedAt;
+    expect(clearStartedAt).not.toBeNull();
 
-    // The clear runs 340ms, the cue 400ms. Past the clear and short of the cue.
+    // The cue runs 400ms and the polished single clear recovers through 450ms.
     await act(async () => {
-      jest.advanceTimersByTime(360);
+      jest.advanceTimersByTime(420);
     });
 
     const after = driver.animator().effects;
-    expect(after.map((effect) => effect.id)).toEqual(["s1:c1"]);
+    expect(after.map((effect) => effect.id)).toEqual(["s1:t1"]);
     // An unchanged start time is what "did not restart" means from outside: a
     // survivor that remounted would be re-stamped by a fresh draw report.
-    expect(after[0].startedAt).toBe(cueStartedAt);
+    expect(after[0].startedAt).toBe(clearStartedAt);
 
     await driver.unmount();
   });

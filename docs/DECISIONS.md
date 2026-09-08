@@ -1987,3 +1987,24 @@ stale completion cannot reset a newer turn or interfere with B-03 praise. These
 contracts are presentation-only; gameplay, scoring, timers, effect capacity,
 RNG, persistence, and the default-OFF cinematic flag are unchanged. Physical
 Android visual tuning remains `A-DEVICE-PENDING`.
+
+---
+
+## 2026-09-08 — B-05 line clears use one magnitude-aware presentation contract
+
+Committed `linesCleared` events now produce one renderer-independent clear
+contract containing rows, columns, deduplicated cells/intersections, a four-level
+magnitude tier, and presentation timing. The fallback and cinematic renderers
+consume that contract without recalculating gameplay. Impact begins immediately,
+directional travel follows, cells release once, and recovery completes in
+450/560/680/880 ms for one/two/three/four-or-more simultaneous lines.
+
+Multi-clears apply one board-group impulse of 2/4/6 px; a single clear has none,
+and the established explosion treatment remains stronger at 8 px. Reduced Motion
+retains static impact, lane, and completion cues while removing travelling sweeps
+and board impulse. Every clear uses one shared progress clock per live effect,
+intersections are emitted once with stronger emphasis, and the existing bounded
+six-effect queue continues to own identity, overlap, retirement, and session
+cleanup. Gameplay input, clearing/scoring/timer rules, RNG, praise vocabulary,
+dependencies, and the default-OFF cinematic flag are unchanged. Physical Android
+visual tuning remains `A-DEVICE-PENDING`.

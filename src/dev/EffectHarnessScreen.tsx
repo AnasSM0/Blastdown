@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } fr
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { EffectStack } from "../components/effects/EffectStack";
+import { BoardImpulseFrame } from "../components/BoardImpulseFrame";
 import type { GridCell as DomainGridCell } from "../domain/gameTypes";
 import { useEventAnimator, type EventAnimator } from "../hooks/useEventAnimator";
 // The same flag-gated resolver the game screen uses. Importing the cinematic
@@ -75,44 +76,46 @@ export function EffectHarnessScreen() {
   }, []);
   const hooks = useMemo(() => ({ playCue, reset }), [playCue, reset]);
   const runner = useEffectHarnessRunner(hooks);
+  const active = runner.activeScenarioId ? harnessScenario(runner.activeScenarioId) : undefined;
+  const reducedMotion = active?.reducedMotion ?? false;
 
   const animator = useEventAnimator({
     turn: runner.turn,
     events: runner.events,
     grid,
-    reducedMotion: false,
+    reducedMotion,
   });
   useEffect(() => {
     animatorRef.current = animator;
   });
 
-  const active = runner.activeScenarioId ? harnessScenario(runner.activeScenarioId) : undefined;
+  const boardImpulse = CINEMATIC_RENDERER ? null : animator.boardImpulse;
 
   return (
     <SafeAreaView style={styles.screen} testID="effect-harness-screen">
       <View style={styles.boardZone}>
         <View style={{ width: boardSide, height: boardSide }}>
-          <BoardRenderer
-            grid={grid}
-            badges={[]}
-            boardSize={boardSide}
-            placedCells={runner.placedCells}
-            placementNonce={runner.placementNonce}
-            explosionCount={animator.plan?.explosions.length ?? 0}
-            effectKey={animator.effectKey}
-            reducedMotion={false}
-            onCellSizeChange={setCellSize}
-            effectSequences={CINEMATIC_RENDERER ? animator.sequences : undefined}
-            onEffectStarted={animator.startedDrawing}
-          />
-          {CINEMATIC_RENDERER ? null : (
-            <EffectStack
-              sequences={animator.sequences}
-              cellSize={cellSize}
-              reducedMotion={false}
-              onStarted={animator.startedDrawing}
+          <BoardImpulseFrame impulse={boardImpulse} reducedMotion={reducedMotion}>
+            <BoardRenderer
+              grid={grid}
+              badges={[]}
+              boardSize={boardSide}
+              placedCells={runner.placedCells}
+              placementNonce={runner.placementNonce}
+              reducedMotion={reducedMotion}
+              onCellSizeChange={setCellSize}
+              effectSequences={CINEMATIC_RENDERER ? animator.sequences : undefined}
+              onEffectStarted={animator.startedDrawing}
             />
-          )}
+            {CINEMATIC_RENDERER ? null : (
+              <EffectStack
+                sequences={animator.sequences}
+                cellSize={cellSize}
+                reducedMotion={reducedMotion}
+                onStarted={animator.startedDrawing}
+              />
+            )}
+          </BoardImpulseFrame>
         </View>
       </View>
 

@@ -65,9 +65,9 @@ export function CinematicBoardCanvas({
 }) {
   const { geometry, palette } = scene;
   const shake = shakeScene?.shake ?? 0;
-  const shakeDuration = shakeScene?.durationMs ?? 0;
+  const shakeDuration = shakeScene?.shakeDurationMs ?? 0;
 
-  // The explosion shake, applied to the BOARD drawing rather than to the screen
+  // The clear/explosion impulse, applied to the BOARD drawing rather than the screen
   // — `docs/ANIMATION_SPEC.md` is explicit that it must stay board-only. Four
   // half-cycles of a decaying sine over the first ~200 ms, then still. Zero
   // amplitude under reduced motion, where the model has already set `shake` to
@@ -121,13 +121,9 @@ export function CinematicBoardCanvas({
   );
 }
 
-/** How long the shake runs, independent of the sequence it rides on: a shake
- *  that lasted a whole 780 ms explosion sequence would read as a fault. */
-const SHAKE_MS = 200;
-
-/** Horizontal board offset for the explosion shake, in px.
+/** Horizontal board offset for a clear/explosion impulse, in px.
  *
- *  Four half-cycles of a sine, squared-decayed to zero over `SHAKE_MS`. Pulled
+ *  Four half-cycles of a sine, squared-decayed to zero over its own duration. Pulled
  *  out of the worklet and exported so the curve is testable — the shake is
  *  otherwise invisible to every local check, and it has already been broken once
  *  in a way no test would have noticed.
@@ -140,7 +136,7 @@ export function shakeOffset(elapsedMs: number, amplitude: number, sequenceMs: nu
   if (amplitude === 0 || sequenceMs <= 0) {
     return 0;
   }
-  const progress = Math.min(1, Math.max(0, elapsedMs / SHAKE_MS));
+  const progress = Math.min(1, Math.max(0, elapsedMs / sequenceMs));
   if (progress >= 1) {
     return 0;
   }

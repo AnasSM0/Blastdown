@@ -3,6 +3,7 @@ import { memo } from "react";
 import { useDerivedValue, type SharedValue } from "react-native-reanimated";
 
 import type {
+  BloomPrimitive,
   BurstPrimitive,
   EffectScene,
   FlashPrimitive,
@@ -36,6 +37,35 @@ const SWEEP_CORE = alpha("#FFFFFF", 0.9);
 /** How far a settling flash overshoots before resting. */
 const SETTLE = 0.08;
 
+function Bloom({
+  primitive,
+  elapsed,
+}: {
+  primitive: BloomPrimitive;
+  elapsed: SharedValue<number>;
+}) {
+  const { color, delayMs, durationMs, peak, rect } = primitive;
+  const opacity = useDerivedValue(() => {
+    const local = elapsed.value - delayMs;
+    if (local < 0 || local >= durationMs) {
+      return 0;
+    }
+    const progress = local / durationMs;
+    return peak * (1 - progress) * (1 - progress * 0.45);
+  });
+  return (
+    <RoundedRect
+      x={rect.x}
+      y={rect.y}
+      width={rect.width}
+      height={rect.height}
+      r={Math.min(rect.width, rect.height) * 0.22}
+      color={alpha(lighten(color, 0.35), 0.82)}
+      opacity={opacity}
+    />
+  );
+}
+
 function Sweep({
   primitive,
   elapsed,
@@ -43,7 +73,7 @@ function Sweep({
   primitive: SweepPrimitive;
   elapsed: SharedValue<number>;
 }) {
-  const { color, delayMs, durationMs, orientation, rect } = primitive;
+  const { color, delayMs, durationMs, orientation, peak, rect } = primitive;
   const row = orientation === "row";
   const along = row ? rect.width : rect.height;
   const across = row ? rect.height : rect.width;
@@ -60,7 +90,7 @@ function Sweep({
     if (local < 0 || local >= durationMs) {
       return 0;
     }
-    return Math.sin((local / durationMs) * Math.PI);
+    return Math.sin((local / durationMs) * Math.PI) * peak;
   });
   const transform = useDerivedValue(() => {
     const local = elapsed.value - delayMs;
@@ -106,7 +136,7 @@ function Flash({
   primitive: FlashPrimitive;
   elapsed: SharedValue<number>;
 }) {
-  const { color, delayMs, durationMs, rect, settles } = primitive;
+  const { clearTimeline, color, delayMs, durationMs, peak, rect, settles } = primitive;
   const radius = Math.min(rect.width, rect.height) * 0.2;
   const fill = alpha(lighten(color, 0.55), 0.95);
   const center = vec(rect.x + rect.width / 2, rect.y + rect.height / 2);
@@ -116,8 +146,22 @@ function Flash({
     if (local < 0 || local >= durationMs) {
       return 0;
     }
+    if (clearTimeline) {
+      if (local < clearTimeline.impactEndMs) {
+        return peak * (1 - (local / clearTimeline.impactEndMs) * 0.72);
+      }
+      if (local < clearTimeline.releaseStartMs) {
+        return 0;
+      }
+      const releaseDuration = clearTimeline.releaseEndMs - clearTimeline.releaseStartMs;
+      const releaseProgress = Math.max(
+        0,
+        Math.min(1, (local - clearTimeline.releaseStartMs) / releaseDuration),
+      );
+      return Math.sin(releaseProgress * Math.PI) * peak;
+    }
     const remaining = 1 - local / durationMs;
-    return remaining * remaining;
+    return remaining * remaining * peak;
   });
 
   // The settle is one scale about the cell's own centre, not four animated
@@ -125,6 +169,20 @@ function Flash({
   // motion — bind no transform at all and cost a single worklet.
   const transform = useDerivedValue(() => {
     const local = elapsed.value - delayMs;
+    if (clearTimeline) {
+      if (local < clearTimeline.impactEndMs) {
+        return [{ scale: 0.96 + 0.04 * (local / clearTimeline.impactEndMs) }];
+      }
+      if (local >= clearTimeline.releaseStartMs) {
+        const releaseDuration = clearTimeline.releaseEndMs - clearTimeline.releaseStartMs;
+        const progress = Math.max(
+          0,
+          Math.min(1, (local - clearTimeline.releaseStartMs) / releaseDuration),
+        );
+        return [{ scale: 1 - 0.18 * progress }];
+      }
+      return [{ scale: 1 }];
+    }
     const progress = durationMs > 0 ? Math.max(0, Math.min(1, local / durationMs)) : 1;
     return [{ scale: 1 + SETTLE * (1 - progress) }];
   });
@@ -317,6 +375,9 @@ function EffectsLayerImpl({
 }) {
   return (
     <Group>
+      {scene.blooms.map((primitive) => (
+        <Bloom key={primitive.key} primitive={primitive} elapsed={elapsed} />
+      ))}
       {scene.sweeps.map((primitive) => (
         <Sweep key={primitive.key} primitive={primitive} elapsed={elapsed} />
       ))}

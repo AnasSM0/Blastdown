@@ -1,7 +1,11 @@
 import { sceneGeometry } from "../../src/rendering/cinematic/geometry";
 import { cinematicPalette } from "../../src/rendering/cinematic/palette";
 import { buildEffectScene } from "../../src/rendering/cinematic/effects/effectScene";
-import { MAX_BURST_CELLS, type EffectPlan } from "../../src/ui/effects/eventEffects";
+import {
+  buildEffectPlan,
+  MAX_BURST_CELLS,
+  type EffectPlan,
+} from "../../src/ui/effects/eventEffects";
 import { resolveTheme } from "../../src/ui/themes";
 
 /** The effect model decides what plays; the canvas only advances a clock over
@@ -18,7 +22,19 @@ import { resolveTheme } from "../../src/ui/themes";
 const geometry = sceneGeometry(328, 8);
 const palette = cinematicPalette(resolveTheme(undefined));
 
-function plan(overrides: Partial<EffectPlan> = {}): EffectPlan {
+function plan(overrides: Partial<EffectPlan> = {}, reducedMotion = false): EffectPlan {
+  const rows = overrides.rows ?? [];
+  const columns = overrides.columns ?? [];
+  const generated = buildEffectPlan(
+    rows.length > 0 || columns.length > 0
+      ? [{ type: "linesCleared", rows: [...rows], columns: [...columns] }]
+      : [],
+    reducedMotion,
+  );
+  const explosionImpulse =
+    (overrides.explosions?.length ?? 0) > 0 && !reducedMotion
+      ? { source: "explosion" as const, amplitudePx: 8, durationMs: 200 }
+      : generated.boardImpulse;
   return {
     rows: [],
     columns: [],
@@ -33,8 +49,10 @@ function plan(overrides: Partial<EffectPlan> = {}): EffectPlan {
     comboReset: false,
     cue: null,
     hasRequiredSequence: false,
-    durationMs: 340,
     ...overrides,
+    clear: overrides.clear ?? generated.clear,
+    boardImpulse: overrides.boardImpulse ?? explosionImpulse,
+    durationMs: overrides.durationMs ?? (generated.durationMs > 0 ? generated.durationMs : 340),
   };
 }
 
@@ -55,14 +73,14 @@ describe("line clears", () => {
 
   it("staggers along the row, and caps the stagger so a full line still feels immediate", () => {
     const scene = buildEffectScene(clearing, geometry, palette, false);
-    const delays = scene.flashes.map((f) => f.delayMs);
+    const delays = scene.flashes.map((flash) => (flash.clearTimeline?.releaseStartMs ?? 0) - 220);
 
     expect(delays[0]).toBe(0);
     expect(delays[7]).toBeGreaterThan(delays[0]);
     // Without the cap, a wider board would make the last cell of a clear lag
     // noticeably behind the first, and the beat would read as lag rather than
     // as direction.
-    expect(Math.max(...delays)).toBeLessThanOrEqual(112);
+    expect(Math.max(...delays)).toBeLessThanOrEqual(56);
   });
 
   it("gives an intersection the earlier of its two lanes, not both flashes", () => {
@@ -76,8 +94,8 @@ describe("line clears", () => {
       false,
     );
 
-    expect(scene.flashes).toHaveLength(1);
-    expect(scene.flashes[0].delayMs).toBe(0);
+    expect(scene.flashes).toHaveLength(15);
+    expect(scene.flashes.filter((flash) => flash.key === "clear-0-7")).toHaveLength(1);
   });
 });
 
@@ -170,17 +188,18 @@ describe("defuse is contained to its own piece", () => {
 });
 
 describe("reduced motion removes movement, not meaning", () => {
-  const busy = plan({
+  const busyOverrides: Partial<EffectPlan> = {
     rows: [0],
     clearedCells: cells(8),
     explosions: [{ explosionId: "e", pieceId: "p", cells: cells(3, 4) }],
     reviveCells: cells(2, 6),
     scoreDelta: 150,
     defuses: [{ pieceId: "p1", bonus: 25, cells: [{ row: 1, column: 1 }] }],
-  });
+  };
+  const busy = plan(busyOverrides);
 
   it("still reports every event", () => {
-    const reduced = buildEffectScene(busy, geometry, palette, true);
+    const reduced = buildEffectScene(plan(busyOverrides, true), geometry, palette, true);
 
     // `docs/ACCESSIBILITY.md`: a cleared line still flashes, expiry still shows
     // its rubble, a defuse still pulses, a revive still reads as restoration.
@@ -193,7 +212,7 @@ describe("reduced motion removes movement, not meaning", () => {
   });
 
   it("drops travelling sweeps, staggers, debris throw, text rise and shake", () => {
-    const reduced = buildEffectScene(busy, geometry, palette, true);
+    const reduced = buildEffectScene(plan(busyOverrides, true), geometry, palette, true);
 
     expect(reduced.sweeps).toEqual([]);
     expect(reduced.shake).toBe(0);
@@ -204,7 +223,7 @@ describe("reduced motion removes movement, not meaning", () => {
   });
 
   it("shortens each beat, because a static emphasis that lingers reads as a stall", () => {
-    const reduced = buildEffectScene(busy, geometry, palette, true);
+    const reduced = buildEffectScene(plan(busyOverrides, true), geometry, palette, true);
     const full = buildEffectScene(busy, geometry, palette, false);
 
     expect(Math.max(...reduced.flashes.map((f) => f.durationMs))).toBeLessThan(
@@ -244,11 +263,13 @@ describe("an unmeasured board draws nothing", () => {
 
     expect(scene).toEqual({
       sweeps: [],
+      blooms: [],
       flashes: [],
       rings: [],
       bursts: [],
       texts: [],
       shake: 0,
+      shakeDurationMs: 0,
       durationMs: 0,
     });
   });
@@ -272,6 +293,7 @@ describe("every primitive carries a stable, unique key", () => {
 
     const keys = [
       ...scene.sweeps.map((p) => p.key),
+      ...scene.blooms.map((p) => p.key),
       ...scene.flashes.map((p) => p.key),
       ...scene.rings.map((p) => p.key),
       ...scene.bursts.map((p) => p.key),

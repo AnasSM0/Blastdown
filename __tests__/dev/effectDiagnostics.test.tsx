@@ -63,6 +63,8 @@ function plan(overrides: Partial<EffectPlan> = {}): EffectPlan {
     hasRequiredSequence: true,
     durationMs: 340,
     ...overrides,
+    clear: overrides.clear ?? null,
+    boardImpulse: overrides.boardImpulse ?? null,
   };
 }
 
@@ -462,7 +464,7 @@ describe("both renderers report the same delivery", () => {
       handle!.run(scenarioId);
     });
     // One scripted step per advance, exactly as the harness's own suite drives
-    // it. Six steps is 96ms of fake time, well short of the 340ms a clear takes
+    // it. Six steps is 96ms of fake time, well short of the 450ms a clear takes
     // to retire, so nothing finishes before the snapshot is read.
     for (let guard = 0; guard < 64 && !handle!.idle(); guard += 1) {
       await act(async () => {

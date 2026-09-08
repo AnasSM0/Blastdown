@@ -122,7 +122,7 @@ describe("a live reduced-motion change remounts rather than removing a transform
       "src/components/TimerBadge/TimerBadge.tsx",
       "src/components/GridCell/GridCell.tsx",
       "src/components/PieceTray/PieceTray.tsx",
-      "src/components/GameBoard/GameBoard.tsx",
+      "src/components/BoardImpulseFrame/index.tsx",
       // Found by a second audit, not the first: this one's ternary is nested
       // across lines, so a single-line grep for the pattern missed it. Its
       // "scale" mode toggles the transform exactly like the others, and the

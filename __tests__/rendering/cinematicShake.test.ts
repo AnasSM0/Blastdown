@@ -14,11 +14,11 @@ import { shakeOffset } from "../../src/rendering/cinematic/CinematicBoardCanvas"
  *  the part that can be wrong is the part that can be checked. */
 
 const AMPLITUDE = 4;
-const SEQUENCE_MS = 780;
+const SHAKE_MS = 200;
 
 describe("the shake curve", () => {
   it("starts still, so the board does not jump on the first frame", () => {
-    expect(shakeOffset(0, AMPLITUDE, SEQUENCE_MS)).toBeCloseTo(0, 6);
+    expect(shakeOffset(0, AMPLITUDE, SHAKE_MS)).toBeCloseTo(0, 6);
   });
 
   it("actually moves during the shake", () => {
@@ -26,7 +26,7 @@ describe("the shake curve", () => {
     // value and then repeated it. Several distinct offsets across the window is
     // the property that was missing.
     const samples = [20, 40, 60, 80, 100, 120, 140, 160, 180].map((t) =>
-      shakeOffset(t, AMPLITUDE, SEQUENCE_MS),
+      shakeOffset(t, AMPLITUDE, SHAKE_MS),
     );
 
     expect(new Set(samples.map((v) => v.toFixed(4))).size).toBeGreaterThan(5);
@@ -34,7 +34,7 @@ describe("the shake curve", () => {
   });
 
   it("swings both ways, rather than pushing the board off to one side", () => {
-    const samples = [25, 50, 75, 100, 125, 150].map((t) => shakeOffset(t, AMPLITUDE, SEQUENCE_MS));
+    const samples = [15, 30, 45, 60, 75, 90].map((t) => shakeOffset(t, AMPLITUDE, SHAKE_MS));
 
     expect(samples.some((v) => v > 0)).toBe(true);
     expect(samples.some((v) => v < 0)).toBe(true);
@@ -43,31 +43,30 @@ describe("the shake curve", () => {
   it("decays, so the end is gentler than the start", () => {
     // Squared decay: the first swing should clearly outweigh a later one at the
     // same phase. Without it the shake would stop dead rather than settle.
-    const early = Math.abs(shakeOffset(25, AMPLITUDE, SEQUENCE_MS));
-    const late = Math.abs(shakeOffset(175, AMPLITUDE, SEQUENCE_MS));
+    const early = Math.abs(shakeOffset(25, AMPLITUDE, SHAKE_MS));
+    const late = Math.abs(shakeOffset(125, AMPLITUDE, SHAKE_MS));
 
     expect(early).toBeGreaterThan(late);
   });
 
   it("never exceeds its amplitude", () => {
     for (let t = 0; t <= 220; t += 5) {
-      expect(Math.abs(shakeOffset(t, AMPLITUDE, SEQUENCE_MS))).toBeLessThanOrEqual(AMPLITUDE);
+      expect(Math.abs(shakeOffset(t, AMPLITUDE, SHAKE_MS))).toBeLessThanOrEqual(AMPLITUDE);
     }
   });
 
   it("is finished well before the sequence it rides on", () => {
     // A shake lasting the whole 780 ms explosion sequence would read as a fault
     // rather than as impact.
-    expect(shakeOffset(200, AMPLITUDE, SEQUENCE_MS)).toBe(0);
-    expect(shakeOffset(400, AMPLITUDE, SEQUENCE_MS)).toBe(0);
-    expect(shakeOffset(SEQUENCE_MS, AMPLITUDE, SEQUENCE_MS)).toBe(0);
+    expect(shakeOffset(SHAKE_MS, AMPLITUDE, SHAKE_MS)).toBe(0);
+    expect(shakeOffset(400, AMPLITUDE, SHAKE_MS)).toBe(0);
   });
 
   it("stays perfectly still under reduced motion", () => {
     // The model sets the amplitude to 0 for reduced motion, so this function
     // needs no second check — but it must honour it exactly, at every instant.
     for (let t = 0; t <= 400; t += 10) {
-      expect(shakeOffset(t, 0, SEQUENCE_MS)).toBe(0);
+      expect(shakeOffset(t, 0, SHAKE_MS)).toBe(0);
     }
   });
 

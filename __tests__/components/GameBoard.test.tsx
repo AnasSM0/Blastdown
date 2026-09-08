@@ -173,7 +173,7 @@ describe("GameBoard", () => {
     // the 64 cells), which is exactly how the game screen composes them.
     const result = await render(
       <>
-        <GameBoard grid={grid} badges={[]} boardSize={328} explosionCount={1} effectKey="e1" />
+        <GameBoard grid={grid} badges={[]} boardSize={328} />
         <EffectsLayer plan={plan} cellSize={38} reducedMotion={false} />
       </>,
     );

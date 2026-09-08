@@ -150,6 +150,8 @@ describe("effect work is bounded before it reaches the canvas", () => {
     // frame the app is trying hardest to stay smooth.
     const scene = buildEffectScene(
       {
+        clear: null,
+        boardImpulse: { source: "explosion", amplitudePx: 8, durationMs: 200 },
         rows: [],
         columns: [],
         clearedCells: [],

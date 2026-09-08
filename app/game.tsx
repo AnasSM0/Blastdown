@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
 import { BOARD_CONTENT_INSET } from "../src/components/GameBoard";
+import { BoardImpulseFrame } from "../src/components/BoardImpulseFrame";
 import { EffectStack } from "../src/components/effects/EffectStack";
 import { PraiseOverlay } from "../src/components/PraiseOverlay";
 import { PieceTray } from "../src/components/PieceTray";
@@ -698,6 +699,7 @@ export function GameView({
   // the screen hands over one set of values and never learns which it got — the
   // flag switches a component, not a data path.
   const cinematic = CINEMATIC_RENDERER;
+  const boardImpulse = cinematic ? null : animator.boardImpulse;
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.appBackground }]} testID="game-screen">
@@ -720,44 +722,45 @@ export function GameView({
         <View style={styles.content} onLayout={handleContentLayout}>
           <View style={styles.boardZone}>
             {boardSide > 0 ? (
-              <View style={[styles.boardWrapper, { width: boardSide, height: boardSide }]}>
-                <BoardRenderer
-                  ref={boardRef}
-                  grid={state.grid}
-                  badges={badges}
-                  danger={danger}
-                  boardSize={boardSide}
-                  preview={preview}
-                  onCellPress={handleCellPress}
-                  onCellPreviewChange={handleCellPreviewChange}
-                  onCellSizeChange={handleCellSizeChange}
-                  placedCells={placement.cells}
-                  placementNonce={placement.nonce}
-                  explosionCount={animator.plan?.explosions.length ?? 0}
-                  effectKey={animator.effectKey}
-                  highlightPieceId={defuseTarget?.id ?? null}
-                  reducedMotion={reducedMotion}
-                  frozen={freezeActive}
-                  placementHints={placementHints}
-                  // Only the cinematic renderer reads this: it draws effects
-                  // inside its own canvas, so the sibling overlay below is
-                  // suppressed for it. Handing the sequences to both renderers
-                  // would play every beat twice.
-                  effectSequences={cinematic ? animator.sequences : undefined}
-                  onEffectStarted={animator.startedDrawing}
-                />
-                {/* Cosmetic overlay, a SIBLING of the board rather than a child:
-                    a new effect re-renders only this stack, never the 64 cells.
-                    One layer per live effect, each keyed by its own id, so
-                    effects animate and retire independently of each other. */}
-                {!cinematic ? (
-                  <EffectStack
-                    sequences={animator.sequences}
-                    cellSize={cellSize}
+              <View
+                ref={boardRef}
+                collapsable={false}
+                style={[styles.boardWrapper, { width: boardSide, height: boardSide }]}
+              >
+                <BoardImpulseFrame impulse={boardImpulse} reducedMotion={reducedMotion}>
+                  <BoardRenderer
+                    grid={state.grid}
+                    badges={badges}
+                    danger={danger}
+                    boardSize={boardSide}
+                    preview={preview}
+                    onCellPress={handleCellPress}
+                    onCellPreviewChange={handleCellPreviewChange}
+                    onCellSizeChange={handleCellSizeChange}
+                    placedCells={placement.cells}
+                    placementNonce={placement.nonce}
+                    highlightPieceId={defuseTarget?.id ?? null}
                     reducedMotion={reducedMotion}
-                    onStarted={animator.startedDrawing}
+                    frozen={freezeActive}
+                    placementHints={placementHints}
+                    // Only the cinematic renderer reads this: it draws effects
+                    // inside its own canvas, so the sibling overlay below is
+                    // suppressed for it. Handing the sequences to both renderers
+                    // would play every beat twice.
+                    effectSequences={cinematic ? animator.sequences : undefined}
+                    onEffectStarted={animator.startedDrawing}
                   />
-                ) : null}
+                  {/* The fallback overlay shares the board impulse wrapper so
+                      cells and their feedback always move as one object. */}
+                  {!cinematic ? (
+                    <EffectStack
+                      sequences={animator.sequences}
+                      cellSize={cellSize}
+                      reducedMotion={reducedMotion}
+                      onStarted={animator.startedDrawing}
+                    />
+                  ) : null}
+                </BoardImpulseFrame>
                 {activePraise ? (
                   <PraiseOverlay
                     key={activePraise.id}

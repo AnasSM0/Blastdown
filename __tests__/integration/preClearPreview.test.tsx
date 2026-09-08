@@ -80,6 +80,8 @@ describe("pre-clear interaction lifecycle", () => {
     expect(view.queryAllByTestId(/^preclear-/)).toHaveLength(0);
     expect(view.queryByTestId("tray-piece-candidate")).toBeNull();
     expect(view.getByTestId("effects-layer")).toBeTruthy();
+    expect(view.getByTestId("clear-lane-row-0")).toBeTruthy();
+    expect(view.getByTestId("clear-flash-0-0")).toBeTruthy();
   });
 
   it("removes a drag prediction on native cancellation without placing the piece", async () => {

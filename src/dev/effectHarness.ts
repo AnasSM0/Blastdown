@@ -45,6 +45,8 @@ export type HarnessScenario = {
    *  button that produces something nobody can fail. */
   expectation: string;
   steps: readonly HarnessStep[];
+  /** Forces the same effective setting gameplay would pass to both renderers. */
+  reducedMotion?: boolean;
 };
 
 const BOARD_EDGE = 8;
@@ -128,6 +130,27 @@ export const EFFECT_HARNESS_SCENARIOS: readonly HarnessScenario[] = [
     steps: [clearTurn(1, [3])],
   },
   {
+    id: "double-clear",
+    label: "Double line clear",
+    expectation:
+      "Rows 2 and 5 sweep together with a longer, brighter two-line bloom and a subtle board impulse.",
+    steps: [clearTurn(1, [2, 5])],
+  },
+  {
+    id: "triple-clear",
+    label: "Triple line clear",
+    expectation:
+      "Rows 1, 3 and 6 sweep together; the celebration is stronger and lasts longer than the double clear.",
+    steps: [clearTurn(1, [1, 3, 6])],
+  },
+  {
+    id: "overload-clear",
+    label: "Four-line overload",
+    expectation:
+      "Four rows resolve as one maximum-tier clear with the strongest clear bloom and board impulse, still below an explosion.",
+    steps: [clearTurn(1, [0, 2, 4, 6])],
+  },
+  {
     id: "row-and-column",
     label: "Row + column together",
     expectation:
@@ -140,6 +163,21 @@ export const EFFECT_HARNESS_SCENARIOS: readonly HarnessScenario[] = [
     expectation:
       "Two separate clears run side by side. Neither restarts the other, and the first is not cut short by the second.",
     steps: [clearTurn(1, [1]), clearTurn(2, [6])],
+  },
+  {
+    id: "rapid-clear-3",
+    label: "Three rapid clears",
+    expectation:
+      "Three distinct clears overlap without restarting a survivor; each keeps its own sweep and lifetime.",
+    steps: rapidTurns(3),
+  },
+  {
+    id: "reduced-motion-clear",
+    label: "Reduced-motion clear",
+    expectation:
+      "Row 3 and column 5 remain clearly marked by static impact and release states, with no moving sweep or board impulse.",
+    reducedMotion: true,
+    steps: [clearTurn(1, [3], [5])],
   },
   {
     id: "clear-and-defuse",
@@ -237,7 +275,7 @@ export const EFFECT_HARNESS_SCENARIOS: readonly HarnessScenario[] = [
     id: "retire-lower",
     label: "Lower effect retires first",
     expectation:
-      "The clear (340ms) finishes while the rewarded cue (400ms) is still running. The cue must NOT jump back to its start when the clear disappears.",
+      "The rewarded cue finishes while the clear's recovery is still running. The clear must NOT jump back to its start when the cue disappears.",
     steps: [clearTurn(1, [3]), { kind: "cue", cue: "rewardedDefuse", cells: rowCells(6) }],
   },
   {

@@ -148,7 +148,6 @@ function CinematicBoardImpl(
     frozen = false,
     placementHints,
     effectSequences,
-    effectKey,
     onEffectStarted,
   }: GameBoardProps,
   ref: React.ForwardedRef<View>,
@@ -367,8 +366,15 @@ function CinematicBoardImpl(
 
   // Shake belongs to the board, not to an effect, so it cannot be per-effect:
   // several effects each driving the same transform would fight over it. The
-  // last sequence in draw order is the most important one live, and it wins.
-  const shakeIndex = timed.length - 1;
+  // last impulse-capable sequence in draw order is the most important one live,
+  // and it wins. A later non-impulse cue must not mask a shake already in flight.
+  let shakeIndex = -1;
+  for (let index = timed.length - 1; index >= 0; index--) {
+    if (timed[index].scene.shake > 0) {
+      shakeIndex = index;
+      break;
+    }
+  }
   const shakeScene = shakeIndex >= 0 ? timed[shakeIndex].scene : null;
   const shakeClock = shakeIndex >= 0 ? timed[shakeIndex].elapsed : clock0;
 

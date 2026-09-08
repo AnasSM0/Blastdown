@@ -4,6 +4,7 @@ import { StyleSheet, type ViewStyle } from "react-native";
 import { ComboIndicator } from "../../src/components/ComboIndicator";
 import { DragGhost } from "../../src/components/DragGhost";
 import { GameBoard } from "../../src/components/GameBoard";
+import { BoardImpulseFrame } from "../../src/components/BoardImpulseFrame";
 import { GridCell } from "../../src/components/GridCell";
 import { PieceTray } from "../../src/components/PieceTray";
 import { RewardedActionBar } from "../../src/components/RewardedActionButton";
@@ -40,14 +41,24 @@ describe("reduced-motion Android transform guards (P1-10)", () => {
 
   it("the board omits the shake transform when reduced motion is on", async () => {
     const on = await render(
-      <GameBoard grid={emptyGrid()} badges={[]} boardSize={320} reducedMotion />,
+      <BoardImpulseFrame
+        impulse={{ id: "s1:t1", source: "clear", amplitudePx: 4, durationMs: 250 }}
+        reducedMotion
+      >
+        <GameBoard grid={emptyGrid()} badges={[]} boardSize={320} reducedMotion />
+      </BoardImpulseFrame>,
     );
-    expect(flat(on.getByTestId("game-board")).transform).toBeUndefined();
+    expect(flat(on.getByTestId("board-impulse-frame")).transform).toBeUndefined();
 
     const off = await render(
-      <GameBoard grid={emptyGrid()} badges={[]} boardSize={320} reducedMotion={false} />,
+      <BoardImpulseFrame
+        impulse={{ id: "s1:t1", source: "clear", amplitudePx: 4, durationMs: 250 }}
+        reducedMotion={false}
+      >
+        <GameBoard grid={emptyGrid()} badges={[]} boardSize={320} reducedMotion={false} />
+      </BoardImpulseFrame>,
     );
-    expect(flat(off.getByTestId("game-board")).transform).toBeDefined();
+    expect(flat(off.getByTestId("board-impulse-frame")).transform).toBeDefined();
   });
 
   it("DragGhost omits the lift scale under reduced motion (position translate only)", async () => {

@@ -11,7 +11,6 @@ import { GridCell, contourMaskOf, type CellEdges, type CellPreviewState } from "
 import { TimerBadge } from "../TimerBadge";
 import { BoardDangerLighting } from "../BoardDangerLighting";
 import { CALM_DANGER_STATE } from "../../ui/dangerState";
-import { motionKey } from "../../ui/motionKey";
 import { PRE_CLEAR_PULSE_MIN, PRE_CLEAR_PULSE_MS, preClearVisual } from "../../ui/preClearPreview";
 import type { GameBoardProps } from "./boardProps";
 
@@ -65,8 +64,6 @@ function GameBoardImpl(
     onCellSizeChange,
     placedCells,
     placementNonce,
-    explosionCount = 0,
-    effectKey,
     highlightPieceId,
     reducedMotion: reducedMotionProp,
     frozen = false,
@@ -78,7 +75,6 @@ function GameBoardImpl(
   const [measured, setMeasured] = useState(0);
   const osReducedMotion = useReducedMotion();
   const reducedMotion = reducedMotionProp ?? osReducedMotion;
-  const [shake] = useState(() => new Animated.Value(0));
   const [preClearPulse] = useState(() => new Animated.Value(1));
   const rows = grid.length;
   const columns = grid[0]?.length ?? 0;
@@ -113,26 +109,6 @@ function GameBoardImpl(
       preClearPulse.setValue(1);
     };
   }, [preClearPulse, reducedMotion, showPreClear]);
-
-  // Subtle single board shake on an explosion turn (skipped under reduced
-  // motion); keyed on effectKey so it retriggers each explosion sequence.
-  useEffect(() => {
-    if (explosionCount === 0 || reducedMotion) {
-      shake.setValue(0);
-      return;
-    }
-    const animation = Animated.sequence([
-      Animated.timing(shake, { toValue: -4, duration: 45, useNativeDriver: true }),
-      Animated.timing(shake, { toValue: 4, duration: 55, useNativeDriver: true }),
-      Animated.timing(shake, { toValue: -3, duration: 45, useNativeDriver: true }),
-      Animated.timing(shake, { toValue: 0, duration: 55, useNativeDriver: true }),
-    ]);
-    animation.start();
-    return () => {
-      animation.stop();
-      shake.setValue(0);
-    };
-  }, [effectKey, explosionCount, reducedMotion, shake]);
 
   // Derived lookups, each memoized on the one input it actually depends on, so
   // a board re-render for an unrelated reason (a preview change, a freeze
@@ -212,18 +188,9 @@ function GameBoardImpl(
   };
 
   return (
-    <Animated.View
-      key={motionKey(reducedMotion)}
+    <View
       ref={ref}
-      style={[
-        styles.board,
-        { backgroundColor: theme.boardBg, borderColor: theme.boardFrame },
-        // Only bind the shake transform when motion is allowed. Under reduced
-        // motion the shake never animates, so an identity transform would only
-        // promote this rounded board (and its rounded cell/rubble children) to
-        // an Android hardware layer for no benefit — the black-render trap.
-        reducedMotion ? undefined : { transform: [{ translateX: shake }] },
-      ]}
+      style={[styles.board, { backgroundColor: theme.boardBg, borderColor: theme.boardFrame }]}
       onLayout={handleLayout}
       collapsable={false}
       accessibilityLabel="Game board"
@@ -428,7 +395,7 @@ function GameBoardImpl(
           ))
         : null}
       <BoardDangerLighting danger={danger} reducedMotion={reducedMotion} />
-    </Animated.View>
+    </View>
   );
 }
 

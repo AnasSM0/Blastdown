@@ -12,12 +12,9 @@ import type { DangerState } from "../../ui/dangerState";
  *  cinematic renderer ships behind a flag is that the fallback has to stay
  *  trustworthy.
  *
- *  The cinematic renderer ignores three of these — `placedCells`,
- *  `placementNonce`, `explosionCount` and `effectKey` drive React Native
- *  `Animated` beats that have no equivalent in a canvas, where the same feedback
- *  is driven by shared values instead. They stay in the shared type rather than
- *  being split out, because the screen must be able to hand either renderer the
- *  same object without knowing which one it got. */
+ *  The cinematic renderer ignores `placedCells` and `placementNonce`, which
+ *  drive the fallback renderer's placement snap. They stay in the shared type
+ *  so the screen can hand either renderer the same object. */
 export type GameBoardProps = {
   grid: readonly (readonly DomainGridCell[])[];
   badges: readonly TimerBadgePlacement[];
@@ -37,14 +34,6 @@ export type GameBoardProps = {
   placedCells?: readonly CellPosition[];
   /** Bumped each placement so the snap replays even on the same cells. */
   placementNonce?: number;
-  /** Number of explosions in the turn currently being animated, paired with
-   *  `effectKey` to retrigger the board's single shake. */
-  explosionCount?: number;
-  /** Identity of the effect sequence currently playing, so a repeated
-   *  explosion retriggers the board shake instead of being treated as the same
-   *  animation. A string since effects became individually identified — see
-   *  `src/ui/effects/effectQueue.ts`. */
-  effectKey?: string | null;
   /** Timed piece to ring as the rewarded-defuse target; its cells get a solid
    *  accent highlight while the confirm card is open. */
   highlightPieceId?: string | null;

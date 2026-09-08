@@ -21,7 +21,7 @@ describe("buildEffectPlan", () => {
     const key = (c: { row: number; column: number }) => `${c.row},${c.column}`;
     expect(new Set(plan.clearedCells.map(key)).size).toBe(15);
     expect(plan.clearedCells[0]).toEqual({ row: 0, column: 0 });
-    expect(plan.durationMs).toBe(340);
+    expect(plan.durationMs).toBe(560);
   });
 
   it("groups rubble under its explosion and keeps multiple explosions ordered", () => {
@@ -66,7 +66,7 @@ describe("buildEffectPlan", () => {
     expect(plan.comboReset).toBe(false);
     expect(plan.hasRequiredSequence).toBe(true);
     // Clear + defuse share one beat; adding an explosion would extend it.
-    expect(plan.durationMs).toBe(340);
+    expect(plan.durationMs).toBe(450);
   });
 
   it("captures score penalty and combo reset from an explosion turn", () => {
@@ -90,7 +90,7 @@ describe("buildEffectPlan", () => {
       { type: "rubbleCreated", explosionId: "e-1", cells: [{ row: 4, column: 4 }] },
     ];
     const plan = buildEffectPlan(events, true);
-    expect(plan.durationMs).toBe(120);
+    expect(plan.durationMs).toBe(180);
     // The cells themselves are unchanged — only timing/particles differ.
     expect(plan.explosions[0].cells).toEqual([{ row: 4, column: 4 }]);
   });

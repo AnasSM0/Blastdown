@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { GameEvent } from "../domain/events";
 import type { GridCell } from "../domain/gameTypes";
@@ -24,6 +24,7 @@ import {
   buildEffectPlan,
   type EffectCueKind,
   type EffectPlan,
+  type BoardImpulse,
 } from "../ui/effects/eventEffects";
 
 type Grid = readonly (readonly GridCell[])[];
@@ -58,6 +59,9 @@ export type EventAnimator = {
   /** Identity of whatever `plan` currently is, so the single-plan renderer can
    *  remount cleanly between sequences. */
   effectKey: string | null;
+  /** Highest-priority live board impulse with the identity that owns it.
+   * Non-impulse cues never mask an impulse already in flight. */
+  boardImpulse: (BoardImpulse & { id: string }) | null;
   /** Called by the renderer on the first frame it actually draws an effect.
    *  This is what starts the effect's clock — see `effectQueue.ts` for why the
    *  queue refuses to stamp it at admission. */
@@ -129,7 +133,7 @@ export function useEventAnimator({
   // The grid as it stood BEFORE the turn being animated, so a defused piece's
   // footprint can still be located. Advanced only inside the turn effect.
   const preTurnGridRef = useRef(grid);
-  useEffect(() => {
+  useLayoutEffect(() => {
     queueRef.current = queue;
     eventsRef.current = events;
     reducedRef.current = reducedMotion;
@@ -276,7 +280,7 @@ export function useEventAnimator({
     setQueue((current) => resetSession(current));
   }, [clearAllTimers]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     // Only a forward turn is a new placement; a reset to 0 (restart) clears.
     if (turn <= lastTurnRef.current) {
       lastTurnRef.current = turn;
@@ -340,6 +344,14 @@ export function useEventAnimator({
   // every screen render would defeat their memoization even though the contents
   // are unchanged.
   const sequences = useMemo(() => drawOrder(queue), [queue]);
+  let boardImpulse: EventAnimator["boardImpulse"] = null;
+  for (let index = sequences.length - 1; index >= 0; index--) {
+    const impulse = sequences[index].plan.boardImpulse;
+    if (impulse) {
+      boardImpulse = { id: sequences[index].id, ...impulse };
+      break;
+    }
+  }
 
   return {
     isAnimating: hasRequiredSequence(queue),
@@ -352,6 +364,7 @@ export function useEventAnimator({
     // what is on screen — the renderers draw `sequences`, all of it.
     plan: primary?.plan ?? null,
     effectKey: primary?.id ?? null,
+    boardImpulse,
     startedDrawing,
     playCue,
     reset,
