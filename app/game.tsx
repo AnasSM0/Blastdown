@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 
 import { BOARD_CONTENT_INSET } from "../src/components/GameBoard";
 import { EffectStack } from "../src/components/effects/EffectStack";
+import { PraiseOverlay } from "../src/components/PraiseOverlay";
 import { PieceTray } from "../src/components/PieceTray";
 import { ReactorBackground } from "../src/components/ReactorBackground";
 import { ScoreHeader } from "../src/components/ScoreHeader";
@@ -37,6 +38,7 @@ import {
 import { useHaptics } from "../src/hooks/useHaptics";
 import { useEffectiveReducedMotion } from "../src/hooks/useEffectiveReducedMotion";
 import { useEventAnimator } from "../src/hooks/useEventAnimator";
+import { usePraiseCelebration } from "../src/hooks/usePraiseCelebration";
 import { useGameAnalytics } from "../src/hooks/useGameAnalytics";
 import { useRewardedAction } from "../src/hooks/useRewardedAction";
 import { useRewardOutcome } from "../src/hooks/useRewardOutcome";
@@ -170,11 +172,16 @@ export function GameView({
     turn: state.turn,
     events: controller.lastEvents,
     // The grid is needed to locate a defused piece's cells: `pieceDefused`
-    // carries only an id, and by the time it is handled the piece is gone from
-    // the current board.
+    // carries its identity/timer outcome but not its footprint, and by the time
+    // it is handled the piece is gone from the current board.
     grid: state.grid,
     reducedMotion,
   });
+  const {
+    current: activePraise,
+    complete: completePraise,
+    reset: resetPraise,
+  } = usePraiseCelebration({ turn: state.turn, events: controller.lastEvents });
   const audio = useAudio();
   // Event-driven sound + music: plays each turn's effects once, loops music
   // while the game screen is mounted (both gated by persisted settings).
@@ -608,7 +615,8 @@ export function GameView({
     freezeOutcome.reset();
     defuseOutcome.reset();
     animator.reset();
-  }, [animator, clearDrag, defuseOutcome, freezeOutcome]);
+    resetPraise();
+  }, [animator, clearDrag, defuseOutcome, freezeOutcome, resetPraise]);
 
   const handleRestart = useCallback(() => {
     audio.playSfx("button");
@@ -736,6 +744,14 @@ export function GameView({
                     cellSize={cellSize}
                     reducedMotion={reducedMotion}
                     onStarted={animator.startedDrawing}
+                  />
+                ) : null}
+                {activePraise ? (
+                  <PraiseOverlay
+                    key={activePraise.id}
+                    praise={activePraise}
+                    reducedMotion={reducedMotion}
+                    onComplete={completePraise}
                   />
                 ) : null}
               </View>

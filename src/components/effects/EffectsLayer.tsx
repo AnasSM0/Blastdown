@@ -186,7 +186,7 @@ export function EffectsLayer({
             const bonus = plan.defuses.reduce((sum, defuse) => sum + defuse.bonus, 0);
             return anchor ? (
               <FloatingText
-                text={`DEFUSED +${bonus}`}
+                text={`+${bonus}`}
                 color={theme.accent}
                 centerX={centerX(anchor.column)}
                 top={top(anchor.row) - cellSize}

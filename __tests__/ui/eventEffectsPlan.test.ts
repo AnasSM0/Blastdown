@@ -71,7 +71,7 @@ describe("defuse targeting", () => {
 
     const events: GameEvent[] = [
       { type: "linesCleared", rows: [3], columns: [] },
-      { type: "pieceDefused", pieceId: "piece-9", bonus: 80 },
+      { type: "pieceDefused", pieceId: "piece-9", bonus: 80, remainingTurns: 3 },
       { type: "scoreChanged", delta: 180, score: 180 },
     ];
     const plan = buildEffectPlan(events, false, { previousGrid });
@@ -92,8 +92,8 @@ describe("defuse targeting", () => {
     const plan = buildEffectPlan(
       [
         { type: "linesCleared", rows: [0, 7], columns: [] },
-        { type: "pieceDefused", pieceId: "a", bonus: 40 },
-        { type: "pieceDefused", pieceId: "b", bonus: 60 },
+        { type: "pieceDefused", pieceId: "a", bonus: 40, remainingTurns: 2 },
+        { type: "pieceDefused", pieceId: "b", bonus: 60, remainingTurns: 1 },
       ],
       false,
       { previousGrid },
@@ -106,7 +106,10 @@ describe("defuse targeting", () => {
   });
 
   it("falls back to no cells when the pre-turn grid is unavailable", () => {
-    const plan = buildEffectPlan([{ type: "pieceDefused", pieceId: "gone", bonus: 10 }], false);
+    const plan = buildEffectPlan(
+      [{ type: "pieceDefused", pieceId: "gone", bonus: 10, remainingTurns: 1 }],
+      false,
+    );
     expect(plan.defuses[0].cells).toEqual([]);
   });
 });

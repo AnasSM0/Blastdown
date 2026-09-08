@@ -360,7 +360,7 @@ describe("useEventAnimator", () => {
         turn: 1,
         events: [
           { type: "linesCleared", rows: [4], columns: [] },
-          { type: "pieceDefused", pieceId: "p-defused", bonus: 50 },
+          { type: "pieceDefused", pieceId: "p-defused", bonus: 50, remainingTurns: 3 },
         ],
         grid: EMPTY_GRID,
       });

@@ -1957,3 +1957,13 @@ committed effect queue remains the sole owner of post-placement celebration;
 gameplay, scoring, audio, haptics, and the default-OFF cinematic flag are
 unchanged. Physical Android latency and visual acceptance remain
 `A-DEVICE-PENDING`.
+
+## 2026-09-08 — Natural-defuse events expose their resolved timer value
+
+- **Decision:** `pieceDefused` now carries the timed piece's pre-decrement
+  `remainingTurns` alongside its id and bonus.
+- **Reason:** B-03 praise must distinguish `DEFUSED`, `CLOSE ONE`, and `CLUTCH!`
+  from the actual committed defuse outcome. Presentation must not reconstruct
+  that value from already-updated board state or placement prediction.
+- **Impact:** This extends the in-memory domain event contract only. Gameplay,
+  scoring, timer order, persistence, and deterministic RNG are unchanged.

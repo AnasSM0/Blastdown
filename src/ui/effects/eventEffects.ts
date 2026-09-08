@@ -171,7 +171,7 @@ const CUE_REDUCED_MS = 140;
 /** Read-only context the plan needs but the event stream doesn't carry. */
 export type EffectPlanContext = {
   /** The grid as it stood BEFORE this turn resolved, used to locate a defused
-   *  piece's cells (the `pieceDefused` event carries only its id). */
+   *  piece's cells (the `pieceDefused` event carries no footprint). */
   previousGrid?: Grid;
 };
 

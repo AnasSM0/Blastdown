@@ -146,7 +146,12 @@ export function placePiece(
         const bonus = DEFUSE_BONUS_BASE + DEFUSE_BONUS_PER_REMAINING_TURN * timer.remainingTurns;
         defuseBonusTotal += bonus;
         piecesDefusedThisTurn += 1;
-        events.push({ type: "pieceDefused", pieceId: timer.id, bonus });
+        events.push({
+          type: "pieceDefused",
+          pieceId: timer.id,
+          bonus,
+          remainingTurns: timer.remainingTurns,
+        });
         activeTimers = Object.fromEntries(
           Object.entries(activeTimers).filter(([id]) => id !== timer.id),
         );

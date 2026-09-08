@@ -147,7 +147,19 @@ export const EFFECT_HARNESS_SCENARIOS: readonly HarnessScenario[] = [
     expectation:
       "Row 2 sweeps and the defused piece flashes on its own footprint — not on the cleared line's midpoint.",
     steps: [
-      clearTurn(1, [2], [], [{ type: "pieceDefused", pieceId: "harness-timed-1", bonus: 50 }]),
+      clearTurn(
+        1,
+        [2],
+        [],
+        [
+          {
+            type: "pieceDefused",
+            pieceId: "harness-timed-1",
+            bonus: 50,
+            remainingTurns: 3,
+          },
+        ],
+      ),
     ],
   },
   {

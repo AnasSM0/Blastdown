@@ -53,7 +53,7 @@ describe("buildEffectPlan", () => {
   it("coordinates a defuse and a line clear in the same turn", () => {
     const events: GameEvent[] = [
       { type: "linesCleared", rows: [3], columns: [] },
-      { type: "pieceDefused", pieceId: "piece-2", bonus: 95 },
+      { type: "pieceDefused", pieceId: "piece-2", bonus: 95, remainingTurns: 3 },
       { type: "scoreChanged", delta: 100, score: 100 },
       { type: "comboChanged", combo: 1 },
     ];

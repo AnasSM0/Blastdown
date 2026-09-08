@@ -15,14 +15,15 @@ describe("EffectsLayer", () => {
     expect(result.getByTestId("effects-layer")).toBeTruthy();
   });
 
-  it("shows a DEFUSED bonus when a piece is defused with the clear", async () => {
+  it("shows the numeric bonus while semantic defuse copy belongs to praise", async () => {
     const plan = planFor([
       { type: "linesCleared", rows: [2], columns: [] },
-      { type: "pieceDefused", pieceId: "piece-2", bonus: 95 },
+      { type: "pieceDefused", pieceId: "piece-2", bonus: 95, remainingTurns: 3 },
       { type: "scoreChanged", delta: 120, score: 120 },
     ]);
     const result = await render(<EffectsLayer plan={plan} cellSize={40} reducedMotion={false} />);
-    expect(result.getByText("DEFUSED +95")).toBeTruthy();
+    expect(result.getByText("+95")).toBeTruthy();
+    expect(result.queryByText(/DEFUSED/)).toBeNull();
   });
 
   it("shows a positive score float for a plain clear (no defuse)", async () => {

@@ -34,7 +34,7 @@ type UseEventAnimatorArgs = {
   /** Events emitted by the placement that produced the current `turn`. */
   events: readonly GameEvent[];
   /** The current authoritative grid. The hook keeps the previous turn's grid so
-   *  a defused piece's footprint can be resolved (the event carries only an id). */
+   *  a defused piece's footprint can be resolved (the event carries no cells). */
   grid: Grid;
   reducedMotion: boolean;
 };
