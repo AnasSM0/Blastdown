@@ -39,6 +39,21 @@ describe("fallback premium clear presentation", () => {
     );
   });
 
+  it("represents clear lanes on all four board edges", async () => {
+    const result = await render(
+      <EffectsLayer plan={plan([0, 7], [0, 7])} cellSize={38} reducedMotion={false} />,
+    );
+
+    for (const testID of [
+      "clear-lane-row-0",
+      "clear-lane-row-7",
+      "clear-lane-column-0",
+      "clear-lane-column-7",
+    ]) {
+      expect(result.getByTestId(testID)).toBeTruthy();
+    }
+  });
+
   it("keeps static lane and cell feedback but removes travelling sweeps in Reduced Motion", async () => {
     const result = await render(
       <EffectsLayer plan={plan([2], [6], true)} cellSize={38} reducedMotion />,

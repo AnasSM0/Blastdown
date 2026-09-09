@@ -1,5 +1,6 @@
 import { alpha } from "./palette";
 import type { CinematicPalette, SceneGeometry, SceneRect } from "./types";
+import { boardCornerAccentRects } from "../../ui/boardChrome";
 
 /** The static half of the board, as data.
  *
@@ -42,12 +43,6 @@ export type DrawCommand =
  *  moiré pattern against the cell lattice, which is the failure mode of a
  *  scanline pitch close to the cell pitch. */
 const SCANLINE_PITCH = 3;
-
-/** Corner bracket geometry, matching the React Native board's own accents so
- *  the two renderers frame the board identically. */
-const CORNER_LENGTH = 12;
-const CORNER_THICKNESS = 2;
-const CORNER_INSET = 3;
 
 export function boardDrawCommands(
   geometry: SceneGeometry,
@@ -189,30 +184,10 @@ export function boardDrawCommands(
   }
 
   // 6. Corner brackets, on top of everything static.
-  const corners: [number, number, number, number][] = [
-    [CORNER_INSET, CORNER_INSET, CORNER_LENGTH, CORNER_THICKNESS],
-    [CORNER_INSET, CORNER_INSET, CORNER_THICKNESS, CORNER_LENGTH],
-    [boardSide - CORNER_INSET - CORNER_LENGTH, CORNER_INSET, CORNER_LENGTH, CORNER_THICKNESS],
-    [boardSide - CORNER_INSET - CORNER_THICKNESS, CORNER_INSET, CORNER_THICKNESS, CORNER_LENGTH],
-    [CORNER_INSET, boardSide - CORNER_INSET - CORNER_THICKNESS, CORNER_LENGTH, CORNER_THICKNESS],
-    [CORNER_INSET, boardSide - CORNER_INSET - CORNER_LENGTH, CORNER_THICKNESS, CORNER_LENGTH],
-    [
-      boardSide - CORNER_INSET - CORNER_LENGTH,
-      boardSide - CORNER_INSET - CORNER_THICKNESS,
-      CORNER_LENGTH,
-      CORNER_THICKNESS,
-    ],
-    [
-      boardSide - CORNER_INSET - CORNER_THICKNESS,
-      boardSide - CORNER_INSET - CORNER_LENGTH,
-      CORNER_THICKNESS,
-      CORNER_LENGTH,
-    ],
-  ];
-  for (const [x, y, width, height] of corners) {
+  for (const rect of boardCornerAccentRects(boardSide)) {
     commands.push({
       op: "rect",
-      rect: { x, y, width, height },
+      rect,
       color: alpha(palette.frameCorner, 0.85),
       style: "fill",
     });

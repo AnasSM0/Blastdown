@@ -3,6 +3,11 @@ import { Animated, StyleSheet, View, type LayoutChangeEvent } from "react-native
 
 import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
 import { BOARD_CONTENT_INSET, FRAME_WIDTH } from "../../ui/boardGeometry";
+import {
+  BOARD_CORNER_ACCENT_INSET,
+  BOARD_CORNER_ACCENT_LENGTH,
+  BOARD_CORNER_ACCENT_THICKNESS,
+} from "../../ui/boardChrome";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import { getTimerVisualState } from "../../ui/timerStates";
 import { radius, spacing } from "../../ui/theme";
@@ -40,12 +45,6 @@ function contourEdgesFor(
     left: !samePiece(row, column - 1),
   };
 }
-
-/** Corner-accent geometry (P1-3). Short, thin brackets inset just inside the
- *  frame; purely decorative and non-interactive. */
-const CORNER_LENGTH = 12;
-const CORNER_THICKNESS = 2;
-const CORNER_INSET = 3;
 
 // FRAME_WIDTH and BOARD_CONTENT_INSET now live in ../../ui/boardGeometry (the
 // neutral module) so EffectsLayer can share them without importing this
@@ -476,15 +475,15 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   cornerH: {
-    width: CORNER_LENGTH,
-    height: CORNER_THICKNESS,
+    width: BOARD_CORNER_ACCENT_LENGTH,
+    height: BOARD_CORNER_ACCENT_THICKNESS,
   },
   cornerV: {
-    width: CORNER_THICKNESS,
-    height: CORNER_LENGTH,
+    width: BOARD_CORNER_ACCENT_THICKNESS,
+    height: BOARD_CORNER_ACCENT_LENGTH,
   },
-  cornerTL: { top: CORNER_INSET, left: CORNER_INSET },
-  cornerTR: { top: CORNER_INSET, right: CORNER_INSET },
-  cornerBL: { bottom: CORNER_INSET, left: CORNER_INSET },
-  cornerBR: { bottom: CORNER_INSET, right: CORNER_INSET },
+  cornerTL: { top: BOARD_CORNER_ACCENT_INSET, left: BOARD_CORNER_ACCENT_INSET },
+  cornerTR: { top: BOARD_CORNER_ACCENT_INSET, right: BOARD_CORNER_ACCENT_INSET },
+  cornerBL: { bottom: BOARD_CORNER_ACCENT_INSET, left: BOARD_CORNER_ACCENT_INSET },
+  cornerBR: { bottom: BOARD_CORNER_ACCENT_INSET, right: BOARD_CORNER_ACCENT_INSET },
 });
