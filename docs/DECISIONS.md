@@ -2110,3 +2110,22 @@ timer, matching Defuse's meaningful-target boundary and preventing a wasted-ad
 outcome. This does not change its two-placement duration or two-use cap. Risk:
 the action becomes available slightly later in a fresh run. Physical Android and
 human balance judgment remain `A-DEVICE-PENDING`.
+
+---
+
+## 2026-09-09 — B-11 gates V1 tuning on local human evidence
+
+Human playtest evidence is captured by a development-only observer that reads
+committed game state/events without participating in domain transitions. It
+stores compact milestones and summaries—not boards or personal information—in
+an isolated local key with debounced, failure-contained writes. The existing
+development effect harness hosts its reset/export dashboard; direct `__DEV__`
+dynamic-require seams make both observer and diagnostics implementation
+structurally absent from production bundles.
+
+Exports identify themselves as `blastdown-human-playtest` schema version 1 so
+the dependency-free analyzer rejects simulator/unknown data. Renderer cohort is
+mandatory metadata. Current balance remains unchanged: comprehension,
+fairness, feedback load, repeated-hand frustration, and replay hypotheses must
+be evaluated with the protocol before later tuning. This is not a production
+analytics provider and does not upload data.

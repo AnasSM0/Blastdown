@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import { NoopAnalyticsService } from "./NoopAnalyticsService";
+import { recordPlaytestAnalytics } from "../playtest/signal";
 import type { AnalyticsEvent, AnalyticsService } from "./types";
 
 /** Defaults to the no-op service, so a tree without a provider (isolated
@@ -53,6 +54,7 @@ export function useAnalytics(): AnalyticsTracker {
     } catch {
       // Analytics must never affect gameplay: drop the event and move on.
     }
+    recordPlaytestAnalytics(event);
   }, []);
 
   return useMemo(() => ({ track }), [track]);

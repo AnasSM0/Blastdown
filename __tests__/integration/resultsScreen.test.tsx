@@ -8,6 +8,7 @@ import ResultsScreen from "../../app/results";
 import { createInitialGameState } from "../../src/domain/game";
 import type { GameState } from "../../src/domain/gameTypes";
 import { AudioServiceProvider } from "../../src/services/audio";
+import * as playtestSignal from "../../src/services/playtest/signal";
 import { StorageServiceProvider, createMemoryStorageService } from "../../src/services/storage";
 import { SettingsProvider } from "../../src/state/SettingsProvider";
 
@@ -53,6 +54,7 @@ jest.mock("../../src/state/ProfileProvider", () => ({
 describe("results route", () => {
   let hardwareBack: Parameters<typeof BackHandler.addEventListener>[1] | undefined;
   let backSubscription: jest.SpyInstance;
+  let playtestActionSpy: jest.SpyInstance;
 
   beforeEach(() => {
     mockReplace.mockClear();
@@ -60,6 +62,7 @@ describe("results route", () => {
     mockSettle.mockClear();
     mockClearActiveRun.mockClear();
     mockBack.mockClear();
+    playtestActionSpy = jest.spyOn(playtestSignal, "recordPlaytestAction").mockImplementation();
     hardwareBack = undefined;
     backSubscription = jest
       .spyOn(BackHandler, "addEventListener")
@@ -69,7 +72,10 @@ describe("results route", () => {
       });
   });
 
-  afterEach(() => backSubscription.mockRestore());
+  afterEach(() => {
+    backSubscription.mockRestore();
+    playtestActionSpy.mockRestore();
+  });
 
   function renderResults() {
     // Mirrors the real provider stack (app/_layout): the route plays the shared
@@ -107,12 +113,14 @@ describe("results route", () => {
     await fireEvent.press(result.getByTestId("play-again-button"));
     expect(mockStartNewRun).toHaveBeenCalledTimes(1);
     expect(mockReplace).toHaveBeenCalledWith("/game");
+    expect(playtestActionSpy).toHaveBeenCalledWith("play_again");
   });
 
   it("Home returns to the menu", async () => {
     const result = await renderResults();
     await fireEvent.press(result.getByTestId("results-home-button"));
     expect(mockReplace).toHaveBeenCalledWith("/");
+    expect(playtestActionSpy).toHaveBeenCalledWith("results_home");
   });
 
   it("coalesces rapid duplicate Home presses", async () => {

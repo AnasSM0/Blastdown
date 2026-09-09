@@ -1,4 +1,5 @@
 import { NoopErrorReporter } from "./NoopErrorReporter";
+import { recordPlaytestError } from "../playtest/signal";
 import type { ErrorReport, ErrorReporter, ErrorSurface } from "./types";
 
 /** Active reporter registered by the provider, so non-React code (service
@@ -19,6 +20,7 @@ export function resetActiveErrorReporter(): void {
 /** Report through the active reporter. Safe: never throws (a failing reporter is
  *  swallowed) so a diagnostic can never turn a handled error into a crash. */
 export function reportError(report: ErrorReport): void {
+  recordPlaytestError();
   try {
     activeReporter.report(report);
   } catch {

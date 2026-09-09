@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import { NoopErrorReporter } from "./NoopErrorReporter";
+import { recordPlaytestError } from "../playtest/signal";
 import { resetActiveErrorReporter, setActiveErrorReporter } from "./reportError";
 import type { ErrorReport, ErrorReporter } from "./types";
 
@@ -49,6 +50,7 @@ export function useErrorReporter(): { report: ErrorReportFn } {
   });
 
   const report = useCallback((report: ErrorReport) => {
+    recordPlaytestError();
     try {
       reporterRef.current.report(report);
     } catch {

@@ -56,7 +56,8 @@
     "test:coverage": "jest --coverage",
     "doctor": "expo-doctor",
     "prepare": "node scripts/patch-graphify-hooks.cjs",
-    "graphify:hooks": "node scripts/patch-graphify-hooks.cjs"
+    "graphify:hooks": "node scripts/patch-graphify-hooks.cjs",
+    "analyze:playtests": "node scripts/analyze-playtests.cjs"
   },
   "private": true
 }

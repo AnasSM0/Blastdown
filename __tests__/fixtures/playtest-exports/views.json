@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "kind": "blastdown-human-playtest",
+  "sessions": [
+    {
+      "sessionId": "fixture-session-views",
+      "errorCount": 0,
+      "deviceMetadata": { "renderer": "views" },
+      "runs": [
+        {
+          "turnsSurvived": 20,
+          "finalScore": 400,
+          "firstExplosionTurn": 12,
+          "firstNaturalDefuseTurn": 9,
+          "immediateReplay": true,
+          "freezeUsedCount": 1,
+          "defuseUsedCount": 0,
+          "hands": [{ "hasDuplicate": false }],
+          "gameOverContext": { "occupancy": 0.75 }
+        }
+      ]
+    }
+  ]
+}

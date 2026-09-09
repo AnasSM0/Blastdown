@@ -16,6 +16,7 @@ import { spacing } from "../ui/theme";
 import { EffectDiagnosticsOverlay } from "./EffectDiagnosticsOverlay";
 import { EFFECT_HARNESS_SCENARIOS, harnessScenario } from "./effectHarness";
 import { useEffectHarnessRunner } from "./useEffectHarnessRunner";
+import { PlaytestDashboard } from "./playtest/PlaytestDashboard";
 
 /** The development-only effect delivery harness.
  *
@@ -126,6 +127,7 @@ export function EffectHarnessScreen() {
       </Text>
 
       <ScrollView contentContainerStyle={styles.buttons}>
+        <PlaytestDashboard />
         {EFFECT_HARNESS_SCENARIOS.map((scenario) => (
           <Pressable
             key={scenario.id}

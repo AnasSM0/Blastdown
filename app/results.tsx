@@ -5,6 +5,7 @@ import { BackHandler } from "react-native";
 
 import { ResultsView } from "../src/components/ResultsScreen";
 import { useAnalytics } from "../src/services/analytics";
+import { recordPlaytestAction } from "../src/services/playtest/signal";
 import { useProfile } from "../src/state/ProfileProvider";
 import { useGameSession } from "../src/state/GameSessionProvider";
 
@@ -36,6 +37,7 @@ export default function ResultsScreen() {
       return;
     }
     routeTransitionRef.current = true;
+    recordPlaytestAction("play_again");
     startNewRun();
     router.replace("/game");
   }, [router, startNewRun]);
@@ -45,6 +47,7 @@ export default function ResultsScreen() {
       return;
     }
     routeTransitionRef.current = true;
+    recordPlaytestAction("results_home");
     router.replace("/");
   }, [router]);
 

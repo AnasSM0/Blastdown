@@ -18,6 +18,9 @@ import { ProfileProvider } from "../src/state/ProfileProvider";
 import { SettingsProvider } from "../src/state/SettingsProvider";
 import { ThemeProvider } from "../src/ui/ThemeProvider";
 import { useAppFonts } from "../src/ui/fonts";
+import { resolvePlaytestObserver } from "../src/dev/playtest/playtestEntry";
+
+const PlaytestObserver = resolvePlaytestObserver();
 
 export default function RootLayout() {
   // Loads approved fonts; the tree renders immediately with a system fallback
@@ -38,6 +41,7 @@ export default function RootLayout() {
                       <AudioServiceProvider service={audioService}>
                         <AdServiceProvider>
                           <GameSessionProvider>
+                            {PlaytestObserver ? <PlaytestObserver /> : null}
                             <AnalyticsSessionTracker />
                             <Stack
                               screenOptions={{
