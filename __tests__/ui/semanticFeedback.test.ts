@@ -63,6 +63,11 @@ describe("semantic feedback resolution", () => {
       "timerWarning1",
     );
     expect(resolve([placed], { turn: 0 })).toBeNull();
+    expect(feedbackSpec("timerWarning2").asset).toBe("timer2");
+    expect(feedbackSpec("timerWarning1").asset).toBe("timer1");
+    expect(feedbackSpec("timerWarning1").priority).toBeGreaterThan(
+      feedbackSpec("timerWarning2").priority,
+    );
   });
 
   it("maps a timer-1 natural defuse to clutch and other natural defuses separately", () => {
@@ -72,6 +77,10 @@ describe("semantic feedback resolution", () => {
     expect(
       resolve([{ type: "pieceDefused", pieceId: "p1", bonus: 45, remainingTurns: 2 }])?.cue,
     ).toBe("naturalDefuse");
+    expect(feedbackSpec("clutchDefuse").asset).toBe("clutch");
+    expect(feedbackSpec("clutchDefuse").priority).toBeGreaterThan(
+      feedbackSpec("naturalDefuse").priority,
+    );
   });
 
   it("lets explosion dominate every lower-priority result from the same turn", () => {
@@ -106,6 +115,6 @@ describe("semantic feedback resolution", () => {
     expect(feedbackSpec("piecePickup").asset).toBe("selection");
     expect(feedbackSpec("invalidPlacement").asset).toBe("invalid");
     expect(feedbackSpec("freezeApplied").asset).toBe("freeze");
-    expect(feedbackSpec("defusePowerUpApplied").asset).toBe("defuse");
+    expect(feedbackSpec("defusePowerUpApplied").asset).toBe("defusePowerUp");
   });
 });

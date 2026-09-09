@@ -8,12 +8,20 @@ export type SfxAssetName =
   | "placement"
   | "invalid"
   | "lineClear"
+  | "clearDouble"
+  | "clearTriple"
+  | "clearOverload"
+  | "timer2"
+  | "timer1"
   | "defuse"
+  | "clutch"
+  | "defusePowerUp"
   | "explosion"
   | "rubbleClear"
   | "freeze"
   | "revive"
   | "gameOver"
+  | "newBest"
   | "button";
 
 export type AudioChannelSettings = {

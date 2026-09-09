@@ -7,12 +7,13 @@ import {
   type AudioPlayer,
 } from "expo-audio";
 
+import { GAMEPLAY_MUSIC_MANIFEST, SFX_AUDIO_MANIFEST } from "../../config/audioManifest";
 import { feedbackSpec, playbackRateForSemitones } from "../feedback";
 import { MUSIC_SOURCE, SFX_SOURCES } from "./sfxAssets";
 import type { AudioChannelSettings, AudioService, SfxAssetName } from "./types";
 
-const MUSIC_VOLUME = 0.5;
-const EXPLOSION_DUCK_VOLUME = 0.14;
+const MUSIC_VOLUME = GAMEPLAY_MUSIC_MANIFEST.defaultVolume;
+const EXPLOSION_DUCK_VOLUME = 0.065;
 export const EXPLOSION_DUCK_MS = 520;
 export const MAX_SFX_VOICES = 4;
 const MAX_DEDUPE_IDENTITIES = 256;
@@ -54,6 +55,7 @@ export function createExpoAudioService(): AudioService {
   const voices = new Map<SfxAssetName, Voice>();
   const playedIdentities = new Set<string>();
   const identityOrder: string[] = [];
+  const lastPlayedAt = new Map<SfxAssetName, number>();
   const preloadedSources = [...Object.values(SFX_SOURCES), MUSIC_SOURCE];
   let settings: AudioChannelSettings = { soundEnabled: true, musicEnabled: true };
   let music: AudioPlayer | null = null;
@@ -136,6 +138,10 @@ export function createExpoAudioService(): AudioService {
     play(request) {
       if (!remember(request.identity) || released || suspended || !settings.soundEnabled) return;
       const spec = feedbackSpec(request.cue);
+      const definition = SFX_AUDIO_MANIFEST[spec.asset];
+      const now = Date.now();
+      const previousPlay = lastPlayedAt.get(spec.asset);
+      if (previousPlay !== undefined && now - previousPlay < definition.minimumRetriggerMs) return;
 
       if (spec.ducks) {
         for (const voice of voices.values()) {
@@ -157,11 +163,14 @@ export function createExpoAudioService(): AudioService {
 
       const voice = playerFor(spec.asset);
       if (!voice) return;
+      lastPlayedAt.set(spec.asset, now);
       voice.priority = spec.priority;
       voice.startedAt = ++startedAt;
       safe(() => {
         voice.player.shouldCorrectPitch = false;
-        voice.player.setPlaybackRate(playbackRateForSemitones(request.semitones ?? 0));
+        voice.player.setPlaybackRate(
+          playbackRateForSemitones(definition.pitchVariationAllowed ? (request.semitones ?? 0) : 0),
+        );
         voice.player.volume = spec.volume;
         void voice.player.seekTo(0).catch(() => {});
         voice.player.play();
@@ -238,6 +247,7 @@ export function createExpoAudioService(): AudioService {
       }
       playedIdentities.clear();
       identityOrder.length = 0;
+      lastPlayedAt.clear();
     },
   };
 

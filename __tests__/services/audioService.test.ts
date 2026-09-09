@@ -48,6 +48,8 @@ jest.mock("expo-audio", () => ({
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { EXPLOSION_DUCK_MS, MAX_SFX_VOICES, createExpoAudioService } =
   require("../../src/services/audio/ExpoAudioService") as typeof import("../../src/services/audio/ExpoAudioService");
+const { GAMEPLAY_MUSIC_MANIFEST, SFX_AUDIO_MANIFEST } =
+  require("../../src/config/audioManifest") as typeof import("../../src/config/audioManifest");
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 describe("ExpoAudioService", () => {
@@ -55,6 +57,7 @@ describe("ExpoAudioService", () => {
     players.length = 0;
     jest.clearAllMocks();
     jest.useFakeTimers();
+    jest.setSystemTime(1_000_000);
   });
 
   afterEach(() => {
@@ -68,14 +71,15 @@ describe("ExpoAudioService", () => {
     service.preload();
     await Promise.resolve();
 
-    expect(mockPreload).toHaveBeenCalledTimes(12);
+    const manifestSize = Object.keys(SFX_AUDIO_MANIFEST).length + 1;
+    expect(mockPreload).toHaveBeenCalledTimes(manifestSize);
     service.play({ identity: "pickup-1", cue: "piecePickup" });
     service.startMusic();
     service.release();
     await Promise.resolve();
 
     expect(players.every((player) => player.remove.mock.calls.length === 1)).toBe(true);
-    expect(mockClearPreloadedSource).toHaveBeenCalledTimes(12);
+    expect(mockClearPreloadedSource).toHaveBeenCalledTimes(manifestSize);
   });
 
   it("deduplicates event identities and applies the combo semitone rate", () => {
@@ -120,9 +124,41 @@ describe("ExpoAudioService", () => {
     service.play({ identity: "explosion", cue: "explosion" });
 
     expect(placement.pause).toHaveBeenCalled();
-    expect(music.volume).toBeLessThan(0.5);
+    expect(music.volume).toBeLessThan(GAMEPLAY_MUSIC_MANIFEST.defaultVolume);
     jest.advanceTimersByTime(EXPLOSION_DUCK_MS);
-    expect(music.volume).toBe(0.5);
+    expect(music.volume).toBe(GAMEPLAY_MUSIC_MANIFEST.defaultVolume);
+  });
+
+  it("keeps one music player across repeated starts and resumes", () => {
+    const service = createExpoAudioService();
+    service.startMusic();
+    service.startMusic();
+    const music = players[0];
+
+    service.pauseMusic();
+    service.resumeMusic();
+    service.startMusic();
+
+    expect(players).toHaveLength(1);
+    expect(music.loop).toBe(true);
+    expect(music.play).toHaveBeenCalledTimes(2);
+  });
+
+  it("bounds a rapid burst and suppresses same-asset retriggers", () => {
+    const service = createExpoAudioService();
+    service.play({ identity: "placement-1", cue: "validPlacement" });
+    service.play({ identity: "placement-2", cue: "validPlacement" });
+    expect(players).toHaveLength(1);
+    expect(players[0].play).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(SFX_AUDIO_MANIFEST.placement.minimumRetriggerMs);
+    service.play({ identity: "placement-3", cue: "validPlacement" });
+    (["clearSingle", "clearDouble", "clearTriple"] as const).forEach((cue, index) => {
+      service.play({ identity: `clear-${index}`, cue });
+    });
+
+    expect(players.filter((player) => player.playing)).toHaveLength(MAX_SFX_VOICES);
+    expect(players).toHaveLength(MAX_SFX_VOICES);
   });
 
   it("suspends players on interruption and resumes without duplicating them", async () => {
