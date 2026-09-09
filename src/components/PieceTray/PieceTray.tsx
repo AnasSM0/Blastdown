@@ -25,6 +25,8 @@ type PieceTrayProps = {
   hand: readonly HandPiece[];
   selectedHandId: string | null;
   onSelect: (handId: string) => void;
+  /** Immediate semantic pickup boundary, fired on touch-down. */
+  onPickup?: (handId: string) => void;
   /** Drag callbacks (window-space points). When omitted the tray is
    *  tap-only, which keeps non-gesture render contexts and older tests
    *  working unchanged. */
@@ -162,6 +164,7 @@ type TraySlotProps = {
   dragging: boolean;
   reducedMotion: boolean;
   onSelect: (handId: string) => void;
+  onPickup?: (handId: string) => void;
   onDragStart?: (handId: string, point: Point) => void;
   onDragMove?: (handId: string, point: Point) => void;
   onDragEnd?: (handId: string, point: Point) => void;
@@ -177,6 +180,7 @@ function TraySlot({
   dragging,
   reducedMotion,
   onSelect,
+  onPickup,
   onDragStart,
   onDragMove,
   onDragEnd,
@@ -260,7 +264,10 @@ function TraySlot({
     <AnimatedPressable
       key={motionKey(reducedMotion)}
       onPress={() => onSelect(piece.handId)}
-      onPressIn={() => setPressed(true)}
+      onPressIn={() => {
+        setPressed(true);
+        onPickup?.(piece.handId);
+      }}
       onPressOut={() => setPressed(false)}
       style={[
         styles.slot,
@@ -338,6 +345,7 @@ export function PieceTray({
   hand,
   selectedHandId,
   onSelect,
+  onPickup,
   onDragStart,
   onDragMove,
   onDragEnd,
@@ -373,6 +381,7 @@ export function PieceTray({
               dragging={piece.handId === draggingHandId}
               reducedMotion={reducedMotion}
               onSelect={onSelect}
+              onPickup={onPickup}
               onDragStart={onDragStart}
               onDragMove={onDragMove}
               onDragEnd={onDragEnd}

@@ -7,8 +7,7 @@ import {
   REWARD_OUTCOME_REDUCED_MS,
   type RewardActionPhase,
 } from "../ui/effects/rewardPhase";
-import { useAudio } from "./useAudio";
-import { useHaptics } from "./useHaptics";
+import { useFeedback } from "./useFeedback";
 
 export type RewardOutcome = {
   /** Current transient phase for this action's control. */
@@ -41,8 +40,7 @@ export type RewardOutcome = {
  *  in-flight request, so a replayed effect or a remounted screen cannot
  *  duplicate it. It applies no game rules and grants nothing. */
 export function useRewardOutcome(reducedMotion = false): RewardOutcome {
-  const audio = useAudio();
-  const haptics = useHaptics();
+  const feedback = useFeedback();
   const [phase, setPhase] = useState<RewardActionPhase>("idle");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
@@ -92,8 +90,7 @@ export function useRewardOutcome(reducedMotion = false): RewardOutcome {
       // player watched an ad and got nothing, which they must not learn from a
       // success cue.
       if (next === "failure" || next === "unapplied") {
-        haptics.warning();
-        audio.playSfx("invalid");
+        feedback.emit("rewardFailure");
       }
       clearTimer();
       setPhase(next);
@@ -107,7 +104,7 @@ export function useRewardOutcome(reducedMotion = false): RewardOutcome {
         reducedMotion ? REWARD_OUTCOME_REDUCED_MS : REWARD_OUTCOME_MS,
       );
     },
-    [audio, clearTimer, haptics, reducedMotion],
+    [clearTimer, feedback, reducedMotion],
   );
 
   return { phase, begin, settle, reset };

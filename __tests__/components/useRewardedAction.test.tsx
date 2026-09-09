@@ -99,7 +99,10 @@ describe("useRewardedAction", () => {
       await flushGate;
       order.push("flush-end");
     });
-    const { result } = await renderHook(() => useRewardedAction({ beforeShow }), {
+    const afterShow = jest.fn(() => {
+      order.push("restore");
+    });
+    const { result } = await renderHook(() => useRewardedAction({ beforeShow, afterShow }), {
       wrapper: wrapperFor(service),
     });
 
@@ -116,6 +119,27 @@ describe("useRewardedAction", () => {
     });
 
     expect(beforeShow).toHaveBeenCalledTimes(1);
-    expect(order).toEqual(["flush-start", "flush-end", "show"]);
+    expect(afterShow).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(["flush-start", "flush-end", "show", "restore"]);
+  });
+
+  it("restores lifecycle resources when rewarded native UI throws", async () => {
+    const service: AdService = {
+      preloadRewarded: async () => {},
+      showRewarded: async () => {
+        throw new Error("native overlay failed");
+      },
+    };
+    const afterShow = jest.fn();
+    const { result } = await renderHook(() => useRewardedAction({ afterShow }), {
+      wrapper: wrapperFor(service),
+    });
+
+    await act(async () => {
+      await expect(result.current.run("rewarded_freeze", jest.fn())).resolves.toBe("error");
+    });
+
+    expect(afterShow).toHaveBeenCalledTimes(1);
+    expect(result.current.pending).toBe(false);
   });
 });

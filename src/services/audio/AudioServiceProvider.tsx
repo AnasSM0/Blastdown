@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 
 import { createNoOpAudioService } from "./NoOpAudioService";
 import type { AudioService } from "./types";
@@ -18,6 +18,20 @@ export function AudioServiceProvider({
   service?: AudioService;
 }) {
   const value = useMemo(() => service ?? createNoOpAudioService(), [service]);
+  useEffect(() => {
+    try {
+      value.preload();
+    } catch {
+      // A provider failure degrades to silence; app startup must continue.
+    }
+    return () => {
+      try {
+        value.release();
+      } catch {
+        // Native teardown is also best-effort.
+      }
+    };
+  }, [value]);
   return <AudioServiceContext.Provider value={value}>{children}</AudioServiceContext.Provider>;
 }
 

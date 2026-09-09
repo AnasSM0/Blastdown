@@ -41,16 +41,13 @@ import {
   type GameControllerOptions,
   type PlacementIntent,
 } from "../src/hooks/useGameController";
-import { useHaptics } from "../src/hooks/useHaptics";
 import { useEffectiveReducedMotion } from "../src/hooks/useEffectiveReducedMotion";
 import { useEventAnimator } from "../src/hooks/useEventAnimator";
 import { usePraiseCelebration } from "../src/hooks/usePraiseCelebration";
 import { useGameAnalytics } from "../src/hooks/useGameAnalytics";
+import { useGameFeedback } from "../src/hooks/useGameFeedback";
 import { useRewardedAction } from "../src/hooks/useRewardedAction";
 import { useRewardOutcome } from "../src/hooks/useRewardOutcome";
-import { useAudio } from "../src/hooks/useAudio";
-import { useGameAudio } from "../src/hooks/useGameAudio";
-import { useTimerHaptics } from "../src/hooks/useTimerHaptics";
 import { AudioServiceProvider } from "../src/services/audio";
 import type { AudioService } from "../src/services/audio";
 import { StorageServiceProvider, createMemoryStorageService } from "../src/services/storage";
@@ -177,7 +174,6 @@ export function GameView({
   flushActiveRun = resolvedFlush,
 }: GameViewProps) {
   const { state } = controller;
-  const haptics = useHaptics();
   const reducedMotion = useEffectiveReducedMotion();
   const animator = useEventAnimator({
     turn: state.turn,
@@ -193,17 +189,10 @@ export function GameView({
     complete: completePraise,
     reset: resetPraise,
   } = usePraiseCelebration({ turn: state.turn, events: controller.lastEvents });
-  const audio = useAudio();
-  // Event-driven sound + music: plays each turn's effects once, loops music
-  // while the game screen is mounted (both gated by persisted settings).
-  useGameAudio({ turn: state.turn, events: controller.lastEvents, status: state.status });
-  // Countdown-2 / countdown-1 urgent haptics, once per timer transition.
-  useTimerHaptics({ turn: state.turn, events: controller.lastEvents });
   // Turn-scoped gameplay analytics (placed/line/defused/explosion/rubble),
   // logged once per turn from the domain event stream.
   useGameAnalytics({ turn: state.turn, events: controller.lastEvents });
   const { track } = useAnalytics();
-  const reward = useRewardedAction({ beforeShow: flushActiveRun });
   const theme = useTheme();
   const danger = useMemo(
     () => resolveDangerState({ activeTimers: state.activeTimers }),
@@ -215,6 +204,21 @@ export function GameView({
   );
 
   const [paused, setPaused] = useState(false);
+  const feedback = useGameFeedback({
+    sessionGeneration: controller.sessionGeneration,
+    turn: state.turn,
+    events: controller.lastEvents,
+    status: state.status,
+    paused,
+    combo: state.combo,
+    score: state.score,
+    previousBest: best,
+  });
+  const beforeReward = useCallback(async () => {
+    await flushActiveRun();
+    feedback.interrupt();
+  }, [feedback, flushActiveRun]);
+  const reward = useRewardedAction({ beforeShow: beforeReward, afterShow: feedback.restore });
   const [restartConfirmation, setRestartConfirmation] = useState<"closed" | "open">("closed");
   const restartTransitionRef = useRef(false);
   const homeTransitionRef = useRef(false);
@@ -355,12 +359,17 @@ export function GameView({
       const wasSelected = controller.selectedHandId === handId;
       controller.selectPiece(handId);
       if (!wasSelected) {
-        haptics.selection();
-        audio.playSfx("selection");
         track({ name: "piece_selected" });
       }
     },
-    [audio, controller, haptics, inputLocked, track],
+    [controller, inputLocked, track],
+  );
+
+  const handlePickup = useCallback(
+    (_handId: string) => {
+      if (!inputLocked) feedback.emit("piecePickup");
+    },
+    [feedback, inputLocked],
   );
 
   const handleCellPress = useCallback(
@@ -370,9 +379,8 @@ export function GameView({
         return;
       }
       if (controller.placeAt(position)) {
-        // Placement sound comes from the piecePlaced event (useGameAudio).
+        // Placement feedback comes from the committed piecePlaced event.
         setPreviewOrigin(null);
-        haptics.success();
       } else {
         // Rejected by the domain: show exactly where the attempt conflicts.
         setPreviewOrigin(position);
@@ -383,12 +391,11 @@ export function GameView({
           invalidPreviewTimerRef.current = null;
           setPreviewOrigin(null);
         }, INVALID_RETURN_MS);
-        haptics.warning();
-        audio.playSfx("invalid");
+        feedback.emit("invalidPlacement");
         track({ name: "piece_rejected" });
       }
     },
-    [audio, haptics, track],
+    [feedback, track],
   );
 
   const handleCellPreviewChange = useCallback((position: CellPosition | null) => {
@@ -499,9 +506,8 @@ export function GameView({
       visibleDragIdRef.current = nextDrag.id;
       setReturning(false);
       setDrag(nextDrag);
-      haptics.selection();
     },
-    [haptics, inputLocked, measureBoard],
+    [inputLocked, measureBoard],
   );
 
   const handleDragMove = useCallback(
@@ -565,14 +571,12 @@ export function GameView({
       setDragOrigin(null);
       const placed = origin ? controllerRef.current.place(activeDrag.intent, origin) : false;
       if (placed) {
-        haptics.success();
         clearDrag(activeDrag.id);
       } else {
         // Dropped outside the board or onto an invalid cell: play the return
         // animation, which clears the drag on completion. A drop onto the board
         // that the domain rejected counts as a rejected placement attempt.
-        haptics.warning();
-        audio.playSfx("invalid");
+        feedback.emit("invalidPlacement");
         dragRef.current = null;
         setReturning(true);
         if (origin) {
@@ -580,7 +584,7 @@ export function GameView({
         }
       }
     },
-    [audio, clearDrag, haptics, originForPoint, track],
+    [clearDrag, feedback, originForPoint, track],
   );
 
   const handleDragCancel = useCallback((handId: string) => {
@@ -612,7 +616,7 @@ export function GameView({
     if (inputLocked || !canActivateFreeze(state)) {
       return;
     }
-    audio.playSfx("button");
+    feedback.emit("uiTap");
     // Offer logged when the ad is actually requested; result logged from the
     // resolution (never inside onEarned, so a reward can't double-log).
     track({ name: "freeze_offer" });
@@ -625,15 +629,14 @@ export function GameView({
       .run(REWARD_PLACEMENTS.freeze, () => {
         if (controller.activateFreeze()) {
           applied = true;
-          haptics.success();
-          audio.playSfx("freeze");
+          feedback.emit("freezeApplied");
         }
       })
       .then((result) => {
         track({ name: "freeze_result", result: rewardOutcome(result) });
         freezeOutcome.settle(result, applied);
       });
-  }, [audio, controller, freezeOutcome, haptics, inputLocked, reward, state, track]);
+  }, [controller, feedback, freezeOutcome, inputLocked, reward, state, track]);
 
   const handleDefuseOpen = useCallback(() => {
     if (inputLocked || !canApplyRewardedDefuse(state)) {
@@ -642,20 +645,19 @@ export function GameView({
     clearSelection();
     setPreviewOrigin(null);
     setDefuseConfirmOpen(true);
-    haptics.selection();
-    audio.playSfx("button");
-  }, [audio, clearSelection, haptics, inputLocked, state]);
+    feedback.emit("uiTap");
+  }, [clearSelection, feedback, inputLocked, state]);
 
   const handleDefuseCancel = useCallback(() => {
-    audio.playSfx("button");
+    feedback.emit("uiTap");
     setDefuseConfirmOpen(false);
-  }, [audio]);
+  }, [feedback]);
 
   const handleDefuseConfirm = useCallback(() => {
     if (reward.pending) {
       return;
     }
-    audio.playSfx("button");
+    feedback.emit("uiTap");
     track({ name: "defuse_offer" });
     defuseOutcome.begin();
     // The piece the domain will target, read BEFORE the action is applied: once
@@ -669,8 +671,7 @@ export function GameView({
       .run(REWARD_PLACEMENTS.defuse, () => {
         if (controller.defuse()) {
           applied = true;
-          haptics.success();
-          audio.playSfx("defuse");
+          feedback.emit("defusePowerUpApplied");
           // A rewarded defuse advances no turn, so the turn-keyed animator never
           // sees it — play it explicitly. The board is already updated and stays
           // usable while this presentation runs.
@@ -684,35 +685,35 @@ export function GameView({
       .finally(() => {
         setDefuseConfirmOpen(false);
       });
-  }, [animator, audio, controller, defuseOutcome, haptics, reward, state, track]);
+  }, [animator, controller, defuseOutcome, feedback, reward, state, track]);
 
   const handleEndRun = useCallback(() => {
     if (reward.pending || resultsTransitionRef.current) {
       return;
     }
     resultsTransitionRef.current = true;
-    audio.playSfx("button");
+    feedback.emit("uiTap");
     onResults?.();
-  }, [audio, onResults, reward.pending]);
+  }, [feedback, onResults, reward.pending]);
 
   const handlePause = useCallback(() => {
     // Pausing mid-reward is disallowed so the confirm/overlay stack stays sane.
     if (reward.pending) {
       return;
     }
-    audio.playSfx("button");
+    feedback.emit("uiTap");
     clearSelection();
     setPreviewOrigin(null);
     clearDrag();
     setPaused(true);
     void flushActiveRun();
-  }, [audio, clearDrag, clearSelection, flushActiveRun, reward.pending]);
+  }, [clearDrag, clearSelection, feedback, flushActiveRun, reward.pending]);
 
   const handleResume = useCallback(() => {
-    audio.playSfx("button");
+    feedback.emit("uiTap");
     setRestartConfirmation("closed");
     setPaused(false);
-  }, [audio]);
+  }, [feedback]);
 
   // Drop every transient overlay/selection so a fresh run starts clean. Shared
   // by Restart (pause menu) and leaving to Home.
@@ -733,42 +734,42 @@ export function GameView({
   }, [animator, clearDrag, defuseOutcome, freezeOutcome, resetPraise]);
 
   const handleRestart = useCallback(() => {
-    audio.playSfx("button");
+    feedback.emit("uiTap");
     // A previous confirmed restart deliberately leaves its latch closed to
     // reject stale duplicate events. Reaching this button again proves the new
     // run is active and the player has opened a new confirmation cycle.
     restartTransitionRef.current = false;
     setRestartConfirmation("open");
-  }, [audio]);
+  }, [feedback]);
 
   const handleRestartCancel = useCallback(() => {
-    audio.playSfx("button");
+    feedback.emit("uiTap");
     setRestartConfirmation("closed");
-  }, [audio]);
+  }, [feedback]);
 
   const handleRestartConfirm = useCallback(() => {
     if (restartTransitionRef.current) {
       return;
     }
     restartTransitionRef.current = true;
-    audio.playSfx("button");
+    feedback.emit("uiTap");
     clearPendingUi();
     (onRestart ?? controller.restart)();
-  }, [audio, clearPendingUi, controller.restart, onRestart]);
+  }, [clearPendingUi, controller.restart, feedback, onRestart]);
 
   const handleHome = useCallback(() => {
     if (homeTransitionRef.current) {
       return;
     }
     homeTransitionRef.current = true;
-    audio.playSfx("button");
+    feedback.emit("uiTap");
     // Stay paused/input-locked until the durability boundary completes so no
     // move can land after the snapshot we intend Home to resume.
     void flushActiveRun().then(() => {
       clearPendingUi();
       onExit?.();
     });
-  }, [audio, clearPendingUi, flushActiveRun, onExit]);
+  }, [clearPendingUi, feedback, flushActiveRun, onExit]);
 
   // Android Back is a screen-state action, never a route-pop action. Gameplay
   // opens Pause; Pause closes back to the exact run. A nested restart confirm
@@ -877,6 +878,7 @@ export function GameView({
               hand={state.hand}
               selectedHandId={controller.selectedHandId}
               onSelect={handleSelect}
+              onPickup={handlePickup}
               onDragStart={handleDragStart}
               onDragMove={handleDragMove}
               onDragEnd={handleDragEnd}

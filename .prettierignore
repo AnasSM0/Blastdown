@@ -9,6 +9,7 @@ package-lock.json
 # rebuilt from source on every commit and branch switch; reformatting them breaks
 # `npm run format:check` on output nobody edits by hand.
 graphify-out/
+.planning/graphs/
 
 # Vendored agent skill files, written by `graphify install` and overwritten on
 # every reinstall. Reformatting them would diverge from upstream for one release

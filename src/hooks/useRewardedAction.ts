@@ -20,6 +20,8 @@ export type RewardedActionOptions = {
   /** Optional critical persistence boundary. The game session supplies an
    * active-run flush so native ad UI never opens ahead of the latest snapshot. */
   beforeShow?: () => Promise<void>;
+  /** Restore lifecycle resources after native rewarded UI resolves or throws. */
+  afterShow?: () => void;
 };
 
 /** Wraps the injected `AdService` with the state-safety the run lifecycle
@@ -28,7 +30,7 @@ export type RewardedActionOptions = {
  *  It applies no game rules — `onEarned` calls the pure domain API. */
 export function useRewardedAction(options: RewardedActionOptions = {}): RewardedAction {
   const adService = useAdService();
-  const { beforeShow } = options;
+  const { afterShow, beforeShow } = options;
   const [pending, setPending] = useState(false);
   // The single-flight gate. A ref (not `pending`) so back-to-back synchronous
   // calls in the same tick still see the guard before React re-renders.
@@ -49,9 +51,23 @@ export function useRewardedAction(options: RewardedActionOptions = {}): Rewarded
       inFlightRef.current = true;
       setPending(true);
       let result: RewardedResult = "error";
+      let restored = false;
+      const restoreAfterShow = () => {
+        if (restored) return;
+        restored = true;
+        try {
+          afterShow?.();
+        } catch (error) {
+          reportCaught("reward", error, { placement, phase: "after_show" });
+        }
+      };
       try {
         await beforeShow?.();
         result = await adService.showRewarded(placement);
+        // The native overlay has closed. Restore feedback before applying an
+        // earned reward so its semantic success cue is not dropped by the
+        // interruption gate.
+        restoreAfterShow();
         // Only a genuine earn mutates, and only if we're still mounted so a
         // reward that resolves after navigation can't touch a dead tree.
         if (result === "earned" && mountedRef.current) {
@@ -62,6 +78,7 @@ export function useRewardedAction(options: RewardedActionOptions = {}): Rewarded
         // diagnostics. The placement id is a safe enumerated value.
         reportCaught("reward", error, { placement });
       } finally {
+        restoreAfterShow();
         inFlightRef.current = false;
         if (mountedRef.current) {
           setPending(false);
@@ -69,7 +86,7 @@ export function useRewardedAction(options: RewardedActionOptions = {}): Rewarded
       }
       return result;
     },
-    [adService, beforeShow],
+    [adService, afterShow, beforeShow],
   );
 
   return { run, pending };

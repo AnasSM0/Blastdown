@@ -7,8 +7,8 @@ const mockNotificationAsync = jest.fn(() => Promise.resolve());
 jest.mock("expo-haptics", () => ({
   impactAsync: mockImpactAsync,
   notificationAsync: mockNotificationAsync,
-  ImpactFeedbackStyle: { Light: "light", Medium: "medium" },
-  NotificationFeedbackType: { Success: "success", Warning: "warning" },
+  ImpactFeedbackStyle: { Light: "light", Medium: "medium", Heavy: "heavy" },
+  NotificationFeedbackType: { Success: "success", Warning: "warning", Error: "error" },
 }));
 
 // Imported after the mock so the hook binds to the stubbed module.
@@ -45,14 +45,17 @@ describe("useHaptics", () => {
   it("maps the vocabulary to expo-haptics when enabled", async () => {
     const storage = createMemoryStorageService();
     const { result } = await renderHook(() => useHarness(), { wrapper: wrapper(storage) });
-    result.current.haptics.selection();
-    result.current.haptics.success();
-    result.current.haptics.warning();
-    result.current.haptics.timerUrgent();
+    await waitFor(() => expect(result.current.settings.loaded).toBe(true));
+    result.current.haptics.play("selection");
+    result.current.haptics.play("success");
+    result.current.haptics.play("warningLight");
+    result.current.haptics.play("mediumImpact");
+    result.current.haptics.play("explosion");
     expect(mockImpactAsync).toHaveBeenCalledWith("light");
     expect(mockNotificationAsync).toHaveBeenCalledWith("success");
     expect(mockNotificationAsync).toHaveBeenCalledWith("warning");
     expect(mockImpactAsync).toHaveBeenCalledWith("medium");
+    expect(mockNotificationAsync).toHaveBeenCalledWith("error");
   });
 
   it("produces no haptics when disabled", async () => {
@@ -64,8 +67,8 @@ describe("useHaptics", () => {
     const { result } = await renderHook(() => useHarness(), { wrapper: wrapper(storage) });
     await waitFor(() => expect(result.current.settings.settings.hapticsEnabled).toBe(false));
 
-    result.current.haptics.selection();
-    result.current.haptics.timerUrgent();
+    result.current.haptics.play("selection");
+    result.current.haptics.play("warningStrong");
     expect(mockImpactAsync).not.toHaveBeenCalled();
     expect(mockNotificationAsync).not.toHaveBeenCalled();
   });
@@ -74,6 +77,7 @@ describe("useHaptics", () => {
     mockImpactAsync.mockImplementationOnce(() => Promise.reject(new Error("no engine")));
     const storage = createMemoryStorageService();
     const { result } = await renderHook(() => useHarness(), { wrapper: wrapper(storage) });
-    expect(() => result.current.haptics.selection()).not.toThrow();
+    await waitFor(() => expect(result.current.settings.loaded).toBe(true));
+    expect(() => result.current.haptics.play("selection")).not.toThrow();
   });
 });

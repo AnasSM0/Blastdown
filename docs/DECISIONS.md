@@ -2030,3 +2030,30 @@ limited to the current turn's `rubbleCreated` cells. Gameplay rules, gameplay
 RNG, scoring, timers, queue capacity, dependencies, and the default-OFF
 cinematic flag are unchanged. Physical Android tuning remains
 `A-DEVICE-PENDING`.
+
+---
+
+## 2026-09-09 — B-08 centralizes semantic audio and haptics
+
+Committed `GameEvent[]` now resolves through one renderer-independent semantic
+feedback catalog. A session-generation plus turn identity admits only the
+highest-priority meaningful outcome for each committed turn, while pre-commit
+pickup and invalid-placement feedback remains at the interaction boundary.
+Rewarded Freeze and Defuse emit success only after the native interruption has
+closed and the domain mutation succeeds. Hydration establishes a silent
+baseline, so restored timer events do not replay.
+
+The Expo Audio adapter preloads the finite existing manifest once, reuses at
+most one player per requested asset, caps concurrent SFX voices at four, keeps a
+bounded 256-identity dedupe history, and contains all native failures. Clear
+pitch uses a presentation-only playback-rate ladder of one semitone per combo
+step, capped at +12 semitones. Explosion and other terminal cues evict lower
+priority voices and duck the music seam for 520 ms before safe recovery.
+
+One settings-gated haptics boundary maps each semantic cue to at most one native
+response. Backgrounding, Pause, Game Over, rewarded overlays, unmount, and live
+sound/music settings all use the shared service lifecycle; repeated runs do not
+instantiate screen-owned players. The existing self-authored CC0 placeholder
+clips are reused and remain subject to later production replacement. Gameplay,
+scoring, timers, RNG, renderer architecture, and dependencies are unchanged;
+physical Android audio balance and haptic quality remain `A-DEVICE-PENDING`.

@@ -1,10 +1,11 @@
-import { act, fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 import * as Haptics from "expo-haptics";
 import { fireGestureHandler, getByGestureTestId } from "react-native-gesture-handler/jest-utils";
 
 import { GameScreenContent } from "../../app/game";
 import { createInitialGameState } from "../../src/domain/game";
 import type { GameState, GridCell } from "../../src/domain/gameTypes";
+import { createNoOpAudioService } from "../../src/services/audio";
 
 const NOW = 1_752_800_000_000;
 
@@ -217,7 +218,8 @@ describe("gameplay effects pipeline", () => {
   });
 
   it("consumes a duplicated native gesture completion exactly once", async () => {
-    const success = jest.spyOn(Haptics, "notificationAsync");
+    const placementImpact = jest.spyOn(Haptics, "impactAsync");
+    const audio = createNoOpAudioService();
     const initialState: GameState = {
       ...createInitialGameState("gesture-duplicate", NOW),
       hand: [
@@ -226,8 +228,13 @@ describe("gameplay effects pipeline", () => {
       ],
     };
     const result = await render(
-      <GameScreenContent controllerOptions={options(initialState)} boardSize={328} />,
+      <GameScreenContent
+        controllerOptions={options(initialState)}
+        boardSize={328}
+        audioService={audio}
+      />,
     );
+    await waitFor(() => expect(audio.musicCalls).toContain("start"));
     const gesture = getByGestureTestId("tray-drag-h-drag");
     const drop = { absoluteX: 24, absoluteY: 74 };
 
@@ -237,8 +244,8 @@ describe("gameplay effects pipeline", () => {
     });
 
     expect(result.queryByTestId("tray-piece-h-drag")).toBeNull();
-    expect(success).toHaveBeenCalledTimes(1);
-    success.mockRestore();
+    expect(placementImpact).toHaveBeenCalledTimes(1);
+    placementImpact.mockRestore();
   });
 
   it("keeps Pause as an authoritative placement blocker", async () => {

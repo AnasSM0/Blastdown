@@ -3,7 +3,7 @@ import { render, userEvent, waitFor } from "@testing-library/react-native";
 import { GameScreenContent } from "../../app/game";
 import { createInitialGameState } from "../../src/domain/game";
 import type { GameState, GridCell } from "../../src/domain/gameTypes";
-import type { AudioService, SfxName } from "../../src/services/audio";
+import { createNoOpAudioService } from "../../src/services/audio";
 
 const NOW = 1_752_800_000_000;
 
@@ -15,20 +15,6 @@ function makeEmptyGrid(size: number): GridCell[][] {
 
 function options(initialState: GameState) {
   return { seed: "fx-seed", now: () => NOW, nextSeed: () => "restart", initialState };
-}
-
-/** Records every effect played, so a duplicate is visible as a repeated name. */
-function recordingAudio(): AudioService & { played: SfxName[] } {
-  const played: SfxName[] = [];
-  return {
-    played,
-    playSfx: (name: SfxName) => played.push(name),
-    startMusic: () => {},
-    pauseMusic: () => {},
-    resumeMusic: () => {},
-    stopMusic: () => {},
-    release: () => {},
-  };
 }
 
 /** One move away from clearing row 0 — the hand's single completes it. */
@@ -72,9 +58,9 @@ describe("line-clear feedback", () => {
     expect(result.getAllByTestId(/^cell-\d+-\d+$/)).toHaveLength(64);
   });
 
-  it("plays the line-clear cue exactly once for the turn", async () => {
+  it("plays one dominant outcome cue exactly once for a clear-plus-defuse turn", async () => {
     const user = userEvent.setup();
-    const audio = recordingAudio();
+    const audio = createNoOpAudioService();
     const result = await render(
       <GameScreenContent
         controllerOptions={options(clearingState())}
@@ -82,14 +68,17 @@ describe("line-clear feedback", () => {
         boardSize={328}
       />,
     );
+    await waitFor(() => expect(audio.musicCalls).toContain("start"));
 
     await user.press(result.getByTestId("tray-piece-h-single"));
     await user.press(result.getByTestId("cell-0-0"));
 
-    await waitFor(() => expect(audio.played).toContain("lineClear"));
-    expect(audio.played.filter((name) => name === "lineClear")).toHaveLength(1);
-    // The placement cue is also once, never re-fired by the effect replaying.
-    expect(audio.played.filter((name) => name === "placement")).toHaveLength(1);
+    await waitFor(() => expect(audio.cues.some(({ cue }) => cue === "naturalDefuse")).toBe(true));
+    expect(audio.cues.filter(({ cue }) => cue === "naturalDefuse")).toHaveLength(1);
+    // Defuse outranks the simultaneous clear; neither lower-priority clear nor
+    // placement layers underneath it.
+    expect(audio.cues.some(({ cue }) => cue === "clearSingle")).toBe(false);
+    expect(audio.cues.some(({ cue }) => cue === "validPlacement")).toBe(false);
   });
 });
 

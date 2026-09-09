@@ -1,10 +1,10 @@
-import type { SfxName } from "./types";
+import type { SfxAssetName } from "./types";
 
 /** Bundled sources for each effect and the music loop. All clips are original
  *  works generated for BlastDown (CC0 / project-owned) — see
  *  assets/licenses/AUDIO_LICENSES.md. Kept isolated here so only the real
  *  audio service imports the binary assets; tests use the no-op service. */
-export const SFX_SOURCES: Record<SfxName, number> = {
+export const SFX_SOURCES: Record<SfxAssetName, number> = {
   selection: require("../../../assets/audio/selection.wav"),
   placement: require("../../../assets/audio/placement.wav"),
   invalid: require("../../../assets/audio/invalid.wav"),
