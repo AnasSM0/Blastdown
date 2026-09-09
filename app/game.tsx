@@ -15,7 +15,7 @@ import { DefuseConfirmCard } from "../src/components/modals/DefuseConfirmCard";
 import { PauseOverlay } from "../src/components/modals/PauseOverlay";
 import { RunConfirmationCard } from "../src/components/modals/RunConfirmationCard";
 import { RewardedActionBar } from "../src/components/RewardedActionButton";
-import { DragGhost, DRAG_LIFT, type DragGhostHandle } from "../src/components/DragGhost";
+import { DragGhost, type DragGhostHandle } from "../src/components/DragGhost";
 import { BOARD_SIZE } from "../src/domain/board";
 import type { CellPosition } from "../src/domain/placement";
 import { getShapeById } from "../src/domain/shapes";
@@ -28,7 +28,12 @@ import {
 // Resolved behind the build-time flag, so a build with the cinematic renderer
 // off never evaluates Skia at all. See the module's own comment.
 import { BoardRenderer, CINEMATIC_RENDERER } from "../src/rendering/boardRenderer";
-import { dragOriginFromFinger, type BoardLayout, type Point } from "../src/ui/boardGeometry";
+import {
+  fingerPointForDragOrigin,
+  stableDragOriginFromFinger,
+  type BoardLayout,
+  type Point,
+} from "../src/ui/boardGeometry";
 import { cellsOfPiece } from "../src/ui/effects/eventEffects";
 import {
   useGameController,
@@ -60,14 +65,17 @@ import { spacing } from "../src/ui/theme";
 import { useTheme } from "../src/ui/ThemeProvider";
 import { resolveDangerState } from "../src/ui/dangerState";
 import { resolveScoreImpactForTurn } from "../src/ui/scoreImpact";
+import { INVALID_RETURN_MS, dragLiftForCell } from "../src/ui/pieceInteraction";
 
 type DragState = {
+  id: number;
   handId: string;
   intent: PlacementIntent;
   shapeId: string;
   colorId: string;
   startX: number;
   startY: number;
+  visualLift: number;
 };
 
 type ShapeBounds = { maxRow: number; maxColumn: number };
@@ -252,7 +260,7 @@ export function GameView({
     defuseConfirmOpen ||
     restartConfirmation === "open" ||
     state.status !== "playing" ||
-    drag !== null;
+    (drag !== null && !returning);
 
   const boardRef = useRef<View>(null);
   const ghostRef = useRef<DragGhostHandle>(null);
@@ -260,7 +268,10 @@ export function GameView({
   const cellSizeRef = useRef(cellSize);
   const lastDragOriginRef = useRef<CellPosition | null>(null);
   const dragRef = useRef<DragState | null>(null);
+  const visibleDragIdRef = useRef<number | null>(null);
+  const dragSequenceRef = useRef(0);
   const dragFinalizedRef = useRef(false);
+  const invalidPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // The board's press handler must keep a stable identity: `controller` is a
   // fresh object every render and `inputLocked` flips on pause, modal, drag,
   // and reward transitions — depending on either would change the prop on each
@@ -280,20 +291,35 @@ export function GameView({
   const placement = useMemo(() => {
     const event = controller.lastEvents.find((candidate) => candidate.type === "piecePlaced");
     return event && event.type === "piecePlaced"
-      ? { cells: event.cells, nonce: state.turn }
-      : { cells: [] as CellPosition[], nonce: 0 };
-  }, [controller.lastEvents, state.turn]);
+      ? { cells: event.cells, nonce: `${controller.sessionGeneration}:${state.turn}` }
+      : { cells: [] as CellPosition[], nonce: undefined };
+  }, [controller.lastEvents, controller.sessionGeneration, state.turn]);
+  const refillNonce = controller.lastEvents.some((event) => event.type === "handRefilled")
+    ? state.handRefills
+    : undefined;
+  const { clearSelection, previewAt, previewFor, selectedHandId } = controller;
 
-  const dragPreview = drag && dragOrigin ? controller.previewFor(drag.intent, dragOrigin) : null;
-  const tapPreview = previewOrigin ? controller.previewAt(previewOrigin) : null;
-  const preview = dragPreview ?? tapPreview;
+  const dragPreview = useMemo(
+    () => (drag && dragOrigin ? previewFor(drag.intent, dragOrigin) : null),
+    [drag, dragOrigin, previewFor],
+  );
+  const tapPreview = useMemo(
+    () => (previewOrigin ? previewAt(previewOrigin) : null),
+    [previewAt, previewOrigin],
+  );
+  // During drag the native-backed ghost is the one placement silhouette. The
+  // board receives only the same prediction's clear lanes, preventing a second
+  // ghost from stacking underneath while preserving B-02 pre-clear semantics.
+  const preview = useMemo(
+    () => (dragPreview ? { ...dragPreview, cells: [], conflictCells: [] } : tapPreview),
+    [dragPreview, tapPreview],
+  );
 
   // Per-empty-cell anchor validity for the selected piece, for the board's
   // accessibility placement hints. Reuses the domain's own read-only preview
   // (no gameplay mutation, no duplicated rules) and is null while nothing is
   // selected, so empty cells stay silent until a piece is held. Recomputes when
   // the selection or the board changes, so the hints never go stale.
-  const { previewAt, selectedHandId } = controller;
   const placementHints = useMemo(() => {
     if (selectedHandId === null) {
       return null;
@@ -321,6 +347,10 @@ export function GameView({
       if (inputLocked) {
         return;
       }
+      if (invalidPreviewTimerRef.current) {
+        clearTimeout(invalidPreviewTimerRef.current);
+        invalidPreviewTimerRef.current = null;
+      }
       setPreviewOrigin(null);
       const wasSelected = controller.selectedHandId === handId;
       controller.selectPiece(handId);
@@ -346,6 +376,13 @@ export function GameView({
       } else {
         // Rejected by the domain: show exactly where the attempt conflicts.
         setPreviewOrigin(position);
+        if (invalidPreviewTimerRef.current) {
+          clearTimeout(invalidPreviewTimerRef.current);
+        }
+        invalidPreviewTimerRef.current = setTimeout(() => {
+          invalidPreviewTimerRef.current = null;
+          setPreviewOrigin(null);
+        }, INVALID_RETURN_MS);
         haptics.warning();
         audio.playSfx("invalid");
         track({ name: "piece_rejected" });
@@ -360,8 +397,21 @@ export function GameView({
       setPreviewOrigin(null);
       return;
     }
+    if (invalidPreviewTimerRef.current) {
+      clearTimeout(invalidPreviewTimerRef.current);
+      invalidPreviewTimerRef.current = null;
+    }
     setPreviewOrigin(position);
   }, []);
+
+  useEffect(
+    () => () => {
+      if (invalidPreviewTimerRef.current) {
+        clearTimeout(invalidPreviewTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const measureBoard = useCallback(() => {
     const captureLayout = (x: number, y: number) => {
@@ -388,14 +438,31 @@ export function GameView({
     boardRef.current?.measureInWindow((x, y, _width, _height) => captureLayout(x, y));
   }, [boardSize]);
 
-  const originForPoint = useCallback((shapeId: string, point: Point): CellPosition | null => {
-    const layout = boardLayoutRef.current;
-    const bounds = shapeBoundsFor(shapeId);
-    if (!layout || !bounds) {
-      return null;
-    }
-    return dragOriginFromFinger(point, bounds, DRAG_LIFT, layout);
-  }, []);
+  const originForPoint = useCallback(
+    (
+      shapeId: string,
+      point: Point,
+      visualLift: number,
+      previous: CellPosition | null,
+    ): CellPosition | null => {
+      const layout = boardLayoutRef.current;
+      const bounds = shapeBoundsFor(shapeId);
+      if (!layout || !bounds) {
+        return null;
+      }
+      return stableDragOriginFromFinger(point, bounds, visualLift, layout, previous);
+    },
+    [],
+  );
+
+  const ghostPointForOrigin = useCallback(
+    (shapeId: string, origin: CellPosition, visualLift: number): Point | null => {
+      const layout = boardLayoutRef.current;
+      const bounds = shapeBoundsFor(shapeId);
+      return layout && bounds ? fingerPointForDragOrigin(origin, bounds, visualLift, layout) : null;
+    },
+    [],
+  );
 
   const handleDragStart = useCallback(
     (handId: string, point: Point) => {
@@ -417,15 +484,20 @@ export function GameView({
       lastDragOriginRef.current = null;
       setDragOrigin(null);
       dragFinalizedRef.current = false;
+      const visualLift = dragLiftForCell(cellSizeRef.current);
       const nextDrag: DragState = {
+        id: ++dragSequenceRef.current,
         handId,
         intent,
         shapeId: piece.shapeId,
         colorId: piece.colorId,
         startX: point.x,
         startY: point.y,
+        visualLift,
       };
       dragRef.current = nextDrag;
+      visibleDragIdRef.current = nextDrag.id;
+      setReturning(false);
       setDrag(nextDrag);
       haptics.selection();
     },
@@ -434,13 +506,16 @@ export function GameView({
 
   const handleDragMove = useCallback(
     (handId: string, point: Point) => {
-      ghostRef.current?.moveTo(point.x, point.y);
       const activeDrag = dragRef.current;
       if (!activeDrag || activeDrag.handId !== handId || dragFinalizedRef.current) {
         return;
       }
-      const origin = originForPoint(activeDrag.shapeId, point);
       const last = lastDragOriginRef.current;
+      const origin = originForPoint(activeDrag.shapeId, point, activeDrag.visualLift, last);
+      const snappedPoint = origin
+        ? ghostPointForOrigin(activeDrag.shapeId, origin, activeDrag.visualLift)
+        : null;
+      ghostRef.current?.moveTo(snappedPoint?.x ?? point.x, snappedPoint?.y ?? point.y);
       const changed =
         (origin === null) !== (last === null) ||
         (origin !== null &&
@@ -451,10 +526,14 @@ export function GameView({
         setDragOrigin(origin);
       }
     },
-    [originForPoint],
+    [ghostPointForOrigin, originForPoint],
   );
 
-  const clearDrag = useCallback(() => {
+  const clearDrag = useCallback((expectedId?: number) => {
+    if (expectedId !== undefined && visibleDragIdRef.current !== expectedId) {
+      return;
+    }
+    visibleDragIdRef.current = null;
     dragRef.current = null;
     dragFinalizedRef.current = false;
     setDrag(null);
@@ -473,7 +552,12 @@ export function GameView({
         return;
       }
       dragFinalizedRef.current = true;
-      const origin = originForPoint(activeDrag.shapeId, point);
+      const origin = originForPoint(
+        activeDrag.shapeId,
+        point,
+        activeDrag.visualLift,
+        lastDragOriginRef.current,
+      );
       // The pre-clear state ends with the gesture. Any following clear visuals
       // belong to the committed effect system, including while a rejected
       // piece animates back to its tray.
@@ -482,13 +566,14 @@ export function GameView({
       const placed = origin ? controllerRef.current.place(activeDrag.intent, origin) : false;
       if (placed) {
         haptics.success();
-        clearDrag();
+        clearDrag(activeDrag.id);
       } else {
         // Dropped outside the board or onto an invalid cell: play the return
         // animation, which clears the drag on completion. A drop onto the board
         // that the domain rejected counts as a rejected placement attempt.
         haptics.warning();
         audio.playSfx("invalid");
+        dragRef.current = null;
         setReturning(true);
         if (origin) {
           track({ name: "piece_rejected" });
@@ -498,17 +583,28 @@ export function GameView({
     [audio, clearDrag, haptics, originForPoint, track],
   );
 
-  const handleDragCancel = useCallback(
-    (handId: string) => {
-      const activeDrag = dragRef.current;
-      if (!activeDrag || activeDrag.handId !== handId || dragFinalizedRef.current) {
-        return;
-      }
-      dragFinalizedRef.current = true;
+  const handleDragCancel = useCallback((handId: string) => {
+    const activeDrag = dragRef.current;
+    if (!activeDrag || activeDrag.handId !== handId || dragFinalizedRef.current) {
+      return;
+    }
+    dragFinalizedRef.current = true;
+    dragRef.current = null;
+    lastDragOriginRef.current = null;
+    setDragOrigin(null);
+    setReturning(true);
+  }, []);
+
+  // A controller state replacement (hydrate/restart/external session swap)
+  // invalidates every captured intent. Clear the matching presentation too, so
+  // an old ghost can never survive into the new authoritative snapshot.
+  useEffect(() => {
+    if (visibleDragIdRef.current !== null) {
       clearDrag();
-    },
-    [clearDrag],
-  );
+    }
+    // `state` identity changes only at an authoritative controller commit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   const handleFreeze = useCallback(() => {
     // Guard against re-activation while active/exhausted or mid-reward — the
@@ -543,12 +639,12 @@ export function GameView({
     if (inputLocked || !canApplyRewardedDefuse(state)) {
       return;
     }
-    controller.clearSelection();
+    clearSelection();
     setPreviewOrigin(null);
     setDefuseConfirmOpen(true);
     haptics.selection();
     audio.playSfx("button");
-  }, [audio, controller, haptics, inputLocked, state]);
+  }, [audio, clearSelection, haptics, inputLocked, state]);
 
   const handleDefuseCancel = useCallback(() => {
     audio.playSfx("button");
@@ -605,9 +701,12 @@ export function GameView({
       return;
     }
     audio.playSfx("button");
+    clearSelection();
+    setPreviewOrigin(null);
+    clearDrag();
     setPaused(true);
     void flushActiveRun();
-  }, [audio, flushActiveRun, reward.pending]);
+  }, [audio, clearDrag, clearSelection, flushActiveRun, reward.pending]);
 
   const handleResume = useCallback(() => {
     audio.playSfx("button");
@@ -621,6 +720,10 @@ export function GameView({
     setPaused(false);
     setRestartConfirmation("closed");
     setDefuseConfirmOpen(false);
+    if (invalidPreviewTimerRef.current) {
+      clearTimeout(invalidPreviewTimerRef.current);
+      invalidPreviewTimerRef.current = null;
+    }
     setPreviewOrigin(null);
     clearDrag();
     freezeOutcome.reset();
@@ -681,14 +784,12 @@ export function GameView({
         return true;
       }
       if (state.status === "playing") {
-        audio.playSfx("button");
-        setPaused(true);
-        void flushActiveRun();
+        handlePause();
       }
       return true;
     });
     return () => subscription.remove();
-  }, [audio, flushActiveRun, handleResume, paused, restartConfirmation, state.status]);
+  }, [handlePause, handleResume, paused, restartConfirmation, state.status]);
 
   const freezeActive = state.freezeTurnsRemaining > 0;
   const defuseTarget = defuseConfirmOpen ? getRewardedDefuseTarget(state) : null;
@@ -716,9 +817,8 @@ export function GameView({
           onPause={handlePause}
           reducedMotion={reducedMotion}
         />
-        {/* Zones 2–4 — board / tray / action dock, evenly distributed so the
-            board stays large while the tray and dock never drift far below it
-            and the lower screen is not left empty. */}
+        {/* Zones 2–4 — board / tray / action dock, kept close together so the
+            board stays large and finger travel stays predictable. */}
         <View style={styles.content} onLayout={handleContentLayout}>
           <View style={styles.boardZone}>
             {boardSide > 0 ? (
@@ -783,6 +883,9 @@ export function GameView({
               onDragCancel={handleDragCancel}
               draggingHandId={drag?.handId ?? null}
               reducedMotion={reducedMotion}
+              boardCellSize={cellSize}
+              availableWidth={contentBox.width || boardSide || 320}
+              refillNonce={refillNonce}
             />
           </View>
           <View style={styles.actionZone}>
@@ -853,6 +956,7 @@ export function GameView({
       </SafeAreaView>
       {drag && cellSize > 0 ? (
         <DragGhost
+          key={drag.id}
           ref={ghostRef}
           shapeId={drag.shapeId}
           colorId={drag.colorId}
@@ -860,9 +964,10 @@ export function GameView({
           initialX={drag.startX}
           initialY={drag.startY}
           valid={dragPreview?.valid ?? false}
+          visualLift={drag.visualLift}
           returning={returning}
           reducedMotion={reducedMotion}
-          onReturnComplete={clearDrag}
+          onReturnComplete={() => clearDrag(drag.id)}
         />
       ) : null}
     </View>
@@ -969,9 +1074,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.screenPadding,
     paddingVertical: spacing.sm,
-    // Distribute the three gameplay zones so the board stays large and the
-    // remaining space becomes even breathing room rather than a dead bottom gap.
-    justifyContent: "space-evenly",
+    // Keep the tray physically close to the board. Any surplus height remains
+    // below the controls instead of increasing finger travel unpredictably.
+    justifyContent: "flex-start",
     alignItems: "stretch",
   },
   boardZone: {
@@ -983,8 +1088,10 @@ const styles = StyleSheet.create({
   },
   trayZone: {
     justifyContent: "center",
+    marginTop: spacing.xs,
   },
   actionZone: {
     justifyContent: "center",
+    marginTop: spacing.sm,
   },
 });

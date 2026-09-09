@@ -12,9 +12,8 @@ import type { DangerState } from "../../ui/dangerState";
  *  cinematic renderer ships behind a flag is that the fallback has to stay
  *  trustworthy.
  *
- *  The cinematic renderer ignores `placedCells` and `placementNonce`, which
- *  drive the fallback renderer's placement snap. They stay in the shared type
- *  so the screen can hand either renderer the same object. */
+ *  Both renderers consume `placedCells` and `placementNonce` through the same
+ *  semantic settle contract; the screen never branches presentation data. */
 export type GameBoardProps = {
   grid: readonly (readonly DomainGridCell[])[];
   badges: readonly TimerBadgePlacement[];
@@ -33,7 +32,7 @@ export type GameBoardProps = {
   /** Cells of the most recently placed piece, flashed with a settle "snap". */
   placedCells?: readonly CellPosition[];
   /** Bumped each placement so the snap replays even on the same cells. */
-  placementNonce?: number;
+  placementNonce?: number | string;
   /** Timed piece to ring as the rewarded-defuse target; its cells get a solid
    *  accent highlight while the confirm card is open. */
   highlightPieceId?: string | null;

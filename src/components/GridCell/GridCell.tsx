@@ -10,6 +10,7 @@ import { blockSurface, type BlockVariant } from "../../ui/blockSurface";
 import { BlockSurface } from "../BlockSurface";
 import { RubbleSurface } from "../RubbleSurface";
 import { motionKey } from "../../ui/motionKey";
+import { PLACEMENT_START_SCALE } from "../../ui/pieceInteraction";
 // Shared with the cinematic renderer's accessibility overlay, so a board cell
 // says the same thing whichever renderer drew it.
 import { cellLabel, placementHintFor } from "./cellLabel";
@@ -45,7 +46,10 @@ type GridCellProps = {
   /** Changes each turn a piece lands on this cell, triggering a brief settle
    *  "snap" (docs/ANIMATION_SPEC.md "Placement feedback"). Undefined = no
    *  recent placement here. */
-  flashNonce?: number;
+  flashNonce?: number | string;
+  /** Deterministic row-major settle schedule from the shared board contract. */
+  settleDelayMs?: number;
+  settleDurationMs?: number;
   reducedMotion?: boolean;
   /** Anchor validity of the currently selected piece at this empty cell, from
    *  the domain's own placement preview. Present only on empty cells while a
@@ -84,6 +88,8 @@ function GridCellImpl({
   onPress,
   onPreviewChange,
   flashNonce,
+  settleDelayMs = 0,
+  settleDurationMs = 0,
   reducedMotion,
   placementState,
   remainingTurns,
@@ -92,7 +98,7 @@ function GridCellImpl({
   const theme = useTheme();
   const base = { width: size, height: size };
   const [snap] = useState(() => new Animated.Value(1));
-  const lastFlash = useRef<number | undefined>(undefined);
+  const lastFlash = useRef<number | string | undefined>(undefined);
   const handlePress = useCallback(() => onPress?.({ row, column }), [onPress, row, column]);
   const handlePressIn = useCallback(
     () => onPreviewChange?.({ row, column }),
@@ -108,15 +114,21 @@ function GridCellImpl({
     if (reducedMotion) {
       return;
     }
-    snap.setValue(1.12);
-    const animation = Animated.timing(snap, {
-      toValue: 1,
-      duration: 150,
-      useNativeDriver: true,
-    });
+    snap.setValue(PLACEMENT_START_SCALE);
+    const animation = Animated.sequence([
+      Animated.delay(settleDelayMs),
+      Animated.timing(snap, {
+        toValue: 1,
+        duration: settleDurationMs,
+        useNativeDriver: true,
+      }),
+    ]);
     animation.start();
-    return () => animation.stop();
-  }, [flashNonce, reducedMotion, snap]);
+    return () => {
+      animation.stop();
+      snap.setValue(1);
+    };
+  }, [flashNonce, reducedMotion, settleDelayMs, settleDurationMs, snap]);
 
   // Filled blocks (timed/normal) render as a shared premium "energy tile"
   // surface; empty and rubble cells keep their own flat treatments applied

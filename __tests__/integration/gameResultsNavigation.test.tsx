@@ -20,6 +20,7 @@ const mockController: GameController = {
     ...createInitialGameState("completed-route-run", 1_752_800_000_000),
     status: "gameOver",
   },
+  sessionGeneration: 0,
   selectedHandId: null,
   lastEvents: [],
   selectPiece: jest.fn(),

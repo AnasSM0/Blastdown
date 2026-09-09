@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Animated, Pressable, StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
@@ -12,6 +12,14 @@ import { useTheme } from "../../ui/ThemeProvider";
 import { blockColor } from "../../ui/themes";
 import { blockSurface } from "../../ui/blockSurface";
 import { motionKey } from "../../ui/motionKey";
+import {
+  PICKUP_LIFT_PX,
+  PICKUP_MS,
+  PICKUP_SCALE,
+  refillPlanForSlot,
+  trayMetrics,
+  type TrayMetrics,
+} from "../../ui/pieceInteraction";
 
 type PieceTrayProps = {
   hand: readonly HandPiece[];
@@ -31,14 +39,14 @@ type PieceTrayProps = {
    *  persisted override is honored on the real screen (the OS-only hook would
    *  ignore it). */
   reducedMotion?: boolean;
+  /** Actual board-cell geometry, used to keep previews proportionate. */
+  boardCellSize?: number;
+  /** Measured horizontal room for all three fixed slots. */
+  availableWidth?: number;
+  /** Present only for the turn whose domain events generated a new hand. */
+  refillNonce?: number;
 };
 
-const SLOT_SIZE = 64;
-const MINI_CELL = 14;
-const MINI_GAP = 2;
-const SELECTED_SCALE = 1.08;
-/** Selection lift duration — short and within the Phase 2 100–220 ms band. */
-const SELECT_LIFT_MS = 150;
 /** Finger travel before a press becomes a drag; below this a tap selects. */
 const DRAG_ACTIVATION_DISTANCE = 8;
 
@@ -80,11 +88,15 @@ function layoutSlots(hand: readonly HandPiece[]): (HandPiece | null)[] {
 function MiniShape({
   shapeId,
   colorId,
+  handId,
   dragging,
+  metrics,
 }: {
   shapeId: string;
   colorId: string;
+  handId: string;
   dragging: boolean;
+  metrics: TrayMetrics;
 }) {
   const theme = useTheme();
   const shape = getShapeById(shapeId);
@@ -97,8 +109,9 @@ function MiniShape({
   const surface = blockSurface(theme, accent, dragging ? "disabled" : "tray");
   const maxRow = Math.max(...shape.cells.map((cell) => cell.row));
   const maxColumn = Math.max(...shape.cells.map((cell) => cell.column));
-  const width = (maxColumn + 1) * (MINI_CELL + MINI_GAP) - MINI_GAP;
-  const height = (maxRow + 1) * (MINI_CELL + MINI_GAP) - MINI_GAP;
+  const miniCell = metrics.shapeCellSize({ maxRow, maxColumn });
+  const width = (maxColumn + 1) * (miniCell + metrics.cellGap) - metrics.cellGap;
+  const height = (maxRow + 1) * (miniCell + metrics.cellGap) - metrics.cellGap;
 
   return (
     <View style={{ width, height }}>
@@ -108,13 +121,16 @@ function MiniShape({
           style={[
             styles.miniCell,
             {
-              top: cell.row * (MINI_CELL + MINI_GAP),
-              left: cell.column * (MINI_CELL + MINI_GAP),
+              top: cell.row * (miniCell + metrics.cellGap),
+              left: cell.column * (miniCell + metrics.cellGap),
+              width: miniCell,
+              height: miniCell,
               backgroundColor: surface.fill,
               borderColor: surface.edge,
               opacity: surface.opacity,
             },
           ]}
+          testID={`tray-mini-cell-${handId}-${cell.row}-${cell.column}`}
         />
       ))}
     </View>
@@ -123,13 +139,14 @@ function MiniShape({
 
 /** A dim recessed placeholder holding the position of a consumed piece so the
  *  remaining pieces never shift. Low contrast, no glow, non-interactive. */
-function EmptySlot() {
+function EmptySlot({ slotSize }: { slotSize: number }) {
   const theme = useTheme();
   return (
     <View
       style={[
         styles.slot,
         styles.slotEmpty,
+        { width: slotSize, height: slotSize },
         { backgroundColor: theme.boardBg, borderColor: theme.outlineVariant },
       ]}
       accessibilityLabel="Empty slot"
@@ -149,6 +166,9 @@ type TraySlotProps = {
   onDragMove?: (handId: string, point: Point) => void;
   onDragEnd?: (handId: string, point: Point) => void;
   onDragCancel?: (handId: string) => void;
+  metrics: TrayMetrics;
+  slotIndex: number;
+  refilling: boolean;
 };
 
 function TraySlot({
@@ -161,29 +181,58 @@ function TraySlot({
   onDragMove,
   onDragEnd,
   onDragCancel,
+  metrics,
+  slotIndex,
+  refilling,
 }: TraySlotProps) {
   const theme = useTheme();
-  const [lift] = useState(() => new Animated.Value(selected ? SELECTED_SCALE : 1));
+  const [pressed, setPressed] = useState(false);
+  const active = !dragging && (selected || pressed);
+  const [pickup] = useState(() => new Animated.Value(active ? 1 : 0));
+  const [refill] = useState(() => new Animated.Value(refilling && !reducedMotion ? 0 : 1));
 
   useEffect(() => {
-    const target = selected ? SELECTED_SCALE : 1;
+    const target = active ? 1 : 0;
     if (reducedMotion) {
       // Reduced motion keeps the selected-state distinction (border/glow) but
       // skips the lift transform (BUILD_SPEC.md §19).
-      lift.setValue(target);
+      pickup.setValue(target);
       return;
     }
     // A quick, restrained lift/settle — no spring overshoot (Phase 2 motion
     // rules). Selecting emphasizes the new piece and the previous one settles
     // back cleanly in the same short window.
-    const animation = Animated.timing(lift, {
+    const animation = Animated.timing(pickup, {
       toValue: target,
-      duration: SELECT_LIFT_MS,
+      duration: PICKUP_MS,
       useNativeDriver: true,
     });
     animation.start();
     return () => animation.stop();
-  }, [selected, reducedMotion, lift]);
+  }, [active, reducedMotion, pickup]);
+
+  useEffect(() => {
+    if (!refilling) {
+      refill.setValue(1);
+      return;
+    }
+    const plan = refillPlanForSlot(slotIndex, reducedMotion);
+    if (reducedMotion) {
+      refill.setValue(1);
+      return;
+    }
+    refill.setValue(0);
+    const animation = Animated.sequence([
+      Animated.delay(plan.delayMs),
+      Animated.timing(refill, {
+        toValue: 1,
+        duration: plan.durationMs,
+        useNativeDriver: true,
+      }),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [refill, reducedMotion, refilling, slotIndex]);
 
   // The selected tray piece takes the shared "selected" block material — a
   // saturated edge and a stronger glow keyed to its own color.
@@ -191,23 +240,41 @@ function TraySlot({
   // Under reduced motion no spring runs, so drop the transform entirely to avoid
   // promoting the slot to an Android hardware layer (the rounded-view black-box
   // trigger, docs/DECISIONS "turns black"). Otherwise apply the lift scale.
-  const liftTransform = reducedMotion ? undefined : { transform: [{ scale: lift }] };
+  const liftTransform = reducedMotion
+    ? undefined
+    : {
+        transform: [
+          {
+            scale: pickup.interpolate({ inputRange: [0, 1], outputRange: [1, PICKUP_SCALE] }),
+          },
+          {
+            translateY: pickup.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, -PICKUP_LIFT_PX],
+            }),
+          },
+        ],
+      };
+  const activeSurface = selected || pressed;
   const slot = (
     <AnimatedPressable
       key={motionKey(reducedMotion)}
       onPress={() => onSelect(piece.handId)}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
       style={[
         styles.slot,
+        { width: metrics.slotSize, height: metrics.slotSize },
         { backgroundColor: theme.surfaceBg, borderColor: theme.outlineVariant },
-        selected && { borderColor: selectedSurface.edge },
-        selected && selectedSurface.glow,
+        activeSurface && { borderColor: selectedSurface.edge },
+        activeSurface && selectedSurface.glow,
         dragging && styles.slotDragging,
         liftTransform,
       ]}
       accessibilityRole="button"
       accessibilityLabel={`${piece.colorId} ${piece.shapeId} piece`}
       accessibilityHint="Double tap to select, or drag onto the board to place"
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected: activeSurface }}
       testID={`tray-piece-${piece.handId}`}
     >
       {/* Restrained inner-depth highlight along the top edge — a thin lit line
@@ -215,13 +282,35 @@ function TraySlot({
           radius (the slot sets no overflow:hidden, which would black-box on an
           Android hardware layer). Static and cheap. */}
       <View pointerEvents="none" style={[styles.slotInset, { backgroundColor: theme.onSurface }]} />
-      <MiniShape shapeId={piece.shapeId} colorId={piece.colorId} dragging={dragging} />
+      <MiniShape
+        shapeId={piece.shapeId}
+        colorId={piece.colorId}
+        handId={piece.handId}
+        dragging={dragging}
+        metrics={metrics}
+      />
     </AnimatedPressable>
+  );
+
+  const refillStyle = reducedMotion
+    ? undefined
+    : {
+        opacity: refill,
+        transform: [
+          {
+            translateY: refill.interpolate({ inputRange: [0, 1], outputRange: [4, 0] }),
+          },
+        ],
+      };
+  const wrappedSlot = (
+    <Animated.View style={refillStyle} testID={`tray-refill-${slotIndex}`}>
+      {slot}
+    </Animated.View>
   );
 
   const dragEnabled = Boolean(onDragStart && onDragMove && onDragEnd);
   if (!dragEnabled) {
-    return slot;
+    return wrappedSlot;
   }
 
   const pan = Gesture.Pan()
@@ -240,7 +329,7 @@ function TraySlot({
 
   return (
     <GestureDetector gesture={pan}>
-      <View collapsable={false}>{slot}</View>
+      <View collapsable={false}>{wrappedSlot}</View>
     </GestureDetector>
   );
 }
@@ -255,15 +344,27 @@ export function PieceTray({
   onDragCancel,
   draggingHandId,
   reducedMotion: reducedMotionProp,
+  boardCellSize = 36,
+  availableWidth = 320,
+  refillNonce,
 }: PieceTrayProps) {
   const osReducedMotion = useReducedMotion();
   const reducedMotion = reducedMotionProp ?? osReducedMotion;
   const slots = layoutSlots(hand);
+  const metrics = useMemo(
+    () => trayMetrics(boardCellSize, availableWidth),
+    [availableWidth, boardCellSize],
+  );
+  const refilling = refillNonce !== undefined;
 
   return (
-    <View style={styles.tray} testID="piece-tray">
+    <View style={[styles.tray, { columnGap: metrics.gap }]} testID="piece-tray">
       {slots.map((piece, index) => (
-        <View key={`slot-${index}`} testID={`tray-slot-${index}`} style={styles.slotWrapper}>
+        <View
+          key={`slot-${index}`}
+          testID={`tray-slot-${index}`}
+          style={[styles.slotWrapper, { width: metrics.slotSize, height: metrics.slotSize }]}
+        >
           {piece ? (
             <TraySlot
               key={piece.handId}
@@ -276,9 +377,12 @@ export function PieceTray({
               onDragMove={onDragMove}
               onDragEnd={onDragEnd}
               onDragCancel={onDragCancel}
+              metrics={metrics}
+              slotIndex={index}
+              refilling={refilling}
             />
           ) : (
-            <EmptySlot />
+            <EmptySlot slotSize={metrics.slotSize} />
           )}
         </View>
       ))}
@@ -289,15 +393,13 @@ export function PieceTray({
 const styles = StyleSheet.create({
   tray: {
     flexDirection: "row",
-    justifyContent: "space-evenly",
+    justifyContent: "center",
     alignItems: "center",
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
   },
   // Fixed-size wrapper reserving each slot's footprint, so consuming a piece
   // leaves a gap in place rather than letting the others reflow.
   slotWrapper: {
-    width: SLOT_SIZE,
-    height: SLOT_SIZE,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -305,8 +407,6 @@ const styles = StyleSheet.create({
   // (from the lift transform) renders its background black. The inner highlight
   // self-clips via its own top radius instead.
   slot: {
-    width: SLOT_SIZE,
-    height: SLOT_SIZE,
     borderRadius: radius.panel,
     borderWidth: 1,
     alignItems: "center",
@@ -330,8 +430,6 @@ const styles = StyleSheet.create({
   },
   miniCell: {
     position: "absolute",
-    width: MINI_CELL,
-    height: MINI_CELL,
     borderWidth: 1,
     borderRadius: 2,
   },

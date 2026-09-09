@@ -126,6 +126,35 @@ describe("PieceTray", () => {
     expect(onSelect).toHaveBeenCalledWith("h2");
   });
 
+  it("shows pickup state on touch-down before the tap completes", async () => {
+    const result = await render(
+      <PieceTray hand={hand} selectedHandId={null} onSelect={jest.fn()} reducedMotion={false} />,
+    );
+    const piece = result.getByTestId("tray-piece-h1");
+
+    await fireEvent(piece, "pressIn");
+
+    expect(piece.props.accessibilityState?.selected).toBe(true);
+    expect(styleOf(piece).transform).toEqual(
+      expect.arrayContaining([expect.objectContaining({ translateY: expect.anything() })]),
+    );
+  });
+
+  it("sizes previews adaptively from board geometry without shrinking a single to an icon", async () => {
+    const result = await render(
+      <PieceTray
+        hand={hand}
+        selectedHandId={null}
+        onSelect={jest.fn()}
+        boardCellSize={40}
+        availableWidth={320}
+      />,
+    );
+    const single = styleOf(result.getByTestId("tray-mini-cell-h1-0-0"));
+    expect(single.width).toBeGreaterThanOrEqual(26);
+    expect(single.width).toBeLessThanOrEqual(32);
+  });
+
   it("marks the selected piece for accessibility", async () => {
     const result = await render(<PieceTray hand={hand} selectedHandId="h1" onSelect={jest.fn()} />);
     const selected = result.getByTestId("tray-piece-h1");

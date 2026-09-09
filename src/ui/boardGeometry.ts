@@ -1,4 +1,5 @@
 import type { CellPosition } from "../domain/placement";
+import { DRAG_HYSTERESIS_RATIO } from "./pieceInteraction";
 import { spacing } from "./theme";
 
 /** Outer frame border width of the rendered board (px). */
@@ -70,4 +71,59 @@ export function dragOriginFromFinger(
     y: point.y - lift - height + cellSize / 2,
   };
   return cellFromPoint(firstCellCenter, layout);
+}
+
+/** Inverse of `dragOriginFromFinger` for the visual ghost. The returned point
+ * positions the ghost so its (0,0) cell aligns exactly with `origin`, while the
+ * logical placement remains expressed solely in board cells. */
+export function fingerPointForDragOrigin(
+  origin: CellPosition,
+  shapeBounds: { maxRow: number; maxColumn: number },
+  lift: number,
+  layout: BoardLayout,
+): Point {
+  const { cellSize, pitch, contentLeft, contentTop } = layout;
+  const gutter = pitch - cellSize;
+  const width = (shapeBounds.maxColumn + 1) * pitch - gutter;
+  const height = (shapeBounds.maxRow + 1) * pitch - gutter;
+  return {
+    x: contentLeft + origin.column * pitch + width / 2,
+    y: contentTop + origin.row * pitch + lift + height,
+  };
+}
+
+/**
+ * Spatial hysteresis for boundary noise. A previous anchor remains selected in
+ * a narrow, cell-relative band; crossing farther than that resolves the new
+ * anchor immediately. There is no timer and deliberate placement stays exact.
+ */
+export function stableDragOriginFromFinger(
+  point: Point,
+  shapeBounds: { maxRow: number; maxColumn: number },
+  lift: number,
+  layout: BoardLayout,
+  previous: CellPosition | null,
+): CellPosition | null {
+  const raw = dragOriginFromFinger(point, shapeBounds, lift, layout);
+  if (!previous || layout.pitch <= 0) {
+    return raw;
+  }
+
+  const { cellSize, pitch, contentLeft, contentTop } = layout;
+  const gutter = pitch - cellSize;
+  const width = (shapeBounds.maxColumn + 1) * pitch - gutter;
+  const height = (shapeBounds.maxRow + 1) * pitch - gutter;
+  const firstCellCenter = {
+    x: point.x - width / 2 + cellSize / 2,
+    y: point.y - lift - height + cellSize / 2,
+  };
+  const margin = pitch * DRAG_HYSTERESIS_RATIO;
+  const previousLeft = contentLeft + previous.column * pitch;
+  const previousTop = contentTop + previous.row * pitch;
+  const withinPreviousColumn =
+    firstCellCenter.x >= previousLeft - margin && firstCellCenter.x < previousLeft + pitch + margin;
+  const withinPreviousRow =
+    firstCellCenter.y >= previousTop - margin && firstCellCenter.y < previousTop + pitch + margin;
+
+  return withinPreviousColumn && withinPreviousRow ? previous : raw;
 }

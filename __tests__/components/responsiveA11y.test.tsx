@@ -97,6 +97,32 @@ describe("reduced-motion Android transform guards (P1-10)", () => {
     expect(movingTransform?.some((entry) => "scale" in entry)).toBe(true);
   });
 
+  it("keeps valid and invalid ghosts readable without relying on color alone", async () => {
+    const valid = await render(
+      <DragGhost
+        shapeId="single"
+        colorId="cyan"
+        cellSize={30}
+        initialX={100}
+        initialY={100}
+        valid
+      />,
+    );
+    expect(flat(valid.getByTestId("drag-ghost-cell-0-0")).borderStyle).toBe("solid");
+
+    const invalid = await render(
+      <DragGhost
+        shapeId="single"
+        colorId="cyan"
+        cellSize={30}
+        initialX={100}
+        initialY={100}
+        valid={false}
+      />,
+    );
+    expect(flat(invalid.getByTestId("drag-ghost-cell-0-0")).borderStyle).toBe("dashed");
+  });
+
   it("PieceTray honors the effective reduced-motion prop (no lift transform)", async () => {
     const hand: HandPiece[] = [{ handId: "hand-0-0", shapeId: "single", colorId: "cyan" }];
     const tray = await render(

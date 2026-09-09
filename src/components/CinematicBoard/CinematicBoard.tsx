@@ -1,7 +1,7 @@
 import { JetBrainsMono_700Bold } from "@expo-google-fonts/jetbrains-mono";
 import { useFont } from "@shopify/react-native-skia";
 import { forwardRef, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
+import { Animated, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 import {
   Easing,
   cancelAnimation,
@@ -29,9 +29,16 @@ import { assignClockSlots } from "../../ui/effects/effectQueue";
 import { PRE_CLEAR_PULSE_MIN, PRE_CLEAR_PULSE_MS } from "../../ui/preClearPreview";
 import { CALM_DANGER_STATE } from "../../ui/dangerState";
 import { MAX_BOARD_PARTICLES } from "../../ui/effects/eventEffects";
+import {
+  PLACEMENT_START_SCALE,
+  placementSettlePlan,
+  type PlacementSettleStep,
+} from "../../ui/pieceInteraction";
 import { BoardDangerLighting } from "../BoardDangerLighting";
+import { BlockSurface } from "../BlockSurface";
 import { cellLabel, placementHintFor } from "../GridCell/cellLabel";
 import type { GameBoardProps } from "../GameBoard/boardProps";
+import type { SceneBlock } from "../../rendering/cinematic/types";
 
 /** The cinematic board: one Skia canvas, plus a real React Native layer for
  *  everything a canvas cannot be.
@@ -57,6 +64,58 @@ import type { GameBoardProps } from "../GameBoard/boardProps";
 
 /** Numeral size, matching the React Native badge's own 13px digits. */
 const NUMERAL_SIZE = 13;
+
+/** The cinematic board keeps its 64-cell base in Skia, but a placement needs
+ * only the just-committed cells to move. A bounded RN overlay (at most the
+ * placed shape) reuses the same block material and shared settle schedule; it
+ * is pointer-inert and disappears as the Skia base takes over at scale 1. */
+function CinematicPlacementCell({
+  block,
+  step,
+  onComplete,
+}: {
+  block: SceneBlock;
+  step: PlacementSettleStep;
+  onComplete?: () => void;
+}) {
+  const [scale] = useState(() => new Animated.Value(PLACEMENT_START_SCALE));
+
+  useEffect(() => {
+    const animation = Animated.sequence([
+      Animated.delay(step.delayMs),
+      Animated.timing(scale, {
+        toValue: 1,
+        duration: step.durationMs,
+        useNativeDriver: true,
+      }),
+    ]);
+    animation.start(({ finished }) => {
+      if (finished) {
+        onComplete?.();
+      }
+    });
+    return () => animation.stop();
+  }, [onComplete, scale, step.delayMs, step.durationMs]);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      testID={`cinematic-placement-settle-${block.row}-${block.column}`}
+      style={[
+        styles.placementCell,
+        {
+          left: block.rect.x,
+          top: block.rect.y,
+          width: block.rect.width,
+          height: block.rect.height,
+          transform: [{ scale }],
+        },
+      ]}
+    >
+      <BlockSurface size={block.rect.width} surface={block.surface} />
+    </Animated.View>
+  );
+}
 
 /** One transparent touch and accessibility target over the canvas.
  *
@@ -144,6 +203,8 @@ function CinematicBoardImpl(
     onCellPress,
     onCellPreviewChange,
     onCellSizeChange,
+    placedCells,
+    placementNonce,
     highlightPieceId,
     reducedMotion: reducedMotionProp,
     frozen = false,
@@ -194,6 +255,45 @@ function CinematicBoardImpl(
       }),
     [grid, badges, theme, geometry, palette, highlightPieceId, frozen, reducedMotion],
   );
+
+  const placementPlan = useMemo(
+    () => placementSettlePlan(placedCells ?? [], reducedMotion),
+    [placedCells, reducedMotion],
+  );
+  const [completedPlacement, setCompletedPlacement] = useState<number | string | null>(null);
+  const completePlacement = useCallback(() => {
+    if (placementNonce !== undefined) {
+      setCompletedPlacement(placementNonce);
+    }
+  }, [placementNonce]);
+
+  const settling =
+    !reducedMotion &&
+    placementNonce !== undefined &&
+    placementNonce !== completedPlacement &&
+    placementPlan.length > 0;
+  const settlingBlocks = useMemo(() => {
+    if (!settling) {
+      return [];
+    }
+    const blocksByCell = new Map(
+      scene.blocks.map((block) => [`${block.row},${block.column}`, block]),
+    );
+    return placementPlan.flatMap((step) => {
+      const block = blocksByCell.get(`${step.cell.row},${step.cell.column}`);
+      return block ? [{ block, step }] : [];
+    });
+  }, [placementPlan, scene.blocks, settling]);
+  const displayedScene = useMemo(() => {
+    if (settlingBlocks.length === 0) {
+      return scene;
+    }
+    const hidden = new Set(settlingBlocks.map(({ block }) => `${block.row},${block.column}`));
+    return {
+      ...scene,
+      blocks: scene.blocks.filter((block) => !hidden.has(`${block.row},${block.column}`)),
+    };
+  }, [scene, settlingBlocks]);
 
   // The ghost, rebuilt on its own. At most four cells, and the "nothing held"
   // case returns a shared empty array so the memoized layer skips entirely.
@@ -432,7 +532,7 @@ function CinematicBoardImpl(
     >
       {cellSize > 0 ? (
         <CinematicBoardCanvas
-          scene={scene}
+          scene={displayedScene}
           preview={previewCells}
           preClear={preClearHighlights}
           preClearOpacity={reducedMotion ? 1 : preClearPulse}
@@ -443,6 +543,15 @@ function CinematicBoardImpl(
           style={{ width: boardSide, height: boardSide }}
         />
       ) : null}
+
+      {settlingBlocks.map(({ block, step }, index) => (
+        <CinematicPlacementCell
+          key={`${placementNonce}:${block.row},${block.column}`}
+          block={block}
+          step={step}
+          onComplete={index === settlingBlocks.length - 1 ? completePlacement : undefined}
+        />
+      ))}
 
       {/* Accessibility and touch. Transparent, static, and the only part of this
           board the platform can see. */}
@@ -550,5 +659,9 @@ const styles = StyleSheet.create({
     fontSize: NUMERAL_SIZE,
     fontWeight: "700",
     fontVariant: ["tabular-nums"],
+  },
+  placementCell: {
+    position: "absolute",
+    zIndex: 1,
   },
 });

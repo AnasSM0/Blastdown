@@ -13,6 +13,7 @@ import { BoardDangerLighting } from "../BoardDangerLighting";
 import { CALM_DANGER_STATE } from "../../ui/dangerState";
 import { PRE_CLEAR_PULSE_MIN, PRE_CLEAR_PULSE_MS, preClearVisual } from "../../ui/preClearPreview";
 import type { GameBoardProps } from "./boardProps";
+import { placementSettlePlan } from "../../ui/pieceInteraction";
 
 /** Boundary sides of a timed cell within its piece: a side is a boundary when
  *  its neighbor is not the same timed piece. Reads only the cells' existing
@@ -113,9 +114,15 @@ function GameBoardImpl(
   // Derived lookups, each memoized on the one input it actually depends on, so
   // a board re-render for an unrelated reason (a preview change, a freeze
   // toggle) doesn't rebuild all of them.
-  const placedSet = useMemo(
-    () => new Set((placedCells ?? []).map((cell) => `${cell.row},${cell.column}`)),
-    [placedCells],
+  const placementSteps = useMemo(
+    () =>
+      new Map(
+        placementSettlePlan(placedCells ?? [], reducedMotion).map((step) => [
+          `${step.cell.row},${step.cell.column}`,
+          step,
+        ]),
+      ),
+    [placedCells, reducedMotion],
   );
 
   // Pieces whose countdown is urgent, from the badge data already supplied —
@@ -212,42 +219,49 @@ function GameBoardImpl(
       {cellSize > 0
         ? grid.map((rowCells, row) => (
             <View key={`row-${row}`} style={[styles.row, row < rows - 1 && styles.rowGap]}>
-              {rowCells.map((cell, column) => (
-                <View
-                  key={`cell-${row}-${column}`}
-                  style={column < columns - 1 ? styles.cellGap : undefined}
-                >
-                  <GridCell
-                    cell={cell}
-                    row={row}
-                    column={column}
-                    size={cellSize}
-                    previewState={previewMap.get(`${row},${column}`)}
-                    highlighted={
-                      highlightPieceId != null &&
-                      cell.kind === "timed" &&
-                      cell.pieceInstanceId === highlightPieceId
-                    }
-                    critical={cell.kind === "timed" && criticalPieceIds.has(cell.pieceInstanceId)}
-                    contourMask={contourMasks.get(`${row},${column}`)}
-                    // One shared handler for all 64 cells — each cell reports
-                    // its own position, so no per-cell closure is created.
-                    onPress={onCellPress}
-                    onPreviewChange={onCellPreviewChange}
-                    flashNonce={placedSet.has(`${row},${column}`) ? placementNonce : undefined}
-                    reducedMotion={reducedMotion}
-                    placementState={
-                      cell.kind === "empty"
-                        ? (placementHints?.get(`${row},${column}`) ?? undefined)
-                        : undefined
-                    }
-                    remainingTurns={
-                      cell.kind === "timed" ? remainingByPiece.get(cell.pieceInstanceId) : undefined
-                    }
-                    frozen={frozen}
-                  />
-                </View>
-              ))}
+              {rowCells.map((cell, column) => {
+                const placementStep = placementSteps.get(`${row},${column}`);
+                return (
+                  <View
+                    key={`cell-${row}-${column}`}
+                    style={column < columns - 1 ? styles.cellGap : undefined}
+                  >
+                    <GridCell
+                      cell={cell}
+                      row={row}
+                      column={column}
+                      size={cellSize}
+                      previewState={previewMap.get(`${row},${column}`)}
+                      highlighted={
+                        highlightPieceId != null &&
+                        cell.kind === "timed" &&
+                        cell.pieceInstanceId === highlightPieceId
+                      }
+                      critical={cell.kind === "timed" && criticalPieceIds.has(cell.pieceInstanceId)}
+                      contourMask={contourMasks.get(`${row},${column}`)}
+                      // One shared handler for all 64 cells — each cell reports
+                      // its own position, so no per-cell closure is created.
+                      onPress={onCellPress}
+                      onPreviewChange={onCellPreviewChange}
+                      flashNonce={placementStep ? placementNonce : undefined}
+                      settleDelayMs={placementStep?.delayMs}
+                      settleDurationMs={placementStep?.durationMs}
+                      reducedMotion={reducedMotion}
+                      placementState={
+                        cell.kind === "empty"
+                          ? (placementHints?.get(`${row},${column}`) ?? undefined)
+                          : undefined
+                      }
+                      remainingTurns={
+                        cell.kind === "timed"
+                          ? remainingByPiece.get(cell.pieceInstanceId)
+                          : undefined
+                      }
+                      frozen={frozen}
+                    />
+                  </View>
+                );
+              })}
             </View>
           ))
         : null}

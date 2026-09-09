@@ -35,6 +35,8 @@ export type PlacementIntent = Readonly<{
 
 export type GameController = {
   state: GameState;
+  /** Monotonic run identity used by presentation to invalidate stale motion. */
+  sessionGeneration: number;
   selectedHandId: string | null;
   lastEvents: GameEvent[];
   selectPiece: (handId: string) => void;
@@ -85,6 +87,7 @@ export function useGameController(options: GameControllerOptions = {}): GameCont
   );
   const [selectedHandId, setSelectedHandId] = useState<string | null>(null);
   const [lastEvents, setLastEvents] = useState<GameEvent[]>([]);
+  const [sessionGeneration, setSessionGeneration] = useState(0);
 
   // React state is the render snapshot. These refs are the synchronous
   // authoritative snapshot used by imperative event handlers in the interval
@@ -253,6 +256,7 @@ export function useGameController(options: GameControllerOptions = {}): GameCont
   const restart = useCallback(() => {
     const nextState = createInitialGameState(nextSeedRef.current(), nowRef.current());
     sessionGenerationRef.current += 1;
+    setSessionGeneration(sessionGenerationRef.current);
     stateRevisionRef.current = 0;
     stateRef.current = nextState;
     selectedHandIdRef.current = null;
@@ -263,6 +267,7 @@ export function useGameController(options: GameControllerOptions = {}): GameCont
 
   return {
     state,
+    sessionGeneration,
     selectedHandId,
     lastEvents,
     selectPiece,

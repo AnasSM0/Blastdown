@@ -78,6 +78,7 @@ function playingRun(): GameState {
 function controllerStub(seed: string): GameController {
   return {
     state: createInitialGameState(seed, NOW),
+    sessionGeneration: 0,
     selectedHandId: null,
     lastEvents: [],
     selectPiece: jest.fn(),

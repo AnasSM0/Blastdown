@@ -5,6 +5,7 @@ import { GameBoard } from "../../src/components/GameBoard";
 import type { GameBoardProps } from "../../src/components/GameBoard/boardProps";
 import type { GridCell as DomainGridCell } from "../../src/domain/gameTypes";
 import type { TimerBadgePlacement } from "../../src/domain/selectors";
+import { placementSettlePlan } from "../../src/ui/pieceInteraction";
 
 /** Renderer parity.
  *
@@ -190,6 +191,41 @@ describe("both renderers report the same cell size to the drag system", () => {
 
     expect(sizes).toHaveLength(2);
     expect(sizes[0]).toBeCloseTo(sizes[1], 10);
+  });
+});
+
+describe("both renderers consume the shared placement-settle contract", () => {
+  const placedCells = [
+    { row: 0, column: 0 },
+    { row: 0, column: 1 },
+  ];
+
+  it("routes the same deterministic plan into both renderer implementations", () => {
+    // Keep this structural: RN Animated completes synchronously under one Jest
+    // mock and on fake time under another, so transient-node assertions become
+    // suite-order dependent. The pure plan is tested frame-by-frame elsewhere.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { readFileSync } = require("fs") as {
+      readFileSync: (path: string, encoding: string) => string;
+    };
+    const fallback = readFileSync("src/components/GameBoard/GameBoard.tsx", "utf8");
+    const cinematic = readFileSync("src/components/CinematicBoard/CinematicBoard.tsx", "utf8");
+
+    expect(fallback).toContain("placementSettlePlan(placedCells ?? [], reducedMotion)");
+    expect(cinematic).toContain("placementSettlePlan(placedCells ?? [], reducedMotion)");
+    expect(placementSettlePlan(placedCells, false)).toHaveLength(2);
+  });
+
+  it("keeps placement confirmation immediate and transform-free under reduced motion", async () => {
+    const cinematic = await render(
+      <CinematicBoard {...props({ placedCells, placementNonce: 8, reducedMotion: true })} />,
+    );
+    const fallback = await render(
+      <GameBoard {...props({ placedCells, placementNonce: 8, reducedMotion: true })} />,
+    );
+
+    expect(cinematic.queryAllByTestId(/^cinematic-placement-settle-/)).toHaveLength(0);
+    expect(fallback.getByTestId("cell-0-0").props.style).toBeDefined();
   });
 });
 

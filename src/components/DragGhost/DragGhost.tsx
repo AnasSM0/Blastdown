@@ -6,17 +6,17 @@ import { spacing } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import { blockColor } from "../../ui/themes";
 import { blockSurface } from "../../ui/blockSurface";
+import {
+  DRAG_GHOST_OPACITY,
+  INVALID_RETURN_MS,
+  PICKUP_SCALE,
+  dragLiftForCell,
+} from "../../ui/pieceInteraction";
 
-/** How far above the fingertip the dragged piece floats so it stays visible
- *  under the thumb (BUILD_SPEC.md §6.5 drag ergonomics). Exported so the
- *  screen's finger→cell mapping applies the same vertical offset. */
-export const DRAG_LIFT = 28;
-const LIFT = DRAG_LIFT;
 const GUTTER = spacing.gridGutter;
-const RETURN_MS = 160;
-/** Subtle pick-up scale so the dragged piece reads as lifted off the tray.
- *  Kept small per the Phase 2 motion rules (no large scale, no overshoot). */
-const DRAG_SCALE = 1.06;
+const GHOST_FILL_ALPHA = Math.round(DRAG_GHOST_OPACITY * 255)
+  .toString(16)
+  .padStart(2, "0");
 
 export type DragGhostHandle = {
   /** Move the ghost so it floats above the given window-space finger point. */
@@ -30,6 +30,8 @@ type DragGhostProps = {
   initialX: number;
   initialY: number;
   valid: boolean;
+  /** Cell-derived vertical clearance. Defaults from `cellSize` for isolated uses. */
+  visualLift?: number;
   /** When true, the ghost plays a brief return-to-tray animation and then
    *  calls onReturnComplete (an invalid/cancelled drop). */
   returning?: boolean;
@@ -50,6 +52,7 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
     initialX,
     initialY,
     valid,
+    visualLift = dragLiftForCell(cellSize),
     returning,
     reducedMotion,
     onReturnComplete,
@@ -58,10 +61,10 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
 ) {
   const theme = useTheme();
   const [pos] = useState(() => new Animated.ValueXY({ x: initialX, y: initialY }));
-  const [opacity] = useState(() => new Animated.Value(0.9));
+  const [opacity] = useState(() => new Animated.Value(1));
   // Rest at the small lift scale while motion is allowed so the piece reads as
   // picked up the instant the drag begins; reduced motion rests at 1 (no lift).
-  const [scale] = useState(() => new Animated.Value(reducedMotion ? 1 : DRAG_SCALE));
+  const [scale] = useState(() => new Animated.Value(reducedMotion ? 1 : PICKUP_SCALE));
 
   useImperativeHandle(
     ref,
@@ -86,11 +89,19 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
     const animation = Animated.parallel([
       Animated.timing(pos, {
         toValue: { x: initialX, y: initialY },
-        duration: RETURN_MS,
+        duration: INVALID_RETURN_MS,
         useNativeDriver: true,
       }),
-      Animated.timing(opacity, { toValue: 0, duration: RETURN_MS, useNativeDriver: true }),
-      Animated.timing(scale, { toValue: 0.85, duration: RETURN_MS, useNativeDriver: true }),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: INVALID_RETURN_MS,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scale, {
+        toValue: 0.85,
+        duration: INVALID_RETURN_MS,
+        useNativeDriver: true,
+      }),
     ]);
     animation.start(({ finished }) => {
       if (finished) {
@@ -135,7 +146,13 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
       testID="drag-ghost"
     >
       <Animated.View
-        style={{ position: "absolute", left: -width / 2, top: -(LIFT + height), width, height }}
+        style={{
+          position: "absolute",
+          left: -width / 2,
+          top: -(visualLift + height),
+          width,
+          height,
+        }}
       >
         {shape.cells.map((cell) => (
           <Animated.View
@@ -147,11 +164,12 @@ export const DragGhost = forwardRef<DragGhostHandle, DragGhostProps>(function Dr
                 height: cellSize,
                 top: cell.row * pitch,
                 left: cell.column * pitch,
-                backgroundColor: `${accent}55`,
+                backgroundColor: `${valid ? accent : theme.timerCritical}${GHOST_FILL_ALPHA}`,
                 borderColor: cellBorderColor,
                 borderStyle: surface.dashed ? "dashed" : "solid",
               },
             ]}
+            testID={`drag-ghost-cell-${cell.row}-${cell.column}`}
           />
         ))}
       </Animated.View>
@@ -170,6 +188,5 @@ const styles = StyleSheet.create({
     position: "absolute",
     borderRadius: 2,
     borderWidth: 1.5,
-    opacity: 0.9,
   },
 });
