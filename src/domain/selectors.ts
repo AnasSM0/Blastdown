@@ -188,7 +188,8 @@ export function canActivateFreeze(state: GameState): boolean {
   return (
     state.status === "playing" &&
     state.freezeTurnsRemaining === 0 &&
-    state.rewardedFreezeUses < MAX_REWARDED_FREEZES_PER_RUN
+    state.rewardedFreezeUses < MAX_REWARDED_FREEZES_PER_RUN &&
+    Object.keys(state.activeTimers).length > 0
   );
 }
 

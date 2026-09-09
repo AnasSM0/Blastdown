@@ -2083,3 +2083,30 @@ The unused `revive.wav` Phase 4B placeholder remains parseable but is marked
 legacy and has no V1 semantic mapping; no Bolts audio is present. Final mix,
 phone-speaker translation, interruption behavior, and subjective loop quality
 remain `A-DEVICE-PENDING` until physical Android listening.
+
+---
+
+## 2026-09-09 — B-10 retains V1 balance constants and requires a Freeze target
+
+An 8,000-run deterministic study used the real domain engine with 2,000 paired
+seeds across random-legal, immediate-clear, survival, and survival-plus-recovery
+policies. Strategy materially separated outcomes (median 21 / 45.5 / 92 turns),
+natural defuses approximately doubled from random to survival play, simultaneous
+expiration remained bounded, and the configured 40/40/20 category distribution
+was reproduced. These results support a high-pressure loop in which planning
+matters, but they cannot establish human run duration, subjective fairness, or
+physical-device feedback quality.
+
+Decision: retain the existing timer tiers, hand/shape weights, scoring/combo
+values, explosion/rubble rules, and power-up duration/caps. The evidence exposes
+important human-test hypotheses—not a safe numeric change—and bot optimization
+must not substitute for player observation. The reproducible methodology and
+findings live in `docs/V1_GAMEPLAY_TUNING_REPORT.md`.
+
+One coherence defect is corrected. Freeze formerly accepted a rewarded use with
+zero active timers even though approved player copy says it freezes all active
+timers. Freeze eligibility and the domain action now require at least one active
+timer, matching Defuse's meaningful-target boundary and preventing a wasted-ad
+outcome. This does not change its two-placement duration or two-use cap. Risk:
+the action becomes available slightly later in a fresh run. Physical Android and
+human balance judgment remain `A-DEVICE-PENDING`.

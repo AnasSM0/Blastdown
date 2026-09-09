@@ -43,12 +43,22 @@ function basicHand(): GameState["hand"] {
 
 describe("freeze power-up", () => {
   it("activates: freeze counter 2, use counted, freezeActivated emitted", () => {
-    const state = craftState({ hand: basicHand() });
+    const state = craftState({
+      hand: basicHand(),
+      activeTimers: { existing: timer("existing", 3, 1) },
+    });
     const result = activateFreeze(state, NOW);
     expect(result.ok).toBe(true);
     expect(result.state.freezeTurnsRemaining).toBe(2);
     expect(result.state.rewardedFreezeUses).toBe(1);
     expect(eventTypes(result.events)).toContain("freezeActivated");
+  });
+
+  it("rejects when there are no active timers to freeze", () => {
+    const state = craftState({ hand: basicHand() });
+    const result = activateFreeze(state, NOW);
+    expect(result.ok).toBe(false);
+    expect(result.state).toBe(state);
   });
 
   it("rejects when already at the max rewarded freezes", () => {
