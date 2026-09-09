@@ -1,5 +1,6 @@
 import type { ComponentProps } from "react";
 import { fireEvent, render } from "@testing-library/react-native";
+import { StyleSheet, type ViewStyle } from "react-native";
 
 import { HomeScreenView } from "../../src/components/HomeScreen";
 
@@ -52,8 +53,31 @@ describe("HomeScreenView", () => {
     await fireEvent.press(result.getByTestId("play-button"));
     await fireEvent.press(result.getByTestId("settings-button"));
     await fireEvent.press(result.getByTestId("how-to-play-button"));
+    await fireEvent.press(result.getByTestId("privacy-link"));
     expect(props.onPlay).toHaveBeenCalledTimes(1);
     expect(props.onSettings).toHaveBeenCalledTimes(1);
     expect(props.onHowToPlay).toHaveBeenCalledTimes(1);
+    expect(props.onPrivacy).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses a wide game CTA, compact score readout, and safe-area footer", async () => {
+    const result = await render(<HomeScreenView {...viewProps({ bestScore: 999_999 })} />);
+    const primary = StyleSheet.flatten(
+      result.getByTestId("home-primary-action").props.style,
+    ) as ViewStyle;
+
+    expect(result.getByTestId("reactor-background")).toBeTruthy();
+    expect(result.getByTestId("best-score")).toHaveTextContent("999,999");
+    expect(primary.width).toBe("100%");
+    expect(primary.minHeight).toBeGreaterThanOrEqual(64);
+    expect(primary.maxWidth).toBeGreaterThanOrEqual(300);
+    expect(result.getByTestId("home-safe-area").props.edges.bottom).toBe("additive");
+    expect(result.getByTestId("home-footer")).toBeTruthy();
+  });
+
+  it("removes decorative CTA transforms under reduced motion", async () => {
+    const result = await render(<HomeScreenView {...viewProps()} reducedMotion />);
+    const primary = StyleSheet.flatten(result.getByTestId("play-button").props.style) as ViewStyle;
+    expect(primary.transform).toBeUndefined();
   });
 });

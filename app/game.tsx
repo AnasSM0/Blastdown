@@ -820,14 +820,26 @@ export function GameView({
         />
         {/* Zones 2–4 — board / tray / action dock, kept close together so the
             board stays large and finger travel stays predictable. */}
-        <View style={styles.content} onLayout={handleContentLayout}>
-          <View style={styles.boardZone}>
+        <View style={styles.content} onLayout={handleContentLayout} testID="gameplay-content">
+          <View style={styles.boardZone} testID="gameplay-board-zone">
             {boardSide > 0 ? (
               <View
                 ref={boardRef}
                 collapsable={false}
                 style={[styles.boardWrapper, { width: boardSide, height: boardSide }]}
               >
+                <View
+                  pointerEvents="none"
+                  style={[
+                    styles.boardAmbientFrame,
+                    {
+                      borderColor: `${theme.boardFrameCorner}80`,
+                      backgroundColor: `${theme.boardFrameCorner}08`,
+                      shadowColor: theme.boardFrameCorner,
+                    },
+                  ]}
+                  testID="board-ambient-frame"
+                />
                 <BoardImpulseFrame impulse={boardImpulse} reducedMotion={reducedMotion}>
                   <BoardRenderer
                     grid={state.grid}
@@ -873,7 +885,7 @@ export function GameView({
               </View>
             ) : null}
           </View>
-          <View style={styles.trayZone}>
+          <View style={styles.trayZone} testID="gameplay-tray-zone">
             <PieceTray
               hand={state.hand}
               selectedHandId={controller.selectedHandId}
@@ -890,7 +902,7 @@ export function GameView({
               refillNonce={refillNonce}
             />
           </View>
-          <View style={styles.actionZone}>
+          <View style={styles.actionZone} testID="gameplay-action-zone">
             <RewardedActionBar
               reducedMotion={reducedMotion}
               freeze={{
@@ -1076,9 +1088,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.screenPadding,
     paddingVertical: spacing.sm,
-    // Keep the tray physically close to the board. Any surplus height remains
-    // below the controls instead of increasing finger travel unpredictably.
-    justifyContent: "flex-start",
+    // Keep board/tray/dock as one compact unit. On tall phones the unit is
+    // centered in the safe-area remainder rather than leaving an accidental
+    // black well below it; internal gaps stay fixed, so drag travel is stable.
+    justifyContent: "center",
     alignItems: "stretch",
   },
   boardZone: {
@@ -1087,6 +1100,18 @@ const styles = StyleSheet.create({
   },
   boardWrapper: {
     alignSelf: "center",
+  },
+  boardAmbientFrame: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    bottom: -6,
+    left: -6,
+    borderWidth: 1,
+    borderRadius: 13,
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
   },
   trayZone: {
     justifyContent: "center",

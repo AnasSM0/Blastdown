@@ -54,4 +54,10 @@ describe("settings screen", () => {
     await fireEvent.press(getByTestId("settings-replay-tutorial-button"));
     expect(mockPush).toHaveBeenCalledWith("/tutorial");
   });
+
+  it("uses the shared reactor environment", async () => {
+    const { getByTestId } = await renderSettings();
+    expect(getByTestId("reactor-background")).toBeTruthy();
+    expect(getByTestId("settings-content")).toBeTruthy();
+  });
 });

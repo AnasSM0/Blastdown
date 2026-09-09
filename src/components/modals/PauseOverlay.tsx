@@ -36,7 +36,9 @@ export function PauseOverlay({
   return (
     <View style={styles.scrim} testID="pause-overlay" accessibilityLabel="Paused" accessible>
       <Animated.View key={appear.key} style={[styles.panel, appear.style]}>
+        <View style={styles.panelRail} />
         <Text style={styles.title}>PAUSED</Text>
+        <Text style={styles.status}>RUN STATE HELD</Text>
 
         <PressableFeedback
           onPress={onResume}
@@ -102,14 +104,23 @@ const styles = StyleSheet.create({
     zIndex: 15,
   },
   panel: {
+    position: "relative",
     minWidth: 300,
     maxWidth: "90%",
-    backgroundColor: colors.surfaceBg,
+    backgroundColor: `${colors.surfaceBg}F5`,
     borderColor: colors.outlineVariant,
     borderWidth: 1,
     borderRadius: radius.panel,
     padding: spacing.xl,
     gap: spacing.lg,
+  },
+  panelRail: {
+    position: "absolute",
+    top: 0,
+    alignSelf: "center",
+    width: 48,
+    height: 2,
+    backgroundColor: colors.cyanBlock,
   },
   title: {
     ...typography.labelCaps,
@@ -118,17 +129,26 @@ const styles = StyleSheet.create({
     color: colors.cyanBlock,
     textAlign: "center",
   },
+  status: {
+    ...typography.labelCaps,
+    marginTop: -spacing.md,
+    fontSize: 9,
+    letterSpacing: 1.8,
+    color: colors.onSurfaceVariant,
+    textAlign: "center",
+  },
   resume: {
     minHeight: 52,
-    borderRadius: radius.pill,
+    borderRadius: radius.panel,
     borderWidth: 1,
     borderColor: colors.cyanBlock,
+    backgroundColor: `${colors.cyanBlock}12`,
     alignItems: "center",
     justifyContent: "center",
   },
   resumeText: {
     ...typography.buttonText,
-    color: colors.scoreOrange,
+    color: colors.cyanBlock,
   },
   toggles: {
     gap: spacing.sm,
@@ -149,8 +169,8 @@ const styles = StyleSheet.create({
   },
   action: {
     flex: 1,
-    minHeight: 56,
-    borderRadius: radius.panel,
+    minHeight: 48,
+    borderRadius: radius.board,
     backgroundColor: colors.boardBg,
     borderWidth: 1,
     borderColor: colors.outlineVariant,

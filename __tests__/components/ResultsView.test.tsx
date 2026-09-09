@@ -26,6 +26,7 @@ describe("ResultsView", () => {
     expect(result.getByText("156")).toBeTruthy();
     expect(result.getByText("22")).toBeTruthy();
     expect(result.getByText("89")).toBeTruthy();
+    expect(result.getByTestId("reactor-background")).toBeTruthy();
   });
 
   it("fires Play Again and Home", async () => {
@@ -38,5 +39,20 @@ describe("ResultsView", () => {
     await fireEvent.press(result.getByTestId("results-home-button"));
     expect(onPlayAgain).toHaveBeenCalledTimes(1);
     expect(onHome).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps large final and best scores on one stable line", async () => {
+    const result = await render(
+      <ResultsView
+        stats={{ ...stats, score: 999_999 }}
+        bestScore={1_019_999}
+        onPlayAgain={jest.fn()}
+        onHome={jest.fn()}
+      />,
+    );
+    expect(result.getByTestId("results-score")).toHaveTextContent("999,999");
+    expect(result.getByTestId("results-score").props.numberOfLines).toBe(1);
+    expect(result.getByTestId("results-score").props.adjustsFontSizeToFit).toBe(true);
+    expect(result.getByTestId("results-best").props.numberOfLines).toBe(1);
   });
 });

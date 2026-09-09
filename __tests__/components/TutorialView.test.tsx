@@ -11,6 +11,7 @@ describe("TutorialView", () => {
       "Drag a block onto the board.",
     );
     expect(result.queryByTestId("tutorial-skip-button")).toBeNull();
+    expect(result.getByTestId("reactor-background")).toBeTruthy();
     // Next is disabled until the player places the block.
     expect(result.getByTestId("tutorial-next-button").props.accessibilityState.disabled).toBe(true);
   });

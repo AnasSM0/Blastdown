@@ -42,6 +42,7 @@ describe("RewardedActionBar", () => {
     );
 
     expect(result.getByTestId("rewarded-action-bar")).toBeTruthy();
+    expect(result.getByTestId("power-dock-spine")).toBeTruthy();
     expect(result.getByText("FREEZE")).toBeTruthy();
     expect(result.getByText("DEFUSE")).toBeTruthy();
     expect(result.getByTestId("freeze-button").props.accessibilityRole).toBe("button");
@@ -55,6 +56,17 @@ describe("RewardedActionBar", () => {
     expect(defuseStyle.flex).toBe(1);
     expect(freezeStyle.minWidth).toBeGreaterThanOrEqual(48);
     expect(freezeStyle.minHeight).toBeGreaterThanOrEqual(48);
+  });
+
+  it("labels rule-unavailable actions as locked without relying on color", async () => {
+    const result = await render(
+      <RewardedActionBar
+        freeze={freezeAction({ disabled: true, unavailable: true })}
+        defuse={defuseAction()}
+      />,
+    );
+    expect(result.getByTestId("freeze-button-caption")).toHaveTextContent("LOCKED");
+    expect(result.getByTestId("freeze-button").props.accessibilityState.disabled).toBe(true);
   });
 
   it("fires both callbacks while the actions are available", async () => {
@@ -134,7 +146,7 @@ describe("RewardedActionBar", () => {
         defuse={defuseAction()}
       />,
     );
-    expect(unavailable.getByTestId("freeze-button-caption").props.children).toBe("—");
+    expect(unavailable.getByTestId("freeze-button-caption").props.children).toBe("LOCKED");
     expect(
       StyleSheet.flatten(unavailable.getByTestId("freeze-button").props.style).borderStyle,
     ).toBe("dashed");

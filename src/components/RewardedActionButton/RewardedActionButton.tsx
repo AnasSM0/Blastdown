@@ -124,7 +124,7 @@ function captionFor(state: PresentationState): string {
     case "unapplied":
       return "NOT APPLIED";
     case "unavailable":
-      return "—";
+      return "LOCKED";
     case "active":
     case "disabled":
     case "available":
@@ -197,59 +197,71 @@ function DockAction({
       accessibilityState={{ disabled: pressDisabled }}
       testID={testID}
     >
-      <View style={styles.glyphRow}>
+      <View
+        style={[
+          styles.glyphWell,
+          {
+            borderColor: active ? theme.boardBg : theme.outlineVariant,
+            backgroundColor: active ? `${theme.boardBg}24` : theme.surfaceBg,
+          },
+        ]}
+      >
         <Text
           style={[styles.glyph, { color: active ? theme.boardBg : theme.onSurface }]}
           allowFontScaling={false}
         >
           {glyph}
         </Text>
-        {rewardedVisible ? (
-          <View
-            style={[
-              styles.rewardChip,
-              { borderColor: theme.accent, backgroundColor: theme.surfaceBg },
-            ]}
-            testID={`${testID}-reward`}
-          >
-            <Text
-              style={[styles.rewardText, { color: theme.accent }]}
-              numberOfLines={1}
-              maxFontSizeMultiplier={1.3}
-            >
-              ▷ AD
-            </Text>
-          </View>
-        ) : null}
       </View>
-      <Text
-        style={[styles.label, { color: active ? theme.boardBg : theme.onSurface }]}
-        numberOfLines={1}
-        maxFontSizeMultiplier={1.3}
-      >
-        {label}
-      </Text>
-      <View style={styles.captionRow}>
-        {state === "active" && activeCaption ? (
-          activeCaption
-        ) : (
+      <View style={styles.copy}>
+        <View style={styles.labelRow}>
           <Text
-            style={[
-              styles.caption,
-              {
-                color:
-                  state === "failure" || state === "unapplied"
-                    ? theme.timerCritical
-                    : theme.onSurfaceVariant,
-              },
-            ]}
+            style={[styles.label, { color: active ? theme.boardBg : theme.onSurface }]}
             numberOfLines={1}
             maxFontSizeMultiplier={1.3}
-            testID={`${testID}-caption`}
           >
-            {captionFor(state)}
+            {label}
           </Text>
-        )}
+          {rewardedVisible ? (
+            <View
+              style={[
+                styles.rewardChip,
+                { borderColor: theme.accent, backgroundColor: theme.surfaceBg },
+              ]}
+              testID={`${testID}-reward`}
+            >
+              <Text
+                style={[styles.rewardText, { color: theme.accent }]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.3}
+              >
+                AD
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        <View style={styles.captionRow}>
+          {state === "active" && activeCaption ? (
+            activeCaption
+          ) : (
+            <Text
+              style={[
+                styles.caption,
+                {
+                  color:
+                    state === "failure" || state === "unapplied"
+                      ? theme.timerCritical
+                      : theme.onSurfaceVariant,
+                },
+              ]}
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.3}
+              testID={`${testID}-caption`}
+            >
+              {captionFor(state)}
+            </Text>
+          )}
+        </View>
       </View>
     </PressableFeedback>
   );
@@ -263,6 +275,15 @@ export function RewardedActionBar({ freeze, defuse, reducedMotion }: RewardedAct
       style={[styles.bar, { backgroundColor: theme.surfaceBg, borderColor: theme.outlineVariant }]}
       testID="rewarded-action-bar"
     >
+      <View
+        pointerEvents="none"
+        style={[styles.dockSpine, { backgroundColor: theme.outline }]}
+        testID="power-dock-spine"
+      />
+      <View
+        pointerEvents="none"
+        style={[styles.dockDivider, { backgroundColor: theme.outlineVariant }]}
+      />
       <DockAction
         {...freeze}
         reducedMotion={reducedMotion}
@@ -295,64 +316,91 @@ export function RewardedActionBar({ freeze, defuse, reducedMotion }: RewardedAct
 
 const styles = StyleSheet.create({
   bar: {
+    position: "relative",
     flexDirection: "row",
     gap: spacing.xs,
     padding: spacing.xs,
     borderWidth: 1,
     borderRadius: radius.panel,
     shadowColor: "#000000",
-    shadowOpacity: 0.16,
-    shadowRadius: 3,
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
     shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
+    elevation: 1,
+  },
+  dockSpine: {
+    position: "absolute",
+    left: spacing.lg,
+    right: spacing.lg,
+    top: 0,
+    height: 1,
+    opacity: 0.65,
+  },
+  dockDivider: {
+    position: "absolute",
+    top: spacing.sm,
+    bottom: spacing.sm,
+    left: "50%",
+    width: StyleSheet.hairlineWidth,
+    opacity: 0.7,
   },
   action: {
     flex: 1,
     minWidth: 48,
-    minHeight: 76,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    minHeight: 62,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
     borderWidth: 1,
-    borderRadius: radius.cell,
+    borderRadius: radius.board,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: spacing.sm,
   },
-  glyphRow: {
-    minHeight: 22,
+  glyphWell: {
+    width: 32,
+    height: 32,
+    borderWidth: 1,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
   },
   glyph: {
-    fontSize: 20,
-    lineHeight: 22,
+    fontSize: 17,
+    lineHeight: 20,
+  },
+  copy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  labelRow: {
+    minHeight: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
   },
   rewardChip: {
-    position: "absolute",
-    left: 18,
-    top: -2,
     borderWidth: 1,
     borderRadius: radius.pill,
-    paddingHorizontal: spacing.xs,
-    minWidth: 31,
-    height: 16,
+    paddingHorizontal: 5,
+    minWidth: 23,
+    height: 15,
     alignItems: "center",
     justifyContent: "center",
   },
   rewardText: {
     fontSize: 8,
     lineHeight: 10,
-    fontWeight: "600",
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
   label: {
     ...typography.labelCaps,
     fontSize: 11,
     lineHeight: 14,
-    marginTop: 1,
   },
   captionRow: {
-    height: 16,
-    marginTop: 1,
-    alignItems: "center",
+    height: 14,
+    alignItems: "flex-start",
     justifyContent: "center",
   },
   caption: {

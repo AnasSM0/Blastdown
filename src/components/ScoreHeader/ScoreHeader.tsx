@@ -106,16 +106,21 @@ export function ScoreHeader({
 
   return (
     <View style={styles.row} testID="score-header">
+      <View
+        pointerEvents="none"
+        style={[styles.topRail, { backgroundColor: theme.outlineVariant }]}
+        testID="hud-top-rail"
+      />
       <View style={styles.side}>
         <Text
-          style={[typography.labelCaps, { color: theme.onSurfaceVariant }]}
+          style={[styles.sideLabel, { color: theme.onSurfaceVariant }]}
           numberOfLines={1}
           maxFontSizeMultiplier={LABEL_MAX_SCALE}
         >
           BEST
         </Text>
         <Text
-          style={[typography.numericValue, { color: theme.onSurfaceVariant }]}
+          style={[styles.bestValue, { color: theme.onSurfaceVariant }]}
           numberOfLines={1}
           adjustsFontSizeToFit
           maxFontSizeMultiplier={LABEL_MAX_SCALE}
@@ -126,11 +131,19 @@ export function ScoreHeader({
         </Text>
       </View>
 
-      <View style={styles.center}>
+      <View style={styles.center} testID="hud-score-cluster">
+        <Text
+          style={[styles.scoreLabel, { color: theme.outline }]}
+          numberOfLines={1}
+          maxFontSizeMultiplier={LABEL_MAX_SCALE}
+        >
+          SCORE
+        </Text>
         <Animated.Text
           key={motionKey(reducedMotion)}
           style={[
             typography.scoreMobile,
+            styles.scoreValue,
             { color: theme.score },
             glowFor(theme, theme.score, "low"),
             // The glow carries Android elevation, so no identity transform is
@@ -153,7 +166,10 @@ export function ScoreHeader({
         <PressableFeedback
           onPress={onPause}
           reducedMotion={reducedMotion}
-          style={[styles.pauseButton, { borderColor: theme.outlineVariant }]}
+          style={[
+            styles.pauseButton,
+            { borderColor: theme.outlineVariant, backgroundColor: `${theme.surfaceBg}D9` },
+          ]}
           accessibilityRole="button"
           accessibilityLabel="Pause"
           accessibilityHint="Pauses the current run and opens the pause menu"
@@ -162,19 +178,44 @@ export function ScoreHeader({
         >
           <View style={[styles.pauseBar, { backgroundColor: theme.onSurfaceVariant }]} />
           <View style={[styles.pauseBar, { backgroundColor: theme.onSurfaceVariant }]} />
+          <View style={[styles.pauseAccent, { backgroundColor: theme.accent }]} />
         </PressableFeedback>
       </View>
+      <View
+        pointerEvents="none"
+        style={[styles.baseline, { backgroundColor: theme.outlineVariant }]}
+        testID="hud-baseline"
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   row: {
+    position: "relative",
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: spacing.screenPadding,
-    paddingVertical: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    minHeight: 82,
+  },
+  topRail: {
+    position: "absolute",
+    top: spacing.xs,
+    left: spacing.screenPadding,
+    width: 34,
+    height: StyleSheet.hairlineWidth,
+    opacity: 0.8,
+  },
+  baseline: {
+    position: "absolute",
+    left: spacing.screenPadding,
+    right: spacing.screenPadding,
+    bottom: 0,
+    height: StyleSheet.hairlineWidth,
+    opacity: 0.7,
   },
   side: {
     // Fixed, non-shrinking side columns keep the centered score truly centered
@@ -183,6 +224,19 @@ const styles = StyleSheet.create({
     // fit rather than truncating.
     width: 72,
     flexShrink: 0,
+    justifyContent: "center",
+  },
+  sideLabel: {
+    ...typography.labelCaps,
+    fontSize: 9,
+    lineHeight: 12,
+    letterSpacing: 1.8,
+  },
+  bestValue: {
+    ...typography.numericValue,
+    fontSize: 16,
+    lineHeight: 22,
+    fontVariant: ["tabular-nums"],
   },
   sideRight: {
     alignItems: "flex-end",
@@ -193,7 +247,19 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     alignItems: "center",
-    gap: spacing.xs,
+    justifyContent: "center",
+  },
+  scoreLabel: {
+    ...typography.labelCaps,
+    fontSize: 8,
+    lineHeight: 10,
+    letterSpacing: 2.2,
+    marginBottom: -2,
+  },
+  scoreValue: {
+    fontSize: 38,
+    lineHeight: 41,
+    fontVariant: ["tabular-nums"],
   },
   pauseButton: {
     width: 48,
@@ -209,5 +275,12 @@ const styles = StyleSheet.create({
     width: 4,
     height: 16,
     borderRadius: 2,
+  },
+  pauseAccent: {
+    position: "absolute",
+    bottom: 5,
+    width: 12,
+    height: 1,
+    opacity: 0.8,
   },
 });

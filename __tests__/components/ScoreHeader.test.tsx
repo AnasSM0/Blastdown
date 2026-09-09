@@ -50,6 +50,17 @@ describe("ScoreHeader", () => {
     expect(result.getByTestId("best-value").props.numberOfLines).toBe(1);
   });
 
+  it("formats six-digit values inside one authored HUD rail", async () => {
+    const result = await render(
+      <ScoreHeader score={999_999} best={10_199} combo={0} onPause={jest.fn()} />,
+    );
+    expect(result.getByTestId("score-value")).toHaveTextContent("999,999");
+    expect(result.getByTestId("best-value")).toHaveTextContent("10,199");
+    expect(result.getByTestId("hud-top-rail")).toBeTruthy();
+    expect(result.getByTestId("hud-baseline")).toBeTruthy();
+    expect(result.getByTestId("hud-score-cluster")).toBeTruthy();
+  });
+
   it("hides the combo indicator at combo 0", async () => {
     const result = await render(<ScoreHeader score={0} best={0} combo={0} onPause={jest.fn()} />);
     expect(result.queryByTestId("combo-indicator")).toBeNull();

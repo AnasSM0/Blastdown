@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 
 import { SettingsView } from "../src/components/SettingsScreen";
 import { isDevelopmentBuild } from "../src/config/environment";
+import { useEffectiveReducedMotion } from "../src/hooks/useEffectiveReducedMotion";
 import { useAnalytics } from "../src/services/analytics";
 import { useSettings } from "../src/state/SettingsProvider";
 import type { PersistedSettings } from "../src/services/storage/schemas";
@@ -13,6 +14,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { settings, updateSettings } = useSettings();
   const { track } = useAnalytics();
+  const reducedMotion = useEffectiveReducedMotion();
 
   const handleToggle = useCallback(
     (key: "soundEnabled" | "musicEnabled" | "hapticsEnabled" | "reducedMotion", value: boolean) => {
@@ -44,6 +46,7 @@ export default function SettingsScreen() {
         // see `app/dev-effects.tsx`.
         onEffectHarness={isDevelopmentBuild() ? () => router.push("/dev-effects") : undefined}
         onBack={handleBack}
+        reducedMotion={reducedMotion}
       />
       <StatusBar style="light" />
     </>

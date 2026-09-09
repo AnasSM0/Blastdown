@@ -1,8 +1,11 @@
 import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { colors, neonGlow, radius, spacing, typography } from "../../ui/theme";
+import { colors, radius, spacing, typography } from "../../ui/theme";
+import { useTheme } from "../../ui/ThemeProvider";
+import { glowFor } from "../../ui/themes";
 import { PressableFeedback } from "../PressableFeedback";
+import { ReactorBackground } from "../ReactorBackground";
 
 type HomeScreenViewProps = {
   bestScore: number;
@@ -41,83 +44,166 @@ export function HomeScreenView({
   onPrivacy,
   reducedMotion,
 }: HomeScreenViewProps) {
-  return (
-    <SafeAreaView style={styles.screen} testID="home-screen">
-      <View style={styles.topRow}>
-        <PressableFeedback
-          reducedMotion={reducedMotion}
-          style={styles.iconButton}
-          onPress={onSettings}
-          accessibilityRole="button"
-          accessibilityLabel="Settings"
-          testID="settings-button"
-        >
-          <Text style={styles.iconGlyph}>⚙</Text>
-        </PressableFeedback>
-      </View>
+  const theme = useTheme();
+  const primaryLabel = canContinue ? "CONTINUE" : "PLAY";
+  const primaryDetail = canContinue ? "RETURN TO ACTIVE RUN" : "START A FRESH RUN";
 
-      <View style={styles.hero}>
-        <Text style={styles.logo}>BlastDown</Text>
-        <View style={styles.bestPill} testID="best-score">
-          <Text style={styles.bestLabel}>BEST</Text>
-          <Text style={styles.bestValue}>{formatNumber(bestScore)}</Text>
+  return (
+    <View style={styles.screen} testID="home-screen">
+      <ReactorBackground />
+      <SafeAreaView
+        style={styles.safe}
+        edges={["top", "bottom", "left", "right"]}
+        testID="home-safe-area"
+      >
+        <View style={styles.topRow}>
+          <View style={styles.systemMark}>
+            <View style={[styles.systemDot, { backgroundColor: theme.accent }]} />
+            <Text style={[styles.systemText, { color: theme.onSurfaceVariant }]}>
+              REACTOR 08×08
+            </Text>
+          </View>
+          <PressableFeedback
+            reducedMotion={reducedMotion}
+            pressStyle="scale"
+            style={[
+              styles.iconButton,
+              { borderColor: theme.outlineVariant, backgroundColor: `${theme.surfaceBg}D9` },
+            ]}
+            onPress={onSettings}
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+            testID="settings-button"
+          >
+            <Text style={[styles.iconGlyph, { color: theme.onSurfaceVariant }]}>⚙</Text>
+          </PressableFeedback>
         </View>
 
-        <PressableFeedback
-          reducedMotion={reducedMotion}
-          style={[styles.playButton, neonGlow(colors.scoreOrange, "high")]}
-          onPress={canContinue ? onContinue : onPlay}
-          disabled={!actionsEnabled}
-          accessibilityRole="button"
-          accessibilityLabel={canContinue ? "Continue your current game" : "Play a new game"}
-          accessibilityState={{ disabled: !actionsEnabled }}
-          testID={canContinue ? "continue-button" : "play-button"}
-        >
-          <Text style={styles.playGlyph}>▶</Text>
-          <Text style={styles.playText}>{canContinue ? "CONTINUE" : "PLAY"}</Text>
-        </PressableFeedback>
+        <View style={styles.hero}>
+          <View style={styles.identity}>
+            <Text style={[styles.eyebrow, { color: theme.accent }]}>NEON REACTOR</Text>
+            <Text style={[styles.logo, { color: theme.onSurface }]}>BlastDown</Text>
+            <View style={styles.titleRail}>
+              <View style={[styles.titleRailLine, { backgroundColor: theme.outlineVariant }]} />
+              <View style={[styles.titleRailCore, { backgroundColor: theme.score }]} />
+              <View style={[styles.titleRailLine, { backgroundColor: theme.outlineVariant }]} />
+            </View>
+          </View>
 
-        {canContinue ? (
-          <PressableFeedback
-            reducedMotion={reducedMotion}
-            style={styles.continueButton}
-            onPress={onPlay}
-            disabled={!actionsEnabled}
-            accessibilityRole="button"
-            accessibilityLabel="Start a new game"
-            accessibilityState={{ disabled: !actionsEnabled }}
-            testID="play-button"
+          <View
+            style={styles.scoreReadout}
+            accessibilityLabel={`Best score ${formatNumber(bestScore)}`}
+            accessible
+            testID="home-score-readout"
           >
-            <Text style={styles.continueText}>NEW GAME</Text>
-          </PressableFeedback>
-        ) : null}
-      </View>
+            <View
+              style={[
+                styles.readoutBracket,
+                styles.readoutBracketLeft,
+                { borderColor: theme.outline },
+              ]}
+            />
+            <Text style={[styles.bestLabel, { color: theme.onSurfaceVariant }]}>PERSONAL BEST</Text>
+            <Text
+              style={[styles.bestValue, { color: theme.onSurface }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              maxFontSizeMultiplier={1.4}
+              testID="best-score"
+            >
+              {formatNumber(bestScore)}
+            </Text>
+            <View
+              style={[
+                styles.readoutBracket,
+                styles.readoutBracketRight,
+                { borderColor: theme.outline },
+              ]}
+            />
+          </View>
 
-      <View style={styles.footer}>
-        <View style={styles.menuRow}>
+          <View
+            style={[styles.primaryShell, glowFor(theme, theme.score, "high")]}
+            testID="home-primary-action"
+          >
+            <PressableFeedback
+              reducedMotion={reducedMotion}
+              pressStyle="scale"
+              style={[
+                styles.primaryButton,
+                {
+                  borderColor: theme.score,
+                  backgroundColor: `${theme.score}18`,
+                },
+              ]}
+              onPress={canContinue ? onContinue : onPlay}
+              disabled={!actionsEnabled}
+              accessibilityRole="button"
+              accessibilityLabel={canContinue ? "Continue your current game" : "Play a new game"}
+              accessibilityState={{ disabled: !actionsEnabled }}
+              testID={canContinue ? "continue-button" : "play-button"}
+            >
+              <View style={[styles.playGlyphWell, { borderColor: `${theme.score}66` }]}>
+                <Text style={[styles.playGlyph, { color: theme.onSurface }]}>▶</Text>
+              </View>
+              <View style={styles.primaryCopy}>
+                <Text style={[styles.playText, { color: theme.onSurface }]}>{primaryLabel}</Text>
+                <Text style={[styles.playDetail, { color: theme.onSurfaceVariant }]}>
+                  {primaryDetail}
+                </Text>
+              </View>
+              <Text style={[styles.primaryArrow, { color: theme.score }]}>›</Text>
+              <View style={[styles.energyEdge, { backgroundColor: theme.score }]} />
+            </PressableFeedback>
+          </View>
+
+          {canContinue ? (
+            <PressableFeedback
+              reducedMotion={reducedMotion}
+              style={[styles.newGameButton, { borderColor: theme.outlineVariant }]}
+              onPress={onPlay}
+              disabled={!actionsEnabled}
+              accessibilityRole="button"
+              accessibilityLabel="Start a new game"
+              accessibilityState={{ disabled: !actionsEnabled }}
+              testID="play-button"
+            >
+              <Text style={[styles.newGameText, { color: theme.onSurfaceVariant }]}>NEW GAME</Text>
+            </PressableFeedback>
+          ) : null}
+        </View>
+
+        <View style={styles.footer} testID="home-footer">
           <PressableFeedback
             reducedMotion={reducedMotion}
-            style={styles.menuButton}
+            style={[
+              styles.howToButton,
+              { borderColor: theme.outlineVariant, backgroundColor: `${theme.surfaceBg}A6` },
+            ]}
             onPress={onHowToPlay}
             accessibilityRole="button"
             accessibilityLabel="How to play"
             testID="how-to-play-button"
           >
-            <Text style={styles.menuGlyph}>?</Text>
-            <Text style={styles.menuLabel}>HOW TO PLAY</Text>
+            <View style={[styles.helpGlyph, { borderColor: theme.outline }]}>
+              <Text style={[styles.menuGlyph, { color: theme.onSurfaceVariant }]}>?</Text>
+            </View>
+            <Text style={[styles.menuLabel, { color: theme.onSurfaceVariant }]}>HOW TO PLAY</Text>
+            <Text style={[styles.secondaryArrow, { color: theme.outline }]}>›</Text>
+          </PressableFeedback>
+          <PressableFeedback
+            reducedMotion={reducedMotion}
+            style={styles.privacyHit}
+            onPress={onPrivacy}
+            accessibilityRole="link"
+            accessibilityLabel="Privacy policy"
+            testID="privacy-link"
+          >
+            <Text style={[styles.privacy, { color: theme.outline }]}>Privacy Policy</Text>
           </PressableFeedback>
         </View>
-        <PressableFeedback
-          reducedMotion={reducedMotion}
-          onPress={onPrivacy}
-          accessibilityRole="link"
-          accessibilityLabel="Privacy policy"
-          testID="privacy-link"
-        >
-          <Text style={styles.privacy}>Privacy Policy</Text>
-        </PressableFeedback>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -125,14 +211,34 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.appBackground,
+  },
+  safe: {
+    flex: 1,
     paddingHorizontal: spacing.screenPadding,
     justifyContent: "space-between",
   },
   topRow: {
     flexDirection: "row",
-    justifyContent: "flex-start",
+    justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: spacing.md,
+    paddingTop: spacing.sm,
+  },
+  systemMark: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  systemDot: {
+    width: 5,
+    height: 5,
+    borderRadius: radius.pill,
+  },
+  systemText: {
+    ...typography.labelCaps,
+    fontSize: 9,
+    lineHeight: 12,
+    letterSpacing: 1.8,
   },
   iconButton: {
     width: 44,
@@ -150,95 +256,187 @@ const styles = StyleSheet.create({
   },
   hero: {
     alignItems: "center",
-    gap: spacing.xl,
+    width: "100%",
+    gap: spacing.lg,
+  },
+  identity: {
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  eyebrow: {
+    ...typography.labelCaps,
+    fontSize: 10,
+    letterSpacing: 3.2,
   },
   logo: {
-    fontSize: 44,
+    fontSize: 42,
+    lineHeight: 48,
     fontWeight: "800",
-    letterSpacing: 2,
-    color: colors.onSurface,
+    letterSpacing: 1.5,
     textAlign: "center",
   },
-  bestPill: {
+  titleRail: {
+    width: 152,
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceBg,
+    gap: spacing.xs,
+  },
+  titleRailLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
+  titleRailCore: {
+    width: 18,
+    height: 2,
+  },
+  scoreReadout: {
+    minWidth: 152,
+    minHeight: 62,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xl,
+  },
+  readoutBracket: {
+    position: "absolute",
+    top: 6,
+    bottom: 6,
+    width: 10,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+  },
+  readoutBracketLeft: {
+    left: 0,
+    borderLeftWidth: 1,
+  },
+  readoutBracketRight: {
+    right: 0,
+    borderRightWidth: 1,
   },
   bestLabel: {
     ...typography.labelCaps,
+    fontSize: 10,
+    lineHeight: 13,
+    letterSpacing: 2,
   },
   bestValue: {
     ...typography.numericValue,
+    fontSize: 25,
+    lineHeight: 30,
+    fontVariant: ["tabular-nums"],
   },
-  playButton: {
-    width: 200,
-    height: 200,
-    borderRadius: radius.panel * 2,
-    borderWidth: 2,
-    borderColor: colors.scoreOrange,
-    backgroundColor: `${colors.scoreOrange}1F`,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
+  primaryShell: {
+    width: "100%",
+    maxWidth: 340,
+    minHeight: 84,
   },
-  playGlyph: {
-    fontSize: 44,
-    color: colors.onSurface,
-  },
-  playText: {
-    fontSize: 28,
-    fontWeight: "800",
-    letterSpacing: 2,
-    color: colors.onSurface,
-  },
-  continueButton: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.cyanBlock,
-    backgroundColor: `${colors.cyanBlock}14`,
-  },
-  continueText: {
-    ...typography.buttonText,
-    color: colors.cyanBlock,
-    letterSpacing: 1.5,
-  },
-  footer: {
-    alignItems: "center",
-    gap: spacing.md,
-    paddingBottom: spacing.md,
-  },
-  menuRow: {
-    flexDirection: "row",
-    gap: spacing.md,
+  primaryButton: {
+    width: "100%",
+    minHeight: 84,
     borderRadius: radius.panel,
     borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceBg,
-    padding: spacing.md,
-  },
-  menuButton: {
+    flexDirection: "row",
     alignItems: "center",
-    gap: spacing.xs,
     paddingHorizontal: spacing.lg,
+    gap: spacing.md,
+  },
+  playGlyphWell: {
+    width: 46,
+    height: 46,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  playGlyph: {
+    fontSize: 20,
+    lineHeight: 24,
+    marginLeft: 2,
+  },
+  primaryCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  playText: {
+    fontSize: 24,
+    lineHeight: 29,
+    fontWeight: "800",
+    letterSpacing: 2.2,
+  },
+  playDetail: {
+    ...typography.labelCaps,
+    fontSize: 9,
+    lineHeight: 12,
+    letterSpacing: 1.35,
+  },
+  primaryArrow: {
+    fontSize: 30,
+    lineHeight: 34,
+  },
+  energyEdge: {
+    position: "absolute",
+    left: spacing.lg,
+    right: spacing.lg,
+    bottom: 0,
+    height: 2,
+    opacity: 0.9,
+  },
+  newGameButton: {
+    minWidth: 132,
+    minHeight: 44,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  newGameText: {
+    ...typography.labelCaps,
+    letterSpacing: 1.3,
+  },
+  footer: {
+    width: "100%",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
+  howToButton: {
+    width: "100%",
+    maxWidth: 300,
+    minHeight: 50,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: radius.panel,
+    borderWidth: 1,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
+  },
+  helpGlyph: {
+    width: 26,
+    height: 26,
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
   },
   menuGlyph: {
-    fontSize: 18,
-    color: colors.onSurfaceVariant,
+    fontSize: 14,
+    lineHeight: 18,
   },
   menuLabel: {
     ...typography.labelCaps,
+    flex: 1,
+  },
+  secondaryArrow: {
+    fontSize: 22,
+  },
+  privacyHit: {
+    minHeight: 44,
+    minWidth: 120,
+    alignItems: "center",
+    justifyContent: "center",
   },
   privacy: {
     ...typography.labelCaps,
-    color: colors.outline,
     textTransform: "none",
     letterSpacing: 0.5,
   },

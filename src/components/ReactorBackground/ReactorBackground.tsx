@@ -28,6 +28,8 @@ export function ReactorBackground() {
           lightens the middle where the board sits and lets the corners fall
           away, approximating a vignette/gradient without a gradient library. */}
       <View style={[styles.glow, { backgroundColor: bg.glow }]} />
+      <View style={[styles.reactorRingOuter, { borderColor: bg.seam }]} />
+      <View style={[styles.reactorRingInner, { borderColor: bg.grid }]} />
 
       {/* Faint circuit grid: a few evenly spaced hairlines each way. Kept to a
           small, fixed count so the cost is trivial regardless of screen size. */}
@@ -101,6 +103,26 @@ const styles = StyleSheet.create({
     bottom: "22%",
     borderRadius: 320,
     opacity: 0.5,
+  },
+  reactorRingOuter: {
+    position: "absolute",
+    left: "8%",
+    right: "8%",
+    top: "21%",
+    aspectRatio: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    opacity: 0.34,
+  },
+  reactorRingInner: {
+    position: "absolute",
+    left: "19%",
+    right: "19%",
+    top: "27%",
+    aspectRatio: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    opacity: 0.28,
   },
   vLine: {
     position: "absolute",

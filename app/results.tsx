@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { BackHandler } from "react-native";
 
 import { ResultsView } from "../src/components/ResultsScreen";
+import { useEffectiveReducedMotion } from "../src/hooks/useEffectiveReducedMotion";
 import { useAnalytics } from "../src/services/analytics";
 import { recordPlaytestAction } from "../src/services/playtest/signal";
 import { useProfile } from "../src/state/ProfileProvider";
@@ -16,6 +17,7 @@ export default function ResultsScreen() {
   const { controller, startNewRun, clearActiveRun, settleCurrentRun } = useGameSession();
   const { profile } = useProfile();
   const { track } = useAnalytics();
+  const reducedMotion = useEffectiveReducedMotion();
   const state = controller.state;
   const routeTransitionRef = useRef(false);
 
@@ -74,6 +76,7 @@ export default function ResultsScreen() {
         bestScore={profile.bestScore}
         onPlayAgain={handlePlayAgain}
         onHome={handleHome}
+        reducedMotion={reducedMotion}
       />
       <StatusBar style="light" />
     </>

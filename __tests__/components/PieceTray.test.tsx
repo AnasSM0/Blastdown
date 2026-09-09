@@ -28,6 +28,7 @@ describe("PieceTray", () => {
       <PieceTray hand={hand} selectedHandId={null} onSelect={jest.fn()} />,
     );
     expect(result.getAllByTestId(/^tray-piece-/)).toHaveLength(3);
+    expect(result.getByTestId("tray-bay-rail")).toBeTruthy();
   });
 
   it("always renders exactly three fixed slots, full or partial (P1-7)", async () => {

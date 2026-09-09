@@ -272,7 +272,7 @@ function TraySlot({
       style={[
         styles.slot,
         { width: metrics.slotSize, height: metrics.slotSize },
-        { backgroundColor: theme.surfaceBg, borderColor: theme.outlineVariant },
+        { backgroundColor: theme.boardBg, borderColor: theme.outlineVariant },
         activeSurface && { borderColor: selectedSurface.edge },
         activeSurface && selectedSurface.glow,
         dragging && styles.slotDragging,
@@ -289,6 +289,7 @@ function TraySlot({
           radius (the slot sets no overflow:hidden, which would black-box on an
           Android hardware layer). Static and cheap. */}
       <View pointerEvents="none" style={[styles.slotInset, { backgroundColor: theme.onSurface }]} />
+      <View pointerEvents="none" style={[styles.slotPort, { backgroundColor: theme.outline }]} />
       <MiniShape
         shapeId={piece.shapeId}
         colorId={piece.colorId}
@@ -356,6 +357,7 @@ export function PieceTray({
   availableWidth = 320,
   refillNonce,
 }: PieceTrayProps) {
+  const theme = useTheme();
   const osReducedMotion = useReducedMotion();
   const reducedMotion = reducedMotionProp ?? osReducedMotion;
   const slots = layoutSlots(hand);
@@ -367,6 +369,12 @@ export function PieceTray({
 
   return (
     <View style={[styles.tray, { columnGap: metrics.gap }]} testID="piece-tray">
+      <View
+        pointerEvents="none"
+        style={[styles.bayRail, { backgroundColor: theme.outlineVariant }]}
+        testID="tray-bay-rail"
+      />
+      <View pointerEvents="none" style={[styles.bayRailCore, { backgroundColor: theme.accent }]} />
       {slots.map((piece, index) => (
         <View
           key={`slot-${index}`}
@@ -401,10 +409,27 @@ export function PieceTray({
 
 const styles = StyleSheet.create({
   tray: {
+    position: "relative",
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    paddingVertical: spacing.sm,
+    paddingVertical: 6,
+  },
+  bayRail: {
+    position: "absolute",
+    left: spacing.md,
+    right: spacing.md,
+    top: "50%",
+    height: StyleSheet.hairlineWidth,
+    opacity: 0.55,
+  },
+  bayRailCore: {
+    position: "absolute",
+    alignSelf: "center",
+    bottom: 1,
+    width: 28,
+    height: 1,
+    opacity: 0.65,
   },
   // Fixed-size wrapper reserving each slot's footprint, so consuming a piece
   // leaves a gap in place rather than letting the others reflow.
@@ -416,13 +441,13 @@ const styles = StyleSheet.create({
   // (from the lift transform) renders its background black. The inner highlight
   // self-clips via its own top radius instead.
   slot: {
-    borderRadius: radius.panel,
+    borderRadius: radius.board,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
   slotEmpty: {
-    opacity: 0.5,
+    opacity: 0.42,
   },
   slotDragging: {
     opacity: 0.4,
@@ -434,8 +459,15 @@ const styles = StyleSheet.create({
     right: spacing.sm,
     height: StyleSheet.hairlineWidth,
     opacity: 0.12,
-    borderTopLeftRadius: radius.panel,
-    borderTopRightRadius: radius.panel,
+    borderTopLeftRadius: radius.board,
+    borderTopRightRadius: radius.board,
+  },
+  slotPort: {
+    position: "absolute",
+    bottom: 4,
+    width: 14,
+    height: StyleSheet.hairlineWidth,
+    opacity: 0.35,
   },
   miniCell: {
     position: "absolute",

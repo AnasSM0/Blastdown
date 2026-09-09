@@ -91,6 +91,7 @@ export const typography = {
     fontSize: 36,
     lineHeight: 40,
     fontWeight: "700",
+    fontVariant: ["tabular-nums"],
     color: colors.scoreOrange,
   },
   numericValue: {
@@ -98,6 +99,7 @@ export const typography = {
     fontSize: 18,
     lineHeight: 24,
     fontWeight: "600",
+    fontVariant: ["tabular-nums"],
     color: colors.onSurface,
   },
 } satisfies Record<string, TextStyle>;

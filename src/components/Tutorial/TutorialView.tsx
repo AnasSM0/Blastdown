@@ -11,6 +11,7 @@ import { getTimerBadgePlacements, type PlacementPreview } from "../../domain/sel
 import { useGameController } from "../../hooks/useGameController";
 import { tutorialSteps, TUTORIAL_STEP_COUNT } from "../../features/tutorial/tutorialContent";
 import { colors, radius, spacing, typography } from "../../ui/theme";
+import { ReactorBackground } from "../ReactorBackground";
 
 type TutorialViewProps = {
   /** Called when the player reaches the end and finishes the tutorial. */
@@ -125,88 +126,94 @@ export function TutorialView({ onComplete, onSkip, onStepChange, boardSize }: Tu
   const boardPreview = isInteractive ? null : highlightPreview(step.highlightCells);
 
   return (
-    <SafeAreaView style={styles.screen} testID="tutorial-screen">
-      <View style={styles.header}>
-        <Text
-          style={styles.progress}
-          accessibilityLabel={`Step ${step.id} of ${TUTORIAL_STEP_COUNT}`}
-        >
-          {`STEP ${step.id} / ${TUTORIAL_STEP_COUNT}`}
-        </Text>
-        {canSkip ? (
-          <Pressable
-            onPress={onSkip}
-            accessibilityRole="button"
-            accessibilityLabel="Skip tutorial"
-            style={styles.skipButton}
-            hitSlop={8}
-            testID="tutorial-skip-button"
+    <View style={styles.screen} testID="tutorial-screen">
+      <ReactorBackground />
+      <SafeAreaView style={styles.safe} edges={["top", "bottom", "left", "right"]}>
+        <View style={styles.header}>
+          <Text
+            style={styles.progress}
+            accessibilityLabel={`Step ${step.id} of ${TUTORIAL_STEP_COUNT}`}
           >
-            <Text style={styles.skipText}>SKIP</Text>
-          </Pressable>
-        ) : (
-          <View style={styles.skipSpacer} />
-        )}
-      </View>
-
-      <View style={styles.boardWrap}>
-        <GameBoard
-          grid={boardGrid}
-          badges={boardBadges}
-          preview={boardPreview}
-          boardSize={boardSize}
-          onCellPress={isInteractive ? handleCellPress : undefined}
-        />
-      </View>
-
-      {isInteractive ? (
-        <PieceTray
-          hand={controller.state.hand}
-          selectedHandId={controller.selectedHandId}
-          onSelect={handleSelect}
-        />
-      ) : null}
-
-      <View style={styles.panel}>
-        <Text
-          style={styles.message}
-          accessibilityHint={step.accessibilityHint}
-          testID="tutorial-message"
-        >
-          {step.message}
-        </Text>
-        {isInteractive && !canAdvance ? (
-          <Text style={styles.action} testID="tutorial-action-hint">
-            Select the block, then tap the board to place it.
+            {`STEP ${step.id} / ${TUTORIAL_STEP_COUNT}`}
           </Text>
+          {canSkip ? (
+            <Pressable
+              onPress={onSkip}
+              accessibilityRole="button"
+              accessibilityLabel="Skip tutorial"
+              style={styles.skipButton}
+              hitSlop={8}
+              testID="tutorial-skip-button"
+            >
+              <Text style={styles.skipText}>SKIP</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.skipSpacer} />
+          )}
+        </View>
+
+        <View style={styles.boardWrap}>
+          <GameBoard
+            grid={boardGrid}
+            badges={boardBadges}
+            preview={boardPreview}
+            boardSize={boardSize}
+            onCellPress={isInteractive ? handleCellPress : undefined}
+          />
+        </View>
+
+        {isInteractive ? (
+          <PieceTray
+            hand={controller.state.hand}
+            selectedHandId={controller.selectedHandId}
+            onSelect={handleSelect}
+          />
         ) : null}
 
-        <View style={styles.controls}>
-          <Pressable
-            onPress={handleBack}
-            disabled={index === 0}
-            accessibilityRole="button"
-            accessibilityLabel="Previous step"
-            accessibilityState={{ disabled: index === 0 }}
-            style={[styles.navButton, index === 0 && styles.navDisabled]}
-            testID="tutorial-back-button"
+        <View style={styles.panel}>
+          <View style={styles.panelAccent} />
+          <Text
+            style={styles.message}
+            accessibilityHint={step.accessibilityHint}
+            testID="tutorial-message"
           >
-            <Text style={styles.navText}>BACK</Text>
-          </Pressable>
-          <Pressable
-            onPress={handleNext}
-            disabled={!canAdvance}
-            accessibilityRole="button"
-            accessibilityLabel={isLast ? "Finish tutorial" : "Next step"}
-            accessibilityState={{ disabled: !canAdvance }}
-            style={[styles.navButton, styles.navPrimary, !canAdvance && styles.navDisabled]}
-            testID="tutorial-next-button"
-          >
-            <Text style={[styles.navText, styles.navPrimaryText]}>{isLast ? "DONE" : "NEXT"}</Text>
-          </Pressable>
+            {step.message}
+          </Text>
+          {isInteractive && !canAdvance ? (
+            <Text style={styles.action} testID="tutorial-action-hint">
+              Select the block, then tap the board to place it.
+            </Text>
+          ) : null}
+
+          <View style={styles.controls}>
+            <Pressable
+              onPress={handleBack}
+              disabled={index === 0}
+              accessibilityRole="button"
+              accessibilityLabel="Previous step"
+              accessibilityState={{ disabled: index === 0 }}
+              style={[styles.navButton, index === 0 && styles.navDisabled]}
+              testID="tutorial-back-button"
+            >
+              <Text style={styles.navText}>BACK</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleNext}
+              disabled={!canAdvance}
+              accessibilityRole="button"
+              accessibilityLabel={isLast ? "Finish tutorial" : "Next step"}
+              accessibilityState={{ disabled: !canAdvance }}
+              style={[styles.navButton, styles.navPrimary, !canAdvance && styles.navDisabled]}
+              testID="tutorial-next-button"
+            >
+              <Text style={[styles.navText, styles.navPrimaryText]}>
+                {isLast ? "DONE" : "NEXT"}
+              </Text>
+            </Pressable>
+          </View>
         </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -214,6 +221,9 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.appBackground,
+  },
+  safe: {
+    flex: 1,
     paddingHorizontal: spacing.screenPadding,
     gap: spacing.lg,
   },
@@ -246,6 +256,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   panel: {
+    position: "relative",
     backgroundColor: colors.surfaceBg,
     borderColor: colors.outlineVariant,
     borderWidth: 1,
@@ -254,6 +265,14 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginTop: "auto",
     marginBottom: spacing.lg,
+  },
+  panelAccent: {
+    position: "absolute",
+    top: 0,
+    alignSelf: "center",
+    width: 42,
+    height: 1,
+    backgroundColor: colors.cyanBlock,
   },
   message: {
     ...typography.body,
