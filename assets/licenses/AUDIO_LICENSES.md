@@ -7,10 +7,10 @@ BlastDown project dedicates those files under CC0 1.0 and also retains them as
 project-owned assets. Commercial use is permitted and attribution is not
 required.
 
-The earlier Phase 4B clips were audited before replacement. `revive.wav` is the
-only retained legacy placeholder: Revive is outside V1 scope and the file has no
-semantic feedback mapping. It remains solely to avoid an uncertain destructive
-asset removal.
+The earlier Phase 4B clips were audited before replacement. `revive.wav` was the
+only legacy placeholder: Revive is outside V1 scope and the file had no semantic
+feedback mapping. P-01 removed it from the asset tree on 2026-09-11; its row is
+retained below as provenance for the deleted project-authored file.
 
 | File                | Source/provider                          | Creator           | License                 | Commercial use | Attribution | Acquisition date | Modifications                                              | Status/use                                            |
 | ------------------- | ---------------------------------------- | ----------------- | ----------------------- | -------------- | ----------- | ---------------- | ---------------------------------------------------------- | ----------------------------------------------------- |
@@ -33,4 +33,4 @@ asset removal.
 | `gameOver.wav`      | BlastDown deterministic synthesis script | BlastDown project | CC0 1.0 / project-owned | Yes            | None        | 2026-09-09       | Synthesized, normalized, silence-trimmed, PCM encoded      | Production candidate; game over                       |
 | `newBest.wav`       | BlastDown deterministic synthesis script | BlastDown project | CC0 1.0 / project-owned | Yes            | None        | 2026-09-09       | Synthesized, normalized, silence-trimmed, PCM encoded      | Production candidate; new best                        |
 | `music-loop.wav`    | BlastDown deterministic synthesis script | BlastDown project | CC0 1.0 / project-owned | Yes            | None        | 2026-09-09       | Synthesized, seam-smoothed, normalized, stereo PCM encoded | Production candidate; 100 BPM eight-bar gameplay loop |
-| `revive.wav`        | BlastDown Phase 4B synthesis             | BlastDown project | CC0 1.0 / project-owned | Yes            | None        | 2026-07-20       | Original placeholder, no B-09 processing                   | Legacy placeholder; unused, excluded V1 feature       |
+| `revive.wav`        | BlastDown Phase 4B synthesis             | BlastDown project | CC0 1.0 / project-owned | Yes            | None        | 2026-07-20       | Original placeholder, no B-09 processing                   | Removed by P-01 on 2026-09-11; excluded V1 feature    |

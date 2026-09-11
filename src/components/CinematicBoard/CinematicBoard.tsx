@@ -1,4 +1,4 @@
-import { JetBrainsMono_700Bold } from "@expo-google-fonts/jetbrains-mono";
+import { JetBrainsMono_700Bold } from "@expo-google-fonts/jetbrains-mono/700Bold";
 import { useFont } from "@shopify/react-native-skia";
 import { forwardRef, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";

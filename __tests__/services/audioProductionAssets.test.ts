@@ -111,11 +111,9 @@ describe("production audio manifest", () => {
   });
 
   it("references present, trimmed, phone-appropriate PCM SFX", () => {
-    for (const [asset, definition] of Object.entries(SFX_AUDIO_MANIFEST)) {
+    for (const definition of Object.values(SFX_AUDIO_MANIFEST)) {
       const filePath = path.resolve(__dirname, "../../assets/audio", definition.fileName);
       expect(fs.existsSync(filePath)).toBe(true);
-      if (asset === "revive") continue;
-
       const info = inspectWav(filePath);
       expect(definition.status).toBe("production-candidate");
       expect(info.channels).toBe(1);
@@ -162,7 +160,7 @@ describe("production audio manifest", () => {
     expect(totalBytes).toBeLessThan(4 * 1024 * 1024);
   });
 
-  it("licenses every manifest asset and keeps legacy Revive out of V1 semantics", () => {
+  it("licenses every packaged asset and keeps legacy Revive out of the production manifest", () => {
     const licenses = fs.readFileSync(
       path.resolve(__dirname, "../../assets/licenses/AUDIO_LICENSES.md"),
       "utf8",
@@ -172,7 +170,8 @@ describe("production audio manifest", () => {
       GAMEPLAY_MUSIC_MANIFEST.fileName,
     ];
     filenames.forEach((fileName) => expect(licenses).toContain(`\`${fileName}\``));
-    expect(SFX_AUDIO_MANIFEST.revive.status).toBe("legacy-placeholder");
+    expect(Object.keys(SFX_AUDIO_MANIFEST)).not.toContain("revive");
+    expect(fs.existsSync(path.resolve(__dirname, "../../assets/audio/revive.wav"))).toBe(false);
     expect(Object.values(expectedCueAssets)).not.toContain("revive");
     expect(Object.keys(SFX_AUDIO_MANIFEST).some((name) => /bolt/i.test(name))).toBe(false);
   });

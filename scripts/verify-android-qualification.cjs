@@ -57,6 +57,22 @@ for (const [label, flag] of [
   const bundlePath = path.join(output, metadata.fileMetadata.android.bundle);
   const bundle = fs.readFileSync(bundlePath);
   const sourceMap = JSON.parse(fs.readFileSync(`${bundlePath}.map`, "utf8"));
+  const assets = metadata.fileMetadata.android.assets.map((asset) => ({
+    ...asset,
+    bytes: fs.statSync(path.join(output, asset.path)).size,
+  }));
+  const assetsByExtension = Object.fromEntries(
+    [...new Set(assets.map((asset) => asset.ext))].sort().map((extension) => {
+      const matching = assets.filter((asset) => asset.ext === extension);
+      return [
+        extension,
+        {
+          count: matching.length,
+          bytes: matching.reduce((sum, asset) => sum + asset.bytes, 0),
+        },
+      ];
+    }),
+  );
   const sources = sourceMap.sources.map((source) => source.replaceAll("\\", "/"));
   const cinematicSources = sources.filter((source) =>
     /\/rendering\/cinematic\/|\/components\/CinematicBoard\/|@shopify\/react-native-skia\//.test(
@@ -75,6 +91,10 @@ for (const [label, flag] of [
   for (const [marker, included] of Object.entries(markerResults)) {
     assert.equal(included, flag === "1", `${label}: ${marker} mismatch`);
   }
+  // Five app-owned faces plus Expo Router's Android native-tab symbol fallback.
+  // The latter is reachable through expo-symbols even when this app does not
+  // declare native tabs, so removing it would require patching framework code.
+  assert.equal(assetsByExtension.ttf?.count, 6, `${label}: expected six font faces`);
   const record = {
     label,
     flag,
@@ -83,6 +103,11 @@ for (const [label, flag] of [
     sha256: sha256(bundle),
     cinematicSourceCount: cinematicSources.length,
     markers: markerResults,
+    assets: {
+      count: assets.length,
+      bytes: assets.reduce((sum, asset) => sum + asset.bytes, 0),
+      byExtension: assetsByExtension,
+    },
   };
   assert.ok(record.moduleCount > 0, "Missing Metro module count");
   report.exports.push(record);

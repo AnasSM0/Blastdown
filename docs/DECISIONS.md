@@ -2129,3 +2129,28 @@ mandatory metadata. Current balance remains unchanged: comprehension,
 fairness, feedback load, repeated-hand frustration, and replay hypotheses must
 be evaluated with the protocol before later tuning. This is not a production
 analytics provider and does not upload data.
+
+---
+
+## 2026-09-11 — P-01 excludes the optional cinematic native runtime from production fallback
+
+The approved production renderer remains the React Native Views fallback with
+`EXPO_PUBLIC_CINEMATIC_BOARD=0`. Production Android fallback autolinking now
+excludes Skia, Reanimated, and Worklets; development clients and explicit
+cinematic builds retain all three. The exclusion uses React Native's supported
+`platforms.android = null` configuration, is covered by an autolinking contract
+test, and changes neither gameplay nor renderer behavior.
+
+Font imports now name the five used faces directly instead of generated package
+barrels. The V1-unreachable `revive.wav` placeholder and its audio-manifest key
+are removed; persisted backward-compatibility fields are unchanged. Audio mode
+setup and finite catalog preloading move out of service construction and wait
+until persisted settings hydrate, preserving settings gates and feedback
+semantics.
+
+No dependency was added or removed. Release shrinking and `inlineRequires` are
+deferred because the real production AAB and physical Android verification are
+blocked by missing owner-provided production AdMob IDs. P-01 therefore records
+a blocked release decision rather than inferring production or device results
+from the retained development APK. Full evidence and follow-up gates are in
+`docs/V1_SIZE_PERFORMANCE_REPORT.md`.

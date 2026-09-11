@@ -2,6 +2,7 @@ const players: FakePlayer[] = [];
 const mockPreload = jest.fn(() => Promise.resolve());
 const mockClearPreloadedSource = jest.fn(() => Promise.resolve());
 const mockSetIsAudioActiveAsync = jest.fn(() => Promise.resolve());
+const mockSetAudioModeAsync = jest.fn(() => Promise.resolve());
 
 type FakePlayer = {
   playing: boolean;
@@ -42,7 +43,7 @@ jest.mock("expo-audio", () => ({
   preload: mockPreload,
   clearPreloadedSource: mockClearPreloadedSource,
   setIsAudioActiveAsync: mockSetIsAudioActiveAsync,
-  setAudioModeAsync: jest.fn(() => Promise.resolve()),
+  setAudioModeAsync: mockSetAudioModeAsync,
 }));
 
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -67,12 +68,15 @@ describe("ExpoAudioService", () => {
 
   it("preloads the manifest once and releases every owned resource", async () => {
     const service = createExpoAudioService();
+    expect(mockPreload).not.toHaveBeenCalled();
+    expect(mockSetAudioModeAsync).not.toHaveBeenCalled();
     service.preload();
     service.preload();
     await Promise.resolve();
 
     const manifestSize = Object.keys(SFX_AUDIO_MANIFEST).length + 1;
     expect(mockPreload).toHaveBeenCalledTimes(manifestSize);
+    expect(mockSetAudioModeAsync).toHaveBeenCalledTimes(1);
     service.play({ identity: "pickup-1", cue: "piecePickup" });
     service.startMusic();
     service.release();

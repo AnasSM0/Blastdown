@@ -19,11 +19,6 @@ export function AudioServiceProvider({
 }) {
   const value = useMemo(() => service ?? createNoOpAudioService(), [service]);
   useEffect(() => {
-    try {
-      value.preload();
-    } catch {
-      // A provider failure degrades to silence; app startup must continue.
-    }
     return () => {
       try {
         value.release();

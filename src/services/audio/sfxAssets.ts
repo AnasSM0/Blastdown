@@ -20,7 +20,6 @@ export const SFX_SOURCES: Record<SfxAssetName, number> = {
   explosion: require("../../../assets/audio/explosion.wav"),
   rubbleClear: require("../../../assets/audio/rubbleClear.wav"),
   freeze: require("../../../assets/audio/freeze.wav"),
-  revive: require("../../../assets/audio/revive.wav"),
   gameOver: require("../../../assets/audio/gameOver.wav"),
   newBest: require("../../../assets/audio/newBest.wav"),
   button: require("../../../assets/audio/button.wav"),

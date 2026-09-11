@@ -4,7 +4,7 @@ const { readFileSync } = require("node:fs") as {
 };
 
 type QualificationProfile = {
-  developmentClient: boolean;
+  developmentClient?: boolean;
   distribution: string;
   environment: string;
   android: { buildType: string };
@@ -35,5 +35,14 @@ describe("Android qualification profile contract", () => {
       ...fallback,
       env: { ...fallback.env, EXPO_PUBLIC_CINEMATIC_BOARD: "1" },
     });
+  });
+
+  it("makes the fallback renderer explicit in the production AAB profile", () => {
+    const production = config.build.production;
+    expect(production.environment).toBe("production");
+    expect(production.developmentClient).not.toBe(true);
+    expect(production.android.buildType).toBe("app-bundle");
+    expect(production.env.EXPO_PUBLIC_APP_ENV).toBe("production");
+    expect(production.env.EXPO_PUBLIC_CINEMATIC_BOARD).toBe("0");
   });
 });

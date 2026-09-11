@@ -66,8 +66,6 @@ export function createExpoAudioService(): AudioService {
   let startedAt = 0;
   let duckTimer: ReturnType<typeof setTimeout> | null = null;
 
-  safeAsync(() => setAudioModeAsync({ playsInSilentMode: false }));
-
   function remember(identity: string): boolean {
     if (playedIdentities.has(identity)) return false;
     playedIdentities.add(identity);
@@ -128,6 +126,10 @@ export function createExpoAudioService(): AudioService {
     preload() {
       if (preloaded || released) return;
       preloaded = true;
+      // Audio is noncritical startup work. This method is first called after
+      // persisted settings hydrate, so native audio-mode setup and asset cache
+      // warming cannot compete with Home's initial render.
+      safeAsync(() => setAudioModeAsync({ playsInSilentMode: false }));
       for (const source of preloadedSources) safeAsync(() => preloadAudio(source));
     },
     configure(next) {

@@ -19,7 +19,6 @@ export type SfxAssetName =
   | "explosion"
   | "rubbleClear"
   | "freeze"
-  | "revive"
   | "gameOver"
   | "newBest"
   | "button";

@@ -1,6 +1,6 @@
 import type { SfxAssetName } from "../services/audio/types";
 
-export type AudioAssetStatus = "production-candidate" | "legacy-placeholder";
+export type AudioAssetStatus = "production-candidate";
 
 export type SfxAssetDefinition = Readonly<{
   fileName: string;
@@ -50,7 +50,6 @@ export const SFX_AUDIO_MANIFEST: Readonly<Record<SfxAssetName, SfxAssetDefinitio
   rubbleClear: sfx("rubbleClear.wav", 0.6, 70),
   gameOver: sfx("gameOver.wav", 0.72, 180),
   newBest: sfx("newBest.wav", 0.78, 180),
-  revive: sfx("revive.wav", 0, 180, false, "legacy-placeholder"),
 };
 
 export const GAMEPLAY_MUSIC_MANIFEST = {

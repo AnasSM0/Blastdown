@@ -25,6 +25,7 @@ export function useFeedback() {
 
   useEffect(() => {
     if (loaded) {
+      safely(() => audio.preload());
       safely(() =>
         audio.configure({
           soundEnabled: settings.soundEnabled,
