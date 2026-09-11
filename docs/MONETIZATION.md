@@ -32,7 +32,27 @@ determines whether and how the approved action applies.
 Production release requires approved consent handling, a published privacy
 policy, correct audience classification, Play Data Safety declarations, and
 production rewarded-ad identifiers. Development and automated tests use the
-mock adapter. Real AdMob configuration is deferred to G-01 through G-03.
+mock adapter. Production native builds use `GoogleMobileAdsService`, which
+requests non-personalized inventory until the approved consent flow is wired.
+
+### EAS production environment
+
+Configure these Android values in the EAS `production` environment with
+**sensitive** visibility. They are client identifiers embedded in the app, not
+server credentials; EAS must be able to resolve them while evaluating the
+dynamic app config locally.
+
+| Variable                                | Requirement                            | Missing behavior                                         |
+| --------------------------------------- | -------------------------------------- | -------------------------------------------------------- |
+| `ADMOB_ANDROID_APP_ID`                  | Mandatory for Android production build | Config fails before upload; Google test IDs are rejected |
+| `ADMOB_ANDROID_REWARDED_FREEZE_UNIT_ID` | Required to serve Freeze ads           | Freeze ad request returns `unavailable`; no reward       |
+| `ADMOB_ANDROID_REWARDED_DEFUSE_UNIT_ID` | Required to serve Defuse ads           | Defuse ad request returns `unavailable`; no reward       |
+
+Future iOS production uses the equivalent `ADMOB_IOS_APP_ID`,
+`ADMOB_IOS_REWARDED_FREEZE_UNIT_ID`, and
+`ADMOB_IOS_REWARDED_DEFUSE_UNIT_ID`. Android generation does not read or
+require those iOS values. Production never falls back to Google's sample App
+IDs or rewarded unit IDs.
 
 ## Governance
 

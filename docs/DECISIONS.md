@@ -2154,3 +2154,31 @@ blocked by missing owner-provided production AdMob IDs. P-01 therefore records
 a blocked release decision rather than inferring production or device results
 from the retained development APK. Full evidence and follow-up gates are in
 `docs/V1_SIZE_PERFORMANCE_REPORT.md`.
+
+---
+
+## 2026-09-11 — P-01B scopes AdMob configuration to the selected build platform
+
+BlastDown's production guard—not the Google Mobile Ads Expo plugin—incorrectly
+required both platform App IDs while resolving an Android-only EAS build. The
+plugin accepts `androidAppId` and `iosAppId` independently and registers
+separate Android-manifest and iOS-plist mods. EAS production profiles now set a
+non-secret `BLASTDOWN_BUILD_PLATFORM` in the platform-specific `env` block so
+dynamic config evaluation locally and on the worker validates only the selected
+platform. Unknown/multi-platform production config remains fail-closed and
+requires both.
+
+Android production requires `ADMOB_ANDROID_APP_ID` and rejects absent,
+malformed, or Google-sample values. Freeze and Defuse unit IDs are read from
+`ADMOB_ANDROID_REWARDED_FREEZE_UNIT_ID` and
+`ADMOB_ANDROID_REWARDED_DEFUSE_UNIT_ID`. Missing units do not block native
+generation: the corresponding production request returns `unavailable` and can
+never grant a reward. Future iOS builds use the equivalent iOS names.
+
+Production native provider selection now uses the real bounded
+`GoogleMobileAdsService`; development/tests retain `MockAdService`. The native
+adapter initializes lazily, keeps at most one pending load per approved
+placement, normalizes earned only after the ad closes, and treats load/show
+failures as no-reward outcomes. Gameplay/domain code, UI, reward mechanics, and
+the once-only controller boundary are unchanged. Actual production IDs remain
+owner-provided EAS configuration and are never committed.

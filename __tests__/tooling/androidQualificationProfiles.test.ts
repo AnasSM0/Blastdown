@@ -7,7 +7,8 @@ type QualificationProfile = {
   developmentClient?: boolean;
   distribution: string;
   environment: string;
-  android: { buildType: string };
+  android: { buildType: string; env?: Record<string, string> };
+  ios?: { env: Record<string, string> };
   env: Record<string, string>;
 };
 
@@ -42,6 +43,8 @@ describe("Android qualification profile contract", () => {
     expect(production.environment).toBe("production");
     expect(production.developmentClient).not.toBe(true);
     expect(production.android.buildType).toBe("app-bundle");
+    expect(production.android.env).toEqual({ BLASTDOWN_BUILD_PLATFORM: "android" });
+    expect(production.ios?.env).toEqual({ BLASTDOWN_BUILD_PLATFORM: "ios" });
     expect(production.env.EXPO_PUBLIC_APP_ENV).toBe("production");
     expect(production.env.EXPO_PUBLIC_CINEMATIC_BOARD).toBe("0");
   });

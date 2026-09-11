@@ -56,7 +56,15 @@
       "autoIncrement": true,
       "environment": "production",
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "app-bundle",
+        "env": {
+          "BLASTDOWN_BUILD_PLATFORM": "android"
+        }
+      },
+      "ios": {
+        "env": {
+          "BLASTDOWN_BUILD_PLATFORM": "ios"
+        }
       },
       "env": {
         "EXPO_PUBLIC_APP_ENV": "production",

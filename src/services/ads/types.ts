@@ -7,9 +7,9 @@ export type RewardedPlacement = "rewarded_freeze" | "rewarded_defuse";
 export type RewardedResult = "earned" | "closed" | "unavailable" | "error";
 
 /** The seam every ad-dependent flow talks to. `MockAdService` backs
- *  development and tests; the Google Mobile Ads implementation lands with the
- *  real-ads phase. Nothing in `src/domain` may import this — rewards are
- *  applied by calling the pure domain APIs only after `earned`. */
+ *  development and tests; Google Mobile Ads backs production native builds.
+ *  Nothing in `src/domain` may import this — rewards are applied by calling
+ *  the pure domain APIs only after `earned`. */
 export interface AdService {
   preloadRewarded(placement: RewardedPlacement): Promise<void>;
   showRewarded(placement: RewardedPlacement): Promise<RewardedResult>;

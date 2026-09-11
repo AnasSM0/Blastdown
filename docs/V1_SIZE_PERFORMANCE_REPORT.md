@@ -6,9 +6,10 @@
 runtime review found no unbounded gameplay work, but a real production AAB and
 physical low-end Android evidence are unavailable. EAS rejects the production
 configuration before upload because the project has no production
-`ADMOB_ANDROID_APP_ID` or `ADMOB_IOS_APP_ID`. The repository also still uses
-the mock ad service and no-op analytics/error-reporting adapters, so the locked
-production ads, analytics, and crash-reporting scope is not release-complete.
+`ADMOB_ANDROID_APP_ID`. P-01B removed the incorrect iOS coupling and added the
+real production rewarded adapter, but rewarded unit IDs, consent, analytics,
+and crash-reporting release work remain incomplete. See
+`docs/P01B_ANDROID_PRODUCTION_QUALIFICATION.md`.
 
 This report separates exact measurements from estimates and unknowns. It does
 not relabel a development APK, Metro export, or source audit as production or
@@ -133,6 +134,12 @@ remaining 963,776-byte Material Symbols face is reached through Expo Router's
 Android `expo-symbols` native-tab icon utility. Removing it safely would require
 patching framework code, so it is retained.
 
+P-01B's production Google Mobile Ads adapter makes 127,064 additional Hermes
+bytes reachable. Its fresh cinematic-OFF export is 3,468,244 HBC bytes plus
+4,534,938 asset bytes (8,003,182 total), still 2,892,582 bytes or 26.55% below
+the original P-01 baseline. This supersedes the mock-only export only for
+current source sizing; neither export substitutes for a production AAB.
+
 The unused V1-excluded `revive.wav` was removed from the static manifest and
 asset graph, saving 15,918 raw bytes. Deprecated persisted fields and gameplay
 compatibility paths remain parseable.
@@ -188,7 +195,7 @@ does not prove native AAB contents or device performance.
 | Gesture Handler                                    | Required for tray drag                   | Retained; one gesture stream per active drag                                |
 | AsyncStorage                                       | Required for settings/profile/active run | Retained; writes are serialized/coalesced                                   |
 | Expo Audio / Haptics                               | Required V1 feedback                     | Retained; audio native setup/preload deferred until settings hydrate        |
-| Google Mobile Ads                                  | Required V1 rewarded ads                 | Retained, but vendor adapter and real release IDs are still missing         |
+| Google Mobile Ads                                  | Required V1 rewarded ads                 | Retained; real adapter added by P-01B, release IDs still missing            |
 | Skia                                               | Optional cinematic renderer              | Excluded from production Android autolinking when cinematic OFF             |
 | Reanimated / Worklets                              | Used only by cinematic renderer          | Excluded with Skia in production OFF; retained in development and ON builds |
 | Expo Dev Client                                    | Development tooling                      | Retained for qualification profiles; production AAB contribution unverified |
@@ -309,10 +316,10 @@ task. This is not a security-clean declaration and requires separate triage.
 
 Remaining release gates are:
 
-1. Owner supplies real production AdMob Android and iOS app IDs in the EAS
-   production environment.
-2. Replace the mock rewarded-ad adapter and no-op analytics/crash adapters with
-   approved production providers without changing service boundaries.
+1. Owner supplies the Android AdMob App ID plus Freeze/Defuse rewarded unit IDs
+   in the EAS production environment.
+2. Replace the no-op analytics/crash adapters with approved production
+   providers without changing service boundaries.
 3. Build the real cinematic-OFF production AAB from a clean committed source
    revision, inspect it with this repository's analyzer and Android tools, and
    record Play/device-specific size.
