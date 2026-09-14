@@ -56,6 +56,7 @@ describe("platform-scoped production AdMob config", () => {
     });
     expect(config.android?.blockedPermissions).toEqual(
       expect.arrayContaining([
+        "android.permission.FOREGROUND_SERVICE",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW",

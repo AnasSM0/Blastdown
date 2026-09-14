@@ -93,6 +93,7 @@ const config: ExpoConfig = {
     // BlastDown only plays packaged audio. These permissions are contributed
     // by broad Expo library manifests but are not used by the release app.
     blockedPermissions: [
+      "android.permission.FOREGROUND_SERVICE",
       "android.permission.READ_EXTERNAL_STORAGE",
       "android.permission.RECORD_AUDIO",
       "android.permission.SYSTEM_ALERT_WINDOW",
