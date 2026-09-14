@@ -41,6 +41,7 @@ export default function SettingsScreen() {
         settings={settings}
         onToggle={handleToggle}
         onReplayTutorial={() => router.push("/tutorial")}
+        onPrivacy={() => router.push("/privacy")}
         // Undefined outside a development build, so the row is absent rather
         // than present and inert. The route itself renders nothing there too —
         // see `app/dev-effects.tsx`.

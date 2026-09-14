@@ -2,6 +2,7 @@
 const mockCreateGoogleMobileAdsService = jest.fn(() => ({
   preloadRewarded: jest.fn(async () => {}),
   showRewarded: jest.fn(async () => "unavailable" as const),
+  showPrivacyOptions: jest.fn(async () => "not-required" as const),
 }));
 
 jest.mock("react-native-google-mobile-ads", () => ({

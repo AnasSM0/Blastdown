@@ -54,6 +54,22 @@ describe("platform-scoped production AdMob config", () => {
       rewarded_freeze: FREEZE_UNIT_ID,
       rewarded_defuse: DEFUSE_UNIT_ID,
     });
+    expect(config.android?.blockedPermissions).toEqual(
+      expect.arrayContaining([
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+      ]),
+    );
+    expect(config.plugins).toContainEqual([
+      "expo-audio",
+      {
+        recordAudioAndroid: false,
+        enableBackgroundRecording: false,
+        enableBackgroundPlayback: false,
+      },
+    ]);
   });
 
   it("resolves iOS production without an Android App ID", () => {

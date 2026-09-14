@@ -2190,3 +2190,31 @@ placement, normalizes earned only after the ad closes, and treats load/show
 failures as no-reward outcomes. Gameplay/domain code, UI, reward mechanics, and
 the once-only controller boundary are unchanged. Actual production IDs remain
 owner-provided EAS configuration and are never committed.
+
+---
+
+## 2026-09-14 — R-01 makes UMP authoritative and removes unused Android access
+
+The first real production AAB proved that the advertising adapter could request
+limited ads but did not consult Google's User Messaging Platform before an ad
+request. That fails the PRD's production-consent requirement. The production
+adapter now asks UMP to gather any required consent, honors its `canRequestAds`
+result, and fails the optional ad closed when consent lookup fails or ads are
+not eligible. Gameplay remains immediately usable. UMP retains ownership of its
+state, and the Home/Settings privacy surface delegates revisiting choices to
+UMP rather than creating a custom GDPR preference.
+
+Google Mobile Ads' public JavaScript barrel also exported its sample TestIds
+table into release bundles, although BlastDown never referenced those values.
+Production Metro resolution replaces only that inert table; development still
+uses Google's official test configuration. The same release resolver replaces
+React Native's unused installed-bundle localhost fallback with a non-routable
+HTTPS fallback, preserving the server-loaded-bundle behavior while preventing a
+localhost URL from shipping.
+
+BlastDown plays packaged audio only while foregrounded and pauses on lifecycle
+backgrounding. Expo Audio's recording and background-playback options are
+therefore explicitly disabled. Android storage, microphone, and overlay
+permissions contributed by broad library manifests are blocked. This is
+release/compliance configuration only: gameplay, reward semantics, audio cues,
+mix, UI styling, and persistence behavior are unchanged.

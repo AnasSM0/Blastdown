@@ -76,7 +76,7 @@ export default function HomeScreen() {
         onContinue={handleContinue}
         onSettings={() => router.push("/settings")}
         onHowToPlay={() => router.push("/tutorial")}
-        onPrivacy={() => {}}
+        onPrivacy={() => router.push("/privacy")}
         reducedMotion={reducedMotion}
       />
       {newGameConfirmation === "open" ? (

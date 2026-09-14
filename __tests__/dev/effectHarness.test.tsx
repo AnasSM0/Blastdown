@@ -389,6 +389,7 @@ describe("the harness is absent outside development", () => {
         settings={settings as never}
         onToggle={() => {}}
         onReplayTutorial={() => {}}
+        onPrivacy={() => {}}
         onBack={() => {}}
       />,
     );
@@ -401,6 +402,7 @@ describe("the harness is absent outside development", () => {
         settings={settings as never}
         onToggle={() => {}}
         onReplayTutorial={() => {}}
+        onPrivacy={() => {}}
         onBack={() => {}}
         onEffectHarness={() => opened.push(1)}
       />,

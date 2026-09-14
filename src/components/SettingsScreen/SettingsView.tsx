@@ -12,6 +12,7 @@ type SettingsViewProps = {
   settings: PersistedSettings;
   onToggle: (key: ToggleKey, value: boolean) => void;
   onReplayTutorial: () => void;
+  onPrivacy: () => void;
   onBack: () => void;
   /** Opens the development-only effect delivery harness. Omitted from all
    * production builds so the row is structurally absent there. */
@@ -33,6 +34,7 @@ export function SettingsView({
   settings,
   onToggle,
   onReplayTutorial,
+  onPrivacy,
   onBack,
   onEffectHarness,
   reducedMotion,
@@ -105,7 +107,20 @@ export function SettingsView({
               <Text style={styles.label}>REPLAY TUTORIAL</Text>
               <Text style={styles.chevron}>›</Text>
             </PressableFeedback>
-            {onEffectHarness ? (
+            <View style={styles.divider} />
+            <PressableFeedback
+              style={styles.navRow}
+              reducedMotion={reducedMotion}
+              onPress={onPrivacy}
+              accessibilityRole="button"
+              accessibilityLabel="Privacy and ad choices"
+              accessibilityHint="Opens the privacy policy and advertising privacy choices"
+              testID="settings-privacy-button"
+            >
+              <Text style={styles.label}>PRIVACY &amp; AD CHOICES</Text>
+              <Text style={styles.chevron}>›</Text>
+            </PressableFeedback>
+            {__DEV__ && onEffectHarness ? (
               <PressableFeedback
                 style={styles.navRow}
                 reducedMotion={reducedMotion}

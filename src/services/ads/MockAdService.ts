@@ -53,5 +53,8 @@ export function createMockAdService(config: MockAdServiceConfig = {}): AdService
       shown.push(placement);
       return nextRewarded(placement);
     },
+    async showPrivacyOptions() {
+      return "not-required";
+    },
   };
 }

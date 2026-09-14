@@ -27,6 +27,9 @@ function createUnavailableAdService(): AdService {
     async showRewarded() {
       return "unavailable";
     },
+    async showPrivacyOptions() {
+      return "not-required";
+    },
   };
 }
 

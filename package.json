@@ -58,6 +58,7 @@
     "prepare": "node scripts/patch-graphify-hooks.cjs",
     "graphify:hooks": "node scripts/patch-graphify-hooks.cjs",
     "analyze:android-size": "node scripts/analyze-android-size.cjs",
+    "export:production:android": "node scripts/run-production-export.cjs",
     "analyze:playtests": "node scripts/analyze-playtests.cjs"
   },
   "private": true

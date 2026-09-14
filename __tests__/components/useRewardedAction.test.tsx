@@ -54,6 +54,7 @@ describe("useRewardedAction", () => {
     let resolveShow: (() => void) | undefined;
     const service: AdService = {
       preloadRewarded: async () => {},
+      showPrivacyOptions: async () => "not-required",
       showRewarded: () =>
         new Promise((resolve) => {
           resolveShow = () => resolve("earned");
@@ -89,6 +90,7 @@ describe("useRewardedAction", () => {
     const order: string[] = [];
     const service: AdService = {
       preloadRewarded: async () => {},
+      showPrivacyOptions: async () => "not-required",
       showRewarded: async () => {
         order.push("show");
         return "earned";
@@ -126,6 +128,7 @@ describe("useRewardedAction", () => {
   it("restores lifecycle resources when rewarded native UI throws", async () => {
     const service: AdService = {
       preloadRewarded: async () => {},
+      showPrivacyOptions: async () => "not-required",
       showRewarded: async () => {
         throw new Error("native overlay failed");
       },

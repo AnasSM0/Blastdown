@@ -94,6 +94,14 @@ describe("Home route wiring", () => {
     expect(mockPush).not.toHaveBeenCalledWith("/game");
   });
 
+  it("opens the in-app privacy surface from the Home policy link", async () => {
+    const result = await renderHome();
+
+    await fireEvent.press(result.getByTestId("privacy-link"));
+
+    expect(mockPush).toHaveBeenCalledWith("/privacy");
+  });
+
   it("makes Continue primary and keeps the exact saved session when it is used", async () => {
     const { storage, saved } = await storageWithSavedRun();
     const result = await renderHome(storage);

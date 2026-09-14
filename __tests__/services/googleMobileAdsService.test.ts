@@ -3,6 +3,12 @@ jest.mock("react-native-google-mobile-ads", () => ({
   __esModule: true,
   default: () => ({ initialize: () => Promise.resolve() }),
   AdEventType: { CLOSED: "closed", ERROR: "error" },
+  AdsConsent: {
+    gatherConsent: jest.fn(async () => ({ canRequestAds: true })),
+    requestInfoUpdate: jest.fn(async () => ({ privacyOptionsRequirementStatus: "required" })),
+    showPrivacyOptionsForm: jest.fn(async () => ({})),
+  },
+  AdsConsentPrivacyOptionsRequirementStatus: { REQUIRED: "required" },
   RewardedAdEventType: { EARNED_REWARD: "earned_reward", LOADED: "rewarded_loaded" },
   RewardedAd: { createForAdRequest: jest.fn() },
 }));
@@ -37,12 +43,14 @@ function nativeAd() {
 function harness() {
   const ads: ReturnType<typeof nativeAd>[] = [];
   const sdk: GoogleMobileAdsSdk = {
+    gatherConsent: jest.fn(() => Promise.resolve(true)),
     initialize: jest.fn(() => Promise.resolve()),
     createRewarded: jest.fn(() => {
       const ad = nativeAd();
       ads.push(ad);
       return ad;
     }),
+    showPrivacyOptions: jest.fn(() => Promise.resolve("shown")),
   };
   const service = createGoogleMobileAdsService(
     {
@@ -55,8 +63,7 @@ function harness() {
 }
 
 async function emitLoaded(ads: ReturnType<typeof nativeAd>[]) {
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let index = 0; index < 20 && ads.length === 0; index += 1) await Promise.resolve();
   expect(ads).toHaveLength(1);
   ads[0].emit(RewardedAdEventType.LOADED);
   for (let index = 0; index < 10; index += 1) await Promise.resolve();
@@ -65,8 +72,10 @@ async function emitLoaded(ads: ReturnType<typeof nativeAd>[]) {
 describe("GoogleMobileAdsService", () => {
   it("returns unavailable without initializing when a unit ID is missing", async () => {
     const sdk: GoogleMobileAdsSdk = {
+      gatherConsent: jest.fn(() => Promise.resolve(true)),
       initialize: jest.fn(() => Promise.resolve()),
       createRewarded: jest.fn(),
+      showPrivacyOptions: jest.fn(() => Promise.resolve("not-required")),
     };
     const service = createGoogleMobileAdsService(
       { rewarded_freeze: null, rewarded_defuse: null },
@@ -75,6 +84,32 @@ describe("GoogleMobileAdsService", () => {
 
     await expect(service.showRewarded("rewarded_freeze")).resolves.toBe("unavailable");
     expect(sdk.initialize).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when UMP does not authorize ad requests", async () => {
+    const { sdk, service } = harness();
+    jest.mocked(sdk.gatherConsent).mockResolvedValue(false);
+
+    await expect(service.showRewarded("rewarded_freeze")).resolves.toBe("error");
+    expect(sdk.initialize).not.toHaveBeenCalled();
+    expect(sdk.createRewarded).not.toHaveBeenCalled();
+  });
+
+  it("delegates privacy choices to UMP and rechecks eligibility afterward", async () => {
+    const { ads, sdk, service } = harness();
+    const preload = service.preloadRewarded("rewarded_freeze");
+    await emitLoaded(ads);
+    await preload;
+
+    await expect(service.showPrivacyOptions()).resolves.toBe("shown");
+    expect(sdk.showPrivacyOptions).toHaveBeenCalledTimes(1);
+
+    const secondPreload = service.preloadRewarded("rewarded_defuse");
+    for (let index = 0; index < 20 && ads.length < 2; index += 1) await Promise.resolve();
+    expect(sdk.gatherConsent).toHaveBeenCalledTimes(2);
+    const secondAd = ads[1];
+    secondAd.emit(RewardedAdEventType.LOADED);
+    await secondPreload;
   });
 
   it("normalizes earned only after the native ad closes", async () => {
@@ -97,8 +132,9 @@ describe("GoogleMobileAdsService", () => {
 
     const errorHarness = harness();
     const failed = errorHarness.service.showRewarded("rewarded_defuse");
-    await Promise.resolve();
-    await Promise.resolve();
+    for (let index = 0; index < 20 && errorHarness.ads.length === 0; index += 1) {
+      await Promise.resolve();
+    }
     errorHarness.ads[0].emit(AdEventType.ERROR);
     await expect(failed).resolves.toBe("error");
   });

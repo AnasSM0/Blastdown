@@ -90,6 +90,14 @@ const config: ExpoConfig = {
   },
   android: {
     package: "com.blastdown.app",
+    // BlastDown only plays packaged audio. These permissions are contributed
+    // by broad Expo library manifests but are not used by the release app.
+    blockedPermissions: [
+      "android.permission.READ_EXTERNAL_STORAGE",
+      "android.permission.RECORD_AUDIO",
+      "android.permission.SYSTEM_ALERT_WINDOW",
+      "android.permission.WRITE_EXTERNAL_STORAGE",
+    ],
     adaptiveIcon: {
       backgroundColor: "#E6F4FE",
       foregroundImage: "./assets/android-icon-foreground.png",
@@ -104,7 +112,14 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
     "expo-asset",
-    "expo-audio",
+    [
+      "expo-audio",
+      {
+        recordAudioAndroid: false,
+        enableBackgroundRecording: false,
+        enableBackgroundPlayback: false,
+      },
+    ],
     "expo-font",
     "expo-status-bar",
     "expo-splash-screen",
