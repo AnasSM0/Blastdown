@@ -45,6 +45,7 @@ describe("Android qualification profile contract", () => {
     expect(production.env.BLASTDOWN_BUILD_PLATFORM).toBe("android");
     expect(production.env.EXPO_PUBLIC_APP_ENV).toBe("production");
     expect(production.env.EXPO_PUBLIC_CINEMATIC_BOARD).toBe("0");
+    expect(production.env.NPM_CONFIG_OMIT).toBe("optional");
 
     const productionIos = config.build["production-ios"];
     expect(productionIos.environment).toBe("production");
@@ -52,5 +53,6 @@ describe("Android qualification profile contract", () => {
     expect(productionIos.env.BLASTDOWN_BUILD_PLATFORM).toBe("ios");
     expect(productionIos.env.EXPO_PUBLIC_APP_ENV).toBe("production");
     expect(productionIos.env.EXPO_PUBLIC_CINEMATIC_BOARD).toBe("0");
+    expect(productionIos.env.NPM_CONFIG_OMIT).toBe("optional");
   });
 });

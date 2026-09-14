@@ -2212,6 +2212,12 @@ React Native's unused installed-bundle localhost fallback with a non-routable
 HTTPS fallback, preserving the server-loaded-bundle behavior while preventing a
 localhost URL from shipping.
 
+The installed `expo-dev-client` package was also still autolinked into the first
+two store AABs even with EAS `developmentClient` disabled. It is now an optional
+dependency, and only store profiles install with `NPM_CONFIG_OMIT=optional`.
+Development and Android qualification profiles continue to install the same
+dev client; production workers do not receive dev launcher/menu code at all.
+
 BlastDown plays packaged audio only while foregrounded and pauses on lifecycle
 backgrounding. Expo Audio's recording and background-playback options are
 therefore explicitly disabled. Android storage, microphone, and overlay

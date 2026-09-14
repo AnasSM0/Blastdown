@@ -61,7 +61,8 @@
       "env": {
         "EXPO_PUBLIC_APP_ENV": "production",
         "EXPO_PUBLIC_CINEMATIC_BOARD": "0",
-        "BLASTDOWN_BUILD_PLATFORM": "android"
+        "BLASTDOWN_BUILD_PLATFORM": "android",
+        "NPM_CONFIG_OMIT": "optional"
       }
     },
     "production-ios": {
@@ -70,7 +71,8 @@
       "env": {
         "EXPO_PUBLIC_APP_ENV": "production",
         "EXPO_PUBLIC_CINEMATIC_BOARD": "0",
-        "BLASTDOWN_BUILD_PLATFORM": "ios"
+        "BLASTDOWN_BUILD_PLATFORM": "ios",
+        "NPM_CONFIG_OMIT": "optional"
       }
     }
   },
