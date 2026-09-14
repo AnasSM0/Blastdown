@@ -2224,3 +2224,21 @@ therefore explicitly disabled. Android storage, microphone, and overlay
 permissions contributed by broad library manifests are blocked. This is
 release/compliance configuration only: gameplay, reward semantics, audio cues,
 mix, UI styling, and persistence behavior are unchanged.
+
+---
+
+## 2026-09-15 — R-01B treats third-party telemetry as post-launch
+
+BlastDown 1.0.0 is **READY WITH OWNER ACTIONS**. The existing analytics and
+crash-reporting abstractions may remain no-op for the initial MVP; absence of a
+third-party provider is not a Google Play production blocker. Android vitals
+and Play Console crash/ANR reporting are the approved initial monitoring path.
+Selection and integration of Firebase, Crashlytics, Sentry, or another
+production analytics/crash provider is deferred to **POST-LAUNCH** and still
+requires an explicit provider, dependency, privacy, and configuration decision.
+
+This decision corrects release status only. It does not change application
+code, dependencies, gameplay, UI, Android configuration, AdMob/UMP, privacy
+behavior, AAB configuration, package/version values, or the already-qualified
+AAB whose SHA-256 is
+`EF2A5706EE13E2AF926761DE3C8DBFF09A23635B3C09FF8C2F595944B17EF158`.

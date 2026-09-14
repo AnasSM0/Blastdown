@@ -1,22 +1,24 @@
 # BlastDown 1.0.0 Google Play Release Checklist
 
+**Overall release classification: READY WITH OWNER ACTIONS**
+
 Allowed states are **PASS**, **OWNER ACTION REQUIRED**, **BLOCKED**, and
 **POST-LAUNCH**. Update this file with Console links and test evidence as the
 owner completes the submission.
 
 ## Engineering qualification
 
-| Item                                                                                               | Status                    | Evidence / next action                                                                                                                                                 |
-| -------------------------------------------------------------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Production Android environment values exist and match AdMob formats                                | **PASS**                  | Validated without exposing complete identifiers                                                                                                                        |
-| Production uses real ad identifiers; development uses Google's official test configuration         | **PASS**                  | Dynamic config and service tests                                                                                                                                       |
-| Missing production rewarded units fail closed; reward is exactly once                              | **PASS**                  | Service and reward-flow tests                                                                                                                                          |
-| Version 1.0.0 signed AAB built by EAS production profile                                           | **PASS**                  | Record final build ID, version code, SHA-256, and URL in release report                                                                                                |
-| Package, SDK levels, portrait mode, ABIs, permissions, debug/dev absence inspected from actual AAB | **PASS**                  | Artifact qualification report; target SDK must be at least 36                                                                                                          |
-| Raw AAB and packaged contributors measured                                                         | **PASS**                  | Artifact size analysis; Play download/installed estimates require Play or bundletool                                                                                   |
-| Automated quality gate and clean production export                                                 | **PASS**                  | Typecheck, lint, formatting, two Jest runs, coverage, audit, diff check, Graphify                                                                                      |
-| Physical test of exact Play-delivered version                                                      | **OWNER ACTION REQUIRED** | Execute every manual row in `V1_RELEASE_SMOKE_TEST.md` from the internal track                                                                                         |
-| Production analytics and crash reporting                                                           | **BLOCKED**               | Approved V1 scope requires both, but current production providers are no-ops. An owner-approved provider/dependency/configuration decision is required before rollout. |
+| Item                                                                                               | Status                    | Evidence / next action                                                                                                                                                   |
+| -------------------------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Production Android environment values exist and match AdMob formats                                | **PASS**                  | Validated without exposing complete identifiers                                                                                                                          |
+| Production uses real ad identifiers; development uses Google's official test configuration         | **PASS**                  | Dynamic config and service tests                                                                                                                                         |
+| Missing production rewarded units fail closed; reward is exactly once                              | **PASS**                  | Service and reward-flow tests                                                                                                                                            |
+| Version 1.0.0 signed AAB built by EAS production profile                                           | **PASS**                  | Record final build ID, version code, SHA-256, and URL in release report                                                                                                  |
+| Package, SDK levels, portrait mode, ABIs, permissions, debug/dev absence inspected from actual AAB | **PASS**                  | Artifact qualification report; target SDK must be at least 36                                                                                                            |
+| Raw AAB and packaged contributors measured                                                         | **PASS**                  | Artifact size analysis; Play download/installed estimates require Play or bundletool                                                                                     |
+| Automated quality gate and clean production export                                                 | **PASS**                  | Typecheck, lint, formatting, two Jest runs, coverage, audit, diff check, Graphify                                                                                        |
+| Physical test of exact Play-delivered version                                                      | **OWNER ACTION REQUIRED** | Execute every manual row in `V1_RELEASE_SMOKE_TEST.md` from the internal track                                                                                           |
+| Production analytics and crash reporting                                                           | **POST-LAUNCH**           | Existing abstractions remain no-op for 1.0.0. Use Android vitals and Play Console crash/ANR reporting for the initial MVP; third-party provider integration is deferred. |
 
 ## Policy and Console readiness
 
@@ -44,18 +46,18 @@ owner completes the submission.
 
 ## Rollout
 
-| Item                                                 | Status                    | Evidence / next action                                                                           |
-| ---------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------ |
-| Internal-test upload and automated Play checks       | **OWNER ACTION REQUIRED** | Upload exact qualified AAB; resolve Console errors and review every warning                      |
-| Internal tester smoke sign-off                       | **OWNER ACTION REQUIRED** | Attach completed device matrix and rewarded-ad/consent evidence                                  |
-| Closed/production release submission                 | **OWNER ACTION REQUIRED** | Choose the path allowed by the account and submit only after preceding owner actions             |
-| Crash/ANR, ad-fill, consent, and review monitoring   | **POST-LAUNCH**           | Monitor Play vitals, the approved production telemetry providers, and AdMob after staged release |
-| Store-listing/asset experiments and low-value polish | **POST-LAUNCH**           | Must not delay a compliant, stable release                                                       |
+| Item                                                 | Status                    | Evidence / next action                                                                                                                         |
+| ---------------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Internal-test upload and automated Play checks       | **OWNER ACTION REQUIRED** | Upload exact qualified AAB; resolve Console errors and review every warning                                                                    |
+| Internal tester smoke sign-off                       | **OWNER ACTION REQUIRED** | Attach completed device matrix and rewarded-ad/consent evidence                                                                                |
+| Closed/production release submission                 | **OWNER ACTION REQUIRED** | Choose the path allowed by the account and submit only after preceding owner actions                                                           |
+| Crash/ANR, ad-fill, consent, and review monitoring   | **POST-LAUNCH**           | Use Android vitals and Play Console crash/ANR reporting initially; monitor AdMob after staged release and evaluate third-party telemetry later |
+| Store-listing/asset experiments and low-value polish | **POST-LAUNCH**           | Must not delay a compliant, stable release                                                                                                     |
 
-The exact AAB can be uploaded to an internal track for Console validation and
-device smoke testing, but production rollout is **BLOCKED** until the approved
-V1 analytics/crash-reporting requirement has a product-approved provider and a
-verified implementation. All owner actions are also submission gates.
+The exact qualified AAB is **READY WITH OWNER ACTIONS** for Console validation,
+Internal testing, physical smoke testing, and the account-appropriate release
+path. No third-party analytics/crash provider is required for 1.0.0; the
+remaining owner-controlled items are submission or rollout gates.
 
 ## Exact Play Console order
 

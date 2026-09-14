@@ -2,6 +2,14 @@
 
 ## P-01 — 2026-09-11 (Asia/Karachi)
 
+**Current supersession — R-01B, 2026-09-15:** BlastDown 1.0.0 is **READY WITH
+OWNER ACTIONS**. The P-01 blocked decision below records the evidence available
+on September 11 and is not the current release classification. R-01 later
+qualified version `1.0.0` (`versionCode` 5), and R-01B approved Android vitals
+and Play Console crash/ANR reporting as the initial MVP monitoring path.
+Third-party analytics/crash-provider integration is **POST-LAUNCH**, not a
+1.0.0 production blocker. See `docs/PLAYSTORE_RELEASE_AUDIT.md`.
+
 **Release decision: BLOCKED.** The audited source is smaller and the static
 runtime review found no unbounded gameplay work, but a real production AAB and
 physical low-end Android evidence are unavailable. EAS rejects the production
@@ -189,18 +197,18 @@ does not prove native AAB contents or device performance.
 
 ## Dependency audit
 
-| Dependency area                                    | Production need                          | Finding / action                                                            |
-| -------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------- |
-| Expo / React Native / Router / Screens / Safe Area | Required                                 | Retained                                                                    |
-| Gesture Handler                                    | Required for tray drag                   | Retained; one gesture stream per active drag                                |
-| AsyncStorage                                       | Required for settings/profile/active run | Retained; writes are serialized/coalesced                                   |
-| Expo Audio / Haptics                               | Required V1 feedback                     | Retained; audio native setup/preload deferred until settings hydrate        |
-| Google Mobile Ads                                  | Required V1 rewarded ads                 | Retained; real adapter added by P-01B, release IDs still missing            |
-| Skia                                               | Optional cinematic renderer              | Excluded from production Android autolinking when cinematic OFF             |
-| Reanimated / Worklets                              | Used only by cinematic renderer          | Excluded with Skia in production OFF; retained in development and ON builds |
-| Expo Dev Client                                    | Development tooling                      | Retained for qualification profiles; production AAB contribution unverified |
-| Font packages                                      | Required typography                      | Retained; barrel imports eliminated                                         |
-| Analytics / crash SDK                              | Required V1 capability                   | No vendor SDK exists; current adapters are no-op, a release blocker         |
+| Dependency area                                    | Production need                          | Finding / action                                                                                              |
+| -------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Expo / React Native / Router / Screens / Safe Area | Required                                 | Retained                                                                                                      |
+| Gesture Handler                                    | Required for tray drag                   | Retained; one gesture stream per active drag                                                                  |
+| AsyncStorage                                       | Required for settings/profile/active run | Retained; writes are serialized/coalesced                                                                     |
+| Expo Audio / Haptics                               | Required V1 feedback                     | Retained; audio native setup/preload deferred until settings hydrate                                          |
+| Google Mobile Ads                                  | Required V1 rewarded ads                 | Retained; real adapter added by P-01B, release IDs still missing                                              |
+| Skia                                               | Optional cinematic renderer              | Excluded from production Android autolinking when cinematic OFF                                               |
+| Reanimated / Worklets                              | Used only by cinematic renderer          | Excluded with Skia in production OFF; retained in development and ON builds                                   |
+| Expo Dev Client                                    | Development tooling                      | Retained for qualification profiles; production AAB contribution unverified                                   |
+| Font packages                                      | Required typography                      | Retained; barrel imports eliminated                                                                           |
+| Analytics / crash SDK                              | Post-launch provider integration         | Current adapters remain no-op for 1.0.0; Android vitals and Play Console provide initial crash/ANR monitoring |
 
 `react-native.config.js` uses Expo's supported React Native autolinking opt-out
 (`platforms.android = null`) only for production cinematic-OFF builds. Static
@@ -314,14 +322,16 @@ paths include incompatible Expo/Router downgrades and transitive build-tool
 changes, so no `audit fix` or lockfile mutation was accepted in this footprint
 task. This is not a security-clean declaration and requires separate triage.
 
-Remaining release gates are:
+P-01 follow-up status, superseded by R-01/R-01B, is:
 
-1. Owner supplies the Android AdMob App ID plus Freeze/Defuse rewarded unit IDs
-   in the EAS production environment.
-2. Replace the no-op analytics/crash adapters with approved production
-   providers without changing service boundaries.
-3. Build the real cinematic-OFF production AAB from a clean committed source
-   revision, inspect it with this repository's analyzer and Android tools, and
-   record Play/device-specific size.
-4. Run the low-end physical Android matrix above and retain raw traces/logs.
-5. Reassess R8/resource shrinking only with that artifact and regression suite.
+1. **COMPLETE:** production Android AdMob configuration was supplied and
+   qualified without publishing full identifiers.
+2. **POST-LAUNCH:** evaluate a third-party analytics/crash provider while the
+   initial MVP uses Android vitals and Play Console crash/ANR reporting.
+3. **COMPLETE:** the qualified cinematic-OFF production AAB is version `1.0.0`
+   (`versionCode` 5), SHA-256
+   `EF2A5706EE13E2AF926761DE3C8DBFF09A23635B3C09FF8C2F595944B17EF158`.
+4. **OWNER ACTION REQUIRED:** run the low-end physical Android matrix and
+   retain raw traces/logs through Internal testing.
+5. **POST-LAUNCH:** reassess R8/resource shrinking only with regression and
+   device evidence; it does not block 1.0.0.
