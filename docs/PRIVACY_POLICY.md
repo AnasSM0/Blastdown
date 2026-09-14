@@ -1,6 +1,6 @@
 # BlastDown Privacy Policy
 
-**Effective date:** September 15, 2026  
+**Effective date:** September 15, 2026
 **App:** BlastDown (`com.blastdown.app`)
 
 This policy describes the production Android version of BlastDown. Replace the
