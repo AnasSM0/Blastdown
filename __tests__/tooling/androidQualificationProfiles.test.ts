@@ -7,8 +7,7 @@ type QualificationProfile = {
   developmentClient?: boolean;
   distribution: string;
   environment: string;
-  android: { buildType: string; env?: Record<string, string> };
-  ios?: { env: Record<string, string> };
+  android?: { buildType: string };
   env: Record<string, string>;
 };
 
@@ -27,7 +26,7 @@ describe("Android qualification profile contract", () => {
       expect(profile.developmentClient).toBe(true);
       expect(profile.distribution).toBe("internal");
       expect(profile.environment).toBe("development");
-      expect(profile.android.buildType).toBe("apk");
+      expect(profile.android?.buildType).toBe("apk");
       expect(profile.env.EXPO_PUBLIC_APP_ENV).toBe("development");
     }
     expect(fallback.env.EXPO_PUBLIC_CINEMATIC_BOARD).toBe("0");
@@ -42,10 +41,16 @@ describe("Android qualification profile contract", () => {
     const production = config.build.production;
     expect(production.environment).toBe("production");
     expect(production.developmentClient).not.toBe(true);
-    expect(production.android.buildType).toBe("app-bundle");
-    expect(production.android.env).toEqual({ BLASTDOWN_BUILD_PLATFORM: "android" });
-    expect(production.ios?.env).toEqual({ BLASTDOWN_BUILD_PLATFORM: "ios" });
+    expect(production.android?.buildType).toBe("app-bundle");
+    expect(production.env.BLASTDOWN_BUILD_PLATFORM).toBe("android");
     expect(production.env.EXPO_PUBLIC_APP_ENV).toBe("production");
     expect(production.env.EXPO_PUBLIC_CINEMATIC_BOARD).toBe("0");
+
+    const productionIos = config.build["production-ios"];
+    expect(productionIos.environment).toBe("production");
+    expect(productionIos.developmentClient).not.toBe(true);
+    expect(productionIos.env.BLASTDOWN_BUILD_PLATFORM).toBe("ios");
+    expect(productionIos.env.EXPO_PUBLIC_APP_ENV).toBe("production");
+    expect(productionIos.env.EXPO_PUBLIC_CINEMATIC_BOARD).toBe("0");
   });
 });

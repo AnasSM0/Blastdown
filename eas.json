@@ -56,19 +56,21 @@
       "autoIncrement": true,
       "environment": "production",
       "android": {
-        "buildType": "app-bundle",
-        "env": {
-          "BLASTDOWN_BUILD_PLATFORM": "android"
-        }
-      },
-      "ios": {
-        "env": {
-          "BLASTDOWN_BUILD_PLATFORM": "ios"
-        }
+        "buildType": "app-bundle"
       },
       "env": {
         "EXPO_PUBLIC_APP_ENV": "production",
-        "EXPO_PUBLIC_CINEMATIC_BOARD": "0"
+        "EXPO_PUBLIC_CINEMATIC_BOARD": "0",
+        "BLASTDOWN_BUILD_PLATFORM": "android"
+      }
+    },
+    "production-ios": {
+      "autoIncrement": true,
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "production",
+        "EXPO_PUBLIC_CINEMATIC_BOARD": "0",
+        "BLASTDOWN_BUILD_PLATFORM": "ios"
       }
     }
   },

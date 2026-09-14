@@ -2168,6 +2168,14 @@ dynamic config evaluation locally and on the worker validates only the selected
 platform. Unknown/multi-platform production config remains fail-closed and
 requires both.
 
+R-01 qualification on 2026-09-14 found that EAS CLI 23.2.0 evaluates dynamic
+app config before applying an `android.env` platform marker. The Android
+`production` profile therefore now places `BLASTDOWN_BUILD_PLATFORM=android`
+in its root `env`, which EAS applies during local config evaluation, and future
+iOS release work uses the separate `production-ios` profile with an `ios`
+marker. This corrects the execution detail without weakening either platform's
+credential guard.
+
 Android production requires `ADMOB_ANDROID_APP_ID` and rejects absent,
 malformed, or Google-sample values. Freeze and Defuse unit IDs are read from
 `ADMOB_ANDROID_REWARDED_FREEZE_UNIT_ID` and
