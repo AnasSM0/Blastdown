@@ -19,6 +19,7 @@ describe("GameBoard preview and press", () => {
         { row: 2, column: 2 },
       ],
       conflictCells: [],
+      clear: { rows: [], columns: [], cells: [], intersections: [] },
     };
     const result = await render(
       <GameBoard grid={makeEmptyGrid(8)} badges={[]} boardSize={328} preview={preview} />,
@@ -37,6 +38,7 @@ describe("GameBoard preview and press", () => {
         { row: 2, column: 2 },
       ],
       conflictCells: [{ row: 2, column: 2 }],
+      clear: { rows: [], columns: [], cells: [], intersections: [] },
     };
     const result = await render(
       <GameBoard grid={grid} badges={[]} boardSize={328} preview={preview} />,

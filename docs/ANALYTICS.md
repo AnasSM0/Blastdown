@@ -30,36 +30,31 @@ state — the type system is the first line of the privacy contract.
 
 ## Event taxonomy
 
-Properties are numbers, booleans, or **enumerated ids** only (`themeId` from the
-theme catalog, `setting` from the settings keys). No free text.
+Properties are numbers, booleans, or **enumerated ids** only (`setting` from
+the settings keys). No free text.
 
-| Event                                        | Properties                                                                                                                                           | When                                                                |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `app_open`                                   | —                                                                                                                                                    | App tree mounts                                                     |
-| `session_start`                              | —                                                                                                                                                    | Foreground session begins                                           |
-| `session_end`                                | `durationMs`                                                                                                                                         | App backgrounded / tree unmounts                                    |
-| `tutorial_start`                             | —                                                                                                                                                    | Tutorial route entered                                              |
-| `tutorial_step`                              | `step`                                                                                                                                               | Advancing to a new step (not the first)                             |
-| `tutorial_complete`                          | —                                                                                                                                                    | Tutorial finished                                                   |
-| `tutorial_skip`                              | `step`                                                                                                                                               | Skipped, at which step                                              |
-| `run_start`                                  | —                                                                                                                                                    | Play / Play Again                                                   |
-| `piece_selected`                             | —                                                                                                                                                    | A tray piece is selected                                            |
-| `piece_placed`                               | `turn`, `combo`                                                                                                                                      | A placement resolves (per turn)                                     |
-| `piece_rejected`                             | —                                                                                                                                                    | An invalid placement attempt                                        |
-| `line_clear`                                 | `lineCount`, `combo`                                                                                                                                 | Lines cleared this turn                                             |
-| `piece_defused`                              | `bonus`                                                                                                                                              | A timed piece defused by a clear                                    |
-| `explosion`                                  | —                                                                                                                                                    | A timed piece exploded                                              |
-| `rubble_cleared`                             | `cellCount`                                                                                                                                          | Rubble removed                                                      |
-| `freeze_offer` / `freeze_result`             | `result` on result                                                                                                                                   | Freeze ad requested / resolved                                      |
-| `defuse_offer` / `defuse_result`             | `result` on result                                                                                                                                   | Defuse ad requested / resolved                                      |
-| `revive_offer` / `revive_result`             | `result` on result                                                                                                                                   | Revive ad requested / resolved                                      |
-| `double_bolts_offer` / `double_bolts_result` | `result` on result                                                                                                                                   | Double-Bolts ad requested / resolved                                |
-| `run_end`                                    | `score`, `turn`, `bestCombo`, `linesCleared`, `piecesPlaced`, `piecesDefused`, `explosions`, `rubbleCleared`, `revived`, `durationMs`, `boltsEarned` | Run settled (once)                                                  |
-| `results_view`                               | —                                                                                                                                                    | Results screen shown (once)                                         |
-| `theme_view`                                 | —                                                                                                                                                    | Themes screen shown                                                 |
-| `theme_select`                               | `themeId`                                                                                                                                            | A theme is selected                                                 |
-| `theme_purchase`                             | `themeId`, `price`, `result`                                                                                                                         | A purchase attempt (`purchased` / `insufficient` / `already_owned`) |
-| `settings_changed`                           | `setting`, `value` (0/1)                                                                                                                             | A settings toggle changes                                           |
+| Event                            | Properties                                                                                                                 | When                                    |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| `app_open`                       | —                                                                                                                          | App tree mounts                         |
+| `session_start`                  | —                                                                                                                          | Foreground session begins               |
+| `session_end`                    | `durationMs`                                                                                                               | App backgrounded / tree unmounts        |
+| `tutorial_start`                 | —                                                                                                                          | Tutorial route entered                  |
+| `tutorial_step`                  | `step`                                                                                                                     | Advancing to a new step (not the first) |
+| `tutorial_complete`              | —                                                                                                                          | Tutorial finished                       |
+| `tutorial_skip`                  | `step`                                                                                                                     | Skipped, at which step                  |
+| `run_start`                      | —                                                                                                                          | Play / Play Again                       |
+| `piece_selected`                 | —                                                                                                                          | A tray piece is selected                |
+| `piece_placed`                   | `turn`, `combo`                                                                                                            | A placement resolves (per turn)         |
+| `piece_rejected`                 | —                                                                                                                          | An invalid placement attempt            |
+| `line_clear`                     | `lineCount`, `combo`                                                                                                       | Lines cleared this turn                 |
+| `piece_defused`                  | `bonus`                                                                                                                    | A timed piece defused by a clear        |
+| `explosion`                      | —                                                                                                                          | A timed piece exploded                  |
+| `rubble_cleared`                 | `cellCount`                                                                                                                | Rubble removed                          |
+| `freeze_offer` / `freeze_result` | `result` on result                                                                                                         | Freeze ad requested / resolved          |
+| `defuse_offer` / `defuse_result` | `result` on result                                                                                                         | Defuse ad requested / resolved          |
+| `run_end`                        | `score`, `turn`, `bestCombo`, `linesCleared`, `piecesPlaced`, `piecesDefused`, `explosions`, `rubbleCleared`, `durationMs` | Run settled (once)                      |
+| `results_view`                   | —                                                                                                                          | Results screen shown (once)             |
+| `settings_changed`               | `setting`, `value` (0/1)                                                                                                   | A settings toggle changes               |
 
 Reward `result` ∈ `earned` / `closed` / `unavailable` / `failed`
 (`rewardOutcome` maps the ad service's `error` → `failed`).
@@ -82,3 +77,7 @@ Reward `result` ∈ `earned` / `closed` / `unavailable` / `failed`
 Production analytics/crash SDK wiring, ad-unit ids, and consent UI are the
 next phase (6B / production ads). The seam and taxonomy are ready for that
 adapter to drop in behind `AnalyticsService`.
+
+Bolts, Themes/economy, Double Bolts, rewarded Revive, and interstitials are
+excluded from V1 and therefore have no current analytics events or required
+properties.

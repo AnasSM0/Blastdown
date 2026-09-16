@@ -2,16 +2,18 @@ import { act, renderHook, waitFor } from "@testing-library/react-native";
 import type { ReactNode } from "react";
 
 import { captureAppStateHandlers } from "../../test-utils/appState";
-
 import type { GameEvent } from "../../src/domain/events";
-import { useGameAudio } from "../../src/hooks/useGameAudio";
-import { createNoOpAudioService } from "../../src/services/audio/NoOpAudioService";
-import type { RecordingAudioService } from "../../src/services/audio/NoOpAudioService";
+import type { GameState } from "../../src/domain/gameTypes";
+import { useGameFeedback } from "../../src/hooks/useGameFeedback";
 import { AudioServiceProvider } from "../../src/services/audio/AudioServiceProvider";
-import { StorageServiceProvider, createMemoryStorageService } from "../../src/services/storage";
+import {
+  createNoOpAudioService,
+  type RecordingAudioService,
+} from "../../src/services/audio/NoOpAudioService";
+import { createMemoryStorageService, StorageServiceProvider } from "../../src/services/storage";
 import type { MemoryStorageService } from "../../src/services/storage";
-import { SettingsProvider, useSettings } from "../../src/state/SettingsProvider";
 import { defaultSettings } from "../../src/services/storage/schemas";
+import { SettingsProvider, useSettings } from "../../src/state/SettingsProvider";
 
 function wrapper(audio: RecordingAudioService, storage: MemoryStorageService) {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -25,18 +27,36 @@ function wrapper(audio: RecordingAudioService, storage: MemoryStorageService) {
   };
 }
 
-type Props = { turn: number; events: GameEvent[]; status: string };
+type Props = {
+  sessionGeneration: number;
+  turn: number;
+  events: GameEvent[];
+  status: GameState["status"];
+  paused: boolean;
+  combo: number;
+  score: number;
+  previousBest: number;
+};
+
+const BASE: Props = {
+  sessionGeneration: 0,
+  turn: 0,
+  events: [],
+  status: "playing",
+  paused: false,
+  combo: 0,
+  score: 0,
+  previousBest: 0,
+};
+
+const PLACEMENT: GameEvent[] = [
+  { type: "piecePlaced", handId: "h", pieceId: "p1", cells: [{ row: 0, column: 0 }] },
+];
 
 function useHarness(props: Props) {
-  useGameAudio(props);
-  return useSettings();
+  const feedback = useGameFeedback(props);
+  return { feedback, settings: useSettings() };
 }
-
-const CLEAR_TURN: GameEvent[] = [
-  { type: "piecePlaced", handId: "h", pieceId: "p1", cells: [{ row: 0, column: 0 }] },
-  { type: "linesCleared", rows: [0], columns: [] },
-  { type: "scoreChanged", delta: 100, score: 100 },
-];
 
 function seedSettings(
   storage: MemoryStorageService,
@@ -45,95 +65,134 @@ function seedSettings(
   storage.seed("blastdown/settings/v1", JSON.stringify({ ...defaultSettings(), ...patch }));
 }
 
-describe("useGameAudio sound effects", () => {
-  it("plays a turn's event sounds once, and never on a re-render with no new turn", async () => {
+describe("committed game feedback", () => {
+  it("plays an ordinary placement once and ignores a same-turn rerender", async () => {
     const audio = createNoOpAudioService();
     const storage = createMemoryStorageService();
-    const { result, rerender } = await renderHook((p: Props) => useHarness(p), {
+    const { result, rerender } = await renderHook((props: Props) => useHarness(props), {
       wrapper: wrapper(audio, storage),
-      initialProps: { turn: 0, events: [] as GameEvent[], status: "playing" },
+      initialProps: BASE,
     });
-    await waitFor(() => expect(result.current.loaded).toBe(true));
+    await waitFor(() => expect(result.current.settings.loaded).toBe(true));
 
-    await act(async () => {
-      rerender({ turn: 1, events: CLEAR_TURN, status: "playing" });
-    });
-    expect(audio.sfx).toEqual(["placement", "lineClear"]);
+    await act(async () => rerender({ ...BASE, turn: 1, events: PLACEMENT }));
+    await act(async () => rerender({ ...BASE, turn: 1, events: PLACEMENT }));
 
-    // Same turn, re-render: no additional sounds (no spam).
-    await act(async () => {
-      rerender({ turn: 1, events: CLEAR_TURN, status: "playing" });
-    });
-    expect(audio.sfx).toEqual(["placement", "lineClear"]);
+    expect(audio.cues).toEqual([
+      { identity: "s0:t1", cue: "validPlacement", semitones: undefined },
+    ]);
   });
 
-  it("produces no sound effects when sound is disabled", async () => {
+  it("resolves placement plus clear to one magnitude cue with combo pitch", async () => {
+    const audio = createNoOpAudioService();
+    const storage = createMemoryStorageService();
+    const { result, rerender } = await renderHook((props: Props) => useHarness(props), {
+      wrapper: wrapper(audio, storage),
+      initialProps: BASE,
+    });
+    await waitFor(() => expect(result.current.settings.loaded).toBe(true));
+
+    await act(async () =>
+      rerender({
+        ...BASE,
+        turn: 1,
+        combo: 4,
+        events: [...PLACEMENT, { type: "linesCleared", rows: [0, 1], columns: [] }],
+      }),
+    );
+
+    expect(audio.cues).toEqual([{ identity: "s0:t1", cue: "clearDouble", semitones: 3 }]);
+  });
+
+  it("does not replay restored events on mount or after a fresh generation", async () => {
+    const audio = createNoOpAudioService();
+    const storage = createMemoryStorageService();
+    const restored = { ...BASE, turn: 12, events: PLACEMENT };
+    const { result, rerender } = await renderHook((props: Props) => useHarness(props), {
+      wrapper: wrapper(audio, storage),
+      initialProps: restored,
+    });
+    await waitFor(() => expect(result.current.settings.loaded).toBe(true));
+    expect(audio.cues).toEqual([]);
+
+    await act(async () => rerender({ ...restored, sessionGeneration: 1 }));
+    expect(audio.cues).toEqual([]);
+  });
+
+  it("suppresses committed audio when sound is disabled", async () => {
     const audio = createNoOpAudioService();
     const storage = createMemoryStorageService();
     seedSettings(storage, { soundEnabled: false });
-    const { result, rerender } = await renderHook((p: Props) => useHarness(p), {
+    const { result, rerender } = await renderHook((props: Props) => useHarness(props), {
       wrapper: wrapper(audio, storage),
-      initialProps: { turn: 0, events: [] as GameEvent[], status: "playing" },
+      initialProps: BASE,
     });
-    await waitFor(() => expect(result.current.settings.soundEnabled).toBe(false));
+    await waitFor(() => expect(result.current.settings.settings.soundEnabled).toBe(false));
 
-    await act(async () => {
-      rerender({ turn: 1, events: CLEAR_TURN, status: "playing" });
+    await act(async () => rerender({ ...BASE, turn: 1, events: PLACEMENT }));
+    expect(audio.cues).toEqual([]);
+  });
+
+  it("emits new-best feedback from the committed game-over event and prior profile best", async () => {
+    const audio = createNoOpAudioService();
+    const storage = createMemoryStorageService();
+    const { result, rerender } = await renderHook((props: Props) => useHarness(props), {
+      wrapper: wrapper(audio, storage),
+      initialProps: BASE,
     });
-    expect(audio.sfx).toEqual([]);
+    await waitFor(() => expect(result.current.settings.loaded).toBe(true));
+
+    await act(async () =>
+      rerender({
+        ...BASE,
+        turn: 1,
+        events: [{ type: "gameOver" }],
+        status: "gameOver",
+        score: 100,
+        previousBest: 50,
+      }),
+    );
+
+    expect(audio.cues).toEqual([{ identity: "s0:t1", cue: "newBest", semitones: undefined }]);
   });
 });
 
-describe("useGameAudio music lifecycle", () => {
-  it("starts music on mount, pauses on game over, and stops on unmount", async () => {
+describe("game feedback lifecycle", () => {
+  it("starts music, pauses for Pause/Game Over, and stops all on unmount", async () => {
     const audio = createNoOpAudioService();
     const storage = createMemoryStorageService();
-    const { result, rerender, unmount } = await renderHook((p: Props) => useHarness(p), {
+    const { result, rerender, unmount } = await renderHook((props: Props) => useHarness(props), {
       wrapper: wrapper(audio, storage),
-      initialProps: { turn: 0, events: [] as GameEvent[], status: "playing" },
+      initialProps: BASE,
     });
-    await waitFor(() => expect(result.current.loaded).toBe(true));
+    await waitFor(() => expect(result.current.settings.loaded).toBe(true));
     expect(audio.musicCalls).toContain("start");
 
-    await act(async () => {
-      rerender({ turn: 0, events: [], status: "gameOver" });
-    });
-    expect(audio.musicCalls).toContain("pause");
+    await act(async () => rerender({ ...BASE, paused: true }));
+    await act(async () => rerender({ ...BASE, status: "gameOver" }));
+    expect(audio.musicCalls.filter((call) => call === "pause").length).toBeGreaterThanOrEqual(1);
 
-    await act(async () => {
-      unmount();
-    });
-    expect(audio.musicCalls).toContain("stop");
+    await act(async () => unmount());
+    expect(audio.lifecycleCalls).toContain("stopAll");
+    expect(audio.lifecycleCalls).toContain("release");
   });
 
-  it("does not start music when music is disabled", async () => {
-    const audio = createNoOpAudioService();
-    const storage = createMemoryStorageService();
-    seedSettings(storage, { musicEnabled: false });
-    const { result } = await renderHook((p: Props) => useHarness(p), {
-      wrapper: wrapper(audio, storage),
-      initialProps: { turn: 0, events: [] as GameEvent[], status: "playing" },
-    });
-    await waitFor(() => expect(result.current.settings.musicEnabled).toBe(false));
-    expect(audio.musicCalls).not.toContain("start");
-  });
-
-  it("pauses music when the app backgrounds", async () => {
+  it("suspends on background and restores without allocating a new service", async () => {
     const { handlers, restore } = captureAppStateHandlers();
     try {
       const audio = createNoOpAudioService();
       const storage = createMemoryStorageService();
-      const { result } = await renderHook((p: Props) => useHarness(p), {
+      const { result } = await renderHook((props: Props) => useHarness(props), {
         wrapper: wrapper(audio, storage),
-        initialProps: { turn: 0, events: [] as GameEvent[], status: "playing" },
+        initialProps: BASE,
       });
-      await waitFor(() => expect(result.current.loaded).toBe(true));
+      await waitFor(() => expect(result.current.settings.loaded).toBe(true));
       audio.reset();
 
-      await act(async () => {
-        handlers.forEach((h) => h("background"));
-      });
-      expect(audio.musicCalls).toContain("pause");
+      await act(async () => handlers.forEach((handler) => handler("background")));
+      await act(async () => handlers.forEach((handler) => handler("active")));
+
+      expect(audio.lifecycleCalls).toEqual(["suspend", "resume"]);
     } finally {
       restore();
     }

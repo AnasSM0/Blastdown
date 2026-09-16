@@ -1,45 +1,53 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import { BackHandler, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
-import { GameBoard, BOARD_CONTENT_INSET } from "../src/components/GameBoard";
-import { EffectsLayer } from "../src/components/effects/EffectsLayer";
+import { BOARD_CONTENT_INSET } from "../src/components/GameBoard";
+import { BoardImpulseFrame } from "../src/components/BoardImpulseFrame";
+import { EffectStack } from "../src/components/effects/EffectStack";
+import { PraiseOverlay } from "../src/components/PraiseOverlay";
 import { PieceTray } from "../src/components/PieceTray";
 import { ReactorBackground } from "../src/components/ReactorBackground";
 import { ScoreHeader } from "../src/components/ScoreHeader";
 import { GameOverOverlay } from "../src/components/modals/GameOverOverlay";
 import { DefuseConfirmCard } from "../src/components/modals/DefuseConfirmCard";
-import { SecondChanceBanner } from "../src/components/modals/SecondChanceBanner";
 import { PauseOverlay } from "../src/components/modals/PauseOverlay";
+import { RunConfirmationCard } from "../src/components/modals/RunConfirmationCard";
 import { RewardedActionBar } from "../src/components/RewardedActionButton";
-import { DragGhost, DRAG_LIFT, type DragGhostHandle } from "../src/components/DragGhost";
+import { DragGhost, type DragGhostHandle } from "../src/components/DragGhost";
 import { BOARD_SIZE } from "../src/domain/board";
 import type { CellPosition } from "../src/domain/placement";
 import { getShapeById } from "../src/domain/shapes";
 import {
   canActivateFreeze,
   canApplyRewardedDefuse,
-  canRevive,
   getRewardedDefuseTarget,
   getTimerBadgePlacements,
 } from "../src/domain/selectors";
-import { dragOriginFromFinger, type BoardLayout, type Point } from "../src/ui/boardGeometry";
-import { cellsOfPiece, rubbleCellsOf } from "../src/ui/effects/eventEffects";
+// Resolved behind the build-time flag, so a build with the cinematic renderer
+// off never evaluates Skia at all. See the module's own comment.
+import { BoardRenderer, CINEMATIC_RENDERER } from "../src/rendering/boardRenderer";
+import {
+  fingerPointForDragOrigin,
+  stableDragOriginFromFinger,
+  type BoardLayout,
+  type Point,
+} from "../src/ui/boardGeometry";
+import { cellsOfPiece } from "../src/ui/effects/eventEffects";
 import {
   useGameController,
   type GameController,
   type GameControllerOptions,
+  type PlacementIntent,
 } from "../src/hooks/useGameController";
-import { useHaptics } from "../src/hooks/useHaptics";
 import { useEffectiveReducedMotion } from "../src/hooks/useEffectiveReducedMotion";
 import { useEventAnimator } from "../src/hooks/useEventAnimator";
+import { usePraiseCelebration } from "../src/hooks/usePraiseCelebration";
 import { useGameAnalytics } from "../src/hooks/useGameAnalytics";
+import { useGameFeedback } from "../src/hooks/useGameFeedback";
 import { useRewardedAction } from "../src/hooks/useRewardedAction";
 import { useRewardOutcome } from "../src/hooks/useRewardOutcome";
-import { useAudio } from "../src/hooks/useAudio";
-import { useGameAudio } from "../src/hooks/useGameAudio";
-import { useTimerHaptics } from "../src/hooks/useTimerHaptics";
 import { AudioServiceProvider } from "../src/services/audio";
 import type { AudioService } from "../src/services/audio";
 import { StorageServiceProvider, createMemoryStorageService } from "../src/services/storage";
@@ -52,24 +60,59 @@ import { useGameSession } from "../src/state/GameSessionProvider";
 import { useProfile } from "../src/state/ProfileProvider";
 import { spacing } from "../src/ui/theme";
 import { useTheme } from "../src/ui/ThemeProvider";
+import { resolveDangerState } from "../src/ui/dangerState";
+import { resolveScoreImpactForTurn } from "../src/ui/scoreImpact";
+import { INVALID_RETURN_MS, dragLiftForCell } from "../src/ui/pieceInteraction";
 
 type DragState = {
+  id: number;
   handId: string;
+  intent: PlacementIntent;
   shapeId: string;
   colorId: string;
   startX: number;
   startY: number;
+  visualLift: number;
 };
 
-function shapeBoundsFor(shapeId: string): { maxRow: number; maxColumn: number } | null {
-  const shape = getShapeById(shapeId);
-  if (!shape) {
-    return null;
+type ShapeBounds = { maxRow: number; maxColumn: number };
+
+/** Cached shape bounds.
+ *
+ *  A shape's bounds never change — the catalogue is static — but this ran on
+ *  every pointer move of every drag, allocating two intermediate arrays (from
+ *  the two `map`s) plus the bounds object each time, and spreading them into
+ *  `Math.max`. That is roughly sixty allocations a second of values that were
+ *  identical every time, on the one code path that has to stay ahead of a
+ *  finger. There are about twelve shapes, so the cache is bounded by the
+ *  catalogue and never needs clearing.
+ *
+ *  A plain loop rather than `map` + spread: no intermediate arrays, and no
+ *  argument-count limit if a larger shape is ever added. */
+const shapeBoundsCache = new Map<string, ShapeBounds | null>();
+
+function shapeBoundsFor(shapeId: string): ShapeBounds | null {
+  const cached = shapeBoundsCache.get(shapeId);
+  if (cached !== undefined) {
+    return cached;
   }
-  return {
-    maxRow: Math.max(...shape.cells.map((cell) => cell.row)),
-    maxColumn: Math.max(...shape.cells.map((cell) => cell.column)),
-  };
+  const shape = getShapeById(shapeId);
+  let bounds: ShapeBounds | null = null;
+  if (shape) {
+    let maxRow = 0;
+    let maxColumn = 0;
+    for (const cell of shape.cells) {
+      if (cell.row > maxRow) {
+        maxRow = cell.row;
+      }
+      if (cell.column > maxColumn) {
+        maxColumn = cell.column;
+      }
+    }
+    bounds = { maxRow, maxColumn };
+  }
+  shapeBoundsCache.set(shapeId, bounds);
+  return bounds;
 }
 
 type GameViewProps = {
@@ -84,10 +127,13 @@ type GameViewProps = {
   onExit?: () => void;
   /** Invoked to open the end-of-run results screen. */
   onResults?: () => void;
+  /** Replaces the active session with a fresh generation. The real route uses
+   * GameSession; isolated tests fall back to the controller restart seam. */
+  onRestart?: () => void;
+  /** Persistence boundary supplied by the real session. Isolated component
+   * tests default to an already-resolved no-op. */
+  flushActiveRun?: () => Promise<void>;
 };
-
-const SECOND_CHANCE_MS = 1500;
-const SECOND_CHANCE_REDUCED_MS = 800;
 
 /** Upper bound on the board's edge so it never balloons on tablets/wide screens
  *  (mirrors GameBoard's own maxWidth). */
@@ -116,38 +162,67 @@ export function computeBoardSide(content: { width: number; height: number }): nu
 
 /** Presentational gameplay screen over a supplied controller. Holds no
  *  gameplay rules — every decision is delegated to the domain controller. */
-export function GameView({ controller, best = 0, boardSize, onExit, onResults }: GameViewProps) {
+const resolvedFlush = (): Promise<void> => Promise.resolve();
+
+export function GameView({
+  controller,
+  best = 0,
+  boardSize,
+  onExit,
+  onResults,
+  onRestart,
+  flushActiveRun = resolvedFlush,
+}: GameViewProps) {
   const { state } = controller;
-  const haptics = useHaptics();
   const reducedMotion = useEffectiveReducedMotion();
   const animator = useEventAnimator({
     turn: state.turn,
     events: controller.lastEvents,
     // The grid is needed to locate a defused piece's cells: `pieceDefused`
-    // carries only an id, and by the time it is handled the piece is gone from
-    // the current board.
+    // carries its identity/timer outcome but not its footprint, and by the time
+    // it is handled the piece is gone from the current board.
     grid: state.grid,
     reducedMotion,
   });
-  const audio = useAudio();
-  // Event-driven sound + music: plays each turn's effects once, loops music
-  // while the game screen is mounted (both gated by persisted settings).
-  useGameAudio({ turn: state.turn, events: controller.lastEvents, status: state.status });
-  // Countdown-2 / countdown-1 urgent haptics, once per timer transition.
-  useTimerHaptics({ turn: state.turn, events: controller.lastEvents });
+  const {
+    current: activePraise,
+    complete: completePraise,
+    reset: resetPraise,
+  } = usePraiseCelebration({ turn: state.turn, events: controller.lastEvents });
   // Turn-scoped gameplay analytics (placed/line/defused/explosion/rubble),
   // logged once per turn from the domain event stream.
   useGameAnalytics({ turn: state.turn, events: controller.lastEvents });
   const { track } = useAnalytics();
-  const reward = useRewardedAction();
   const theme = useTheme();
+  const danger = useMemo(
+    () => resolveDangerState({ activeTimers: state.activeTimers }),
+    [state.activeTimers],
+  );
+  const scoreImpact = useMemo(
+    () => resolveScoreImpactForTurn(controller.lastEvents, state.turn),
+    [controller.lastEvents, state.turn],
+  );
 
   const [paused, setPaused] = useState(false);
-  // Input is locked during a required effect sequence, while a rewarded ad is
-  // in flight, and while paused, so a reward can't overlap a placement or
-  // another reward and no move lands behind the pause menu.
-  const inputLocked = animator.isAnimating || reward.pending || paused;
-
+  const feedback = useGameFeedback({
+    sessionGeneration: controller.sessionGeneration,
+    turn: state.turn,
+    events: controller.lastEvents,
+    status: state.status,
+    paused,
+    combo: state.combo,
+    score: state.score,
+    previousBest: best,
+  });
+  const beforeReward = useCallback(async () => {
+    await flushActiveRun();
+    feedback.interrupt();
+  }, [feedback, flushActiveRun]);
+  const reward = useRewardedAction({ beforeShow: beforeReward, afterShow: feedback.restore });
+  const [restartConfirmation, setRestartConfirmation] = useState<"closed" | "open">("closed");
+  const restartTransitionRef = useRef(false);
+  const homeTransitionRef = useRef(false);
+  const resultsTransitionRef = useRef(false);
   // Measured gameplay content box; drives a responsive square board that fits
   // both the available width and a height budget. A caller-supplied `boardSize`
   // (test seam) overrides measurement, since onLayout doesn't fire under jest.
@@ -168,30 +243,43 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
   }, []);
 
   const [defuseConfirmOpen, setDefuseConfirmOpen] = useState(false);
-  const [secondChance, setSecondChance] = useState(false);
-  const secondChanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Transient per-action reward feedback (pending while the ad is in flight,
   // then a brief success/failure/cancelled outcome). One shared hook per action
-  // so Freeze, Defuse, and Revive — and Double Bolts on the results screen —
-  // present, sound, and time out identically. Presentation only.
+  // so Freeze and Defuse present, sound, and time out identically.
   const freezeOutcome = useRewardOutcome(reducedMotion);
   const defuseOutcome = useRewardOutcome(reducedMotion);
-  const reviveOutcome = useRewardOutcome(reducedMotion);
   const [previewOrigin, setPreviewOrigin] = useState<CellPosition | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dragOrigin, setDragOrigin] = useState<CellPosition | null>(null);
   const [returning, setReturning] = useState(false);
   const [cellSize, setCellSize] = useState(boardSize ? boardSizeToCell(boardSize) : 0);
 
+  // Only authoritative interaction states block a new action. Presentation
+  // effects intentionally do not participate: their queue can remain active
+  // across later turns. A live drag blocks every new action except its own
+  // move/finalize callbacks.
+  const inputLocked =
+    reward.pending ||
+    paused ||
+    defuseConfirmOpen ||
+    restartConfirmation === "open" ||
+    state.status !== "playing" ||
+    (drag !== null && !returning);
+
   const boardRef = useRef<View>(null);
   const ghostRef = useRef<DragGhostHandle>(null);
   const boardLayoutRef = useRef<BoardLayout | null>(null);
   const cellSizeRef = useRef(cellSize);
   const lastDragOriginRef = useRef<CellPosition | null>(null);
+  const dragRef = useRef<DragState | null>(null);
+  const visibleDragIdRef = useRef<number | null>(null);
+  const dragSequenceRef = useRef(0);
+  const dragFinalizedRef = useRef(false);
+  const invalidPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // The board's press handler must keep a stable identity: `controller` is a
-  // fresh object every render and `inputLocked` flips on every animation,
-  // pause, and reward transition — depending on either would change the prop on
-  // each of those and re-render all 64 cells for something purely cosmetic.
+  // fresh object every render and `inputLocked` flips on pause, modal, drag,
+  // and reward transitions — depending on either would change the prop on each
+  // of those and re-render all 64 cells for unrelated screen state.
   // Both are read through refs written in an effect, so the handler stays
   // referentially stable while still seeing current values when it runs.
   const controllerRef = useRef(controller);
@@ -207,20 +295,35 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
   const placement = useMemo(() => {
     const event = controller.lastEvents.find((candidate) => candidate.type === "piecePlaced");
     return event && event.type === "piecePlaced"
-      ? { cells: event.cells, nonce: state.turn }
-      : { cells: [] as CellPosition[], nonce: 0 };
-  }, [controller.lastEvents, state.turn]);
+      ? { cells: event.cells, nonce: `${controller.sessionGeneration}:${state.turn}` }
+      : { cells: [] as CellPosition[], nonce: undefined };
+  }, [controller.lastEvents, controller.sessionGeneration, state.turn]);
+  const refillNonce = controller.lastEvents.some((event) => event.type === "handRefilled")
+    ? state.handRefills
+    : undefined;
+  const { clearSelection, previewAt, previewFor, selectedHandId } = controller;
 
-  const dragPreview = drag && dragOrigin ? controller.previewFor(drag.handId, dragOrigin) : null;
-  const tapPreview = previewOrigin ? controller.previewAt(previewOrigin) : null;
-  const preview = dragPreview ?? tapPreview;
+  const dragPreview = useMemo(
+    () => (drag && dragOrigin ? previewFor(drag.intent, dragOrigin) : null),
+    [drag, dragOrigin, previewFor],
+  );
+  const tapPreview = useMemo(
+    () => (previewOrigin ? previewAt(previewOrigin) : null),
+    [previewAt, previewOrigin],
+  );
+  // During drag the native-backed ghost is the one placement silhouette. The
+  // board receives only the same prediction's clear lanes, preventing a second
+  // ghost from stacking underneath while preserving B-02 pre-clear semantics.
+  const preview = useMemo(
+    () => (dragPreview ? { ...dragPreview, cells: [], conflictCells: [] } : tapPreview),
+    [dragPreview, tapPreview],
+  );
 
   // Per-empty-cell anchor validity for the selected piece, for the board's
   // accessibility placement hints. Reuses the domain's own read-only preview
   // (no gameplay mutation, no duplicated rules) and is null while nothing is
   // selected, so empty cells stay silent until a piece is held. Recomputes when
   // the selection or the board changes, so the hints never go stale.
-  const { previewAt, selectedHandId } = controller;
   const placementHints = useMemo(() => {
     if (selectedHandId === null) {
       return null;
@@ -248,16 +351,25 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
       if (inputLocked) {
         return;
       }
+      if (invalidPreviewTimerRef.current) {
+        clearTimeout(invalidPreviewTimerRef.current);
+        invalidPreviewTimerRef.current = null;
+      }
       setPreviewOrigin(null);
       const wasSelected = controller.selectedHandId === handId;
       controller.selectPiece(handId);
       if (!wasSelected) {
-        haptics.selection();
-        audio.playSfx("selection");
         track({ name: "piece_selected" });
       }
     },
-    [audio, controller, haptics, inputLocked, track],
+    [controller, inputLocked, track],
+  );
+
+  const handlePickup = useCallback(
+    (_handId: string) => {
+      if (!inputLocked) feedback.emit("piecePickup");
+    },
+    [feedback, inputLocked],
   );
 
   const handleCellPress = useCallback(
@@ -267,22 +379,49 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
         return;
       }
       if (controller.placeAt(position)) {
-        // Placement sound comes from the piecePlaced event (useGameAudio).
+        // Placement feedback comes from the committed piecePlaced event.
         setPreviewOrigin(null);
-        haptics.success();
       } else {
         // Rejected by the domain: show exactly where the attempt conflicts.
         setPreviewOrigin(position);
-        haptics.warning();
-        audio.playSfx("invalid");
+        if (invalidPreviewTimerRef.current) {
+          clearTimeout(invalidPreviewTimerRef.current);
+        }
+        invalidPreviewTimerRef.current = setTimeout(() => {
+          invalidPreviewTimerRef.current = null;
+          setPreviewOrigin(null);
+        }, INVALID_RETURN_MS);
+        feedback.emit("invalidPlacement");
         track({ name: "piece_rejected" });
       }
     },
-    [audio, haptics, track],
+    [feedback, track],
+  );
+
+  const handleCellPreviewChange = useCallback((position: CellPosition | null) => {
+    const activeController = controllerRef.current;
+    if (position === null || inputLockedRef.current || activeController.selectedHandId === null) {
+      setPreviewOrigin(null);
+      return;
+    }
+    if (invalidPreviewTimerRef.current) {
+      clearTimeout(invalidPreviewTimerRef.current);
+      invalidPreviewTimerRef.current = null;
+    }
+    setPreviewOrigin(position);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (invalidPreviewTimerRef.current) {
+        clearTimeout(invalidPreviewTimerRef.current);
+      }
+    },
+    [],
   );
 
   const measureBoard = useCallback(() => {
-    boardRef.current?.measureInWindow((x, y, _width, _height) => {
+    const captureLayout = (x: number, y: number) => {
       const size = cellSizeRef.current;
       if (size <= 0) {
         boardLayoutRef.current = null;
@@ -295,50 +434,94 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
         pitch: size + spacing.gridGutter,
         size: BOARD_SIZE,
       };
-    });
-  }, []);
-
-  const originForPoint = useCallback((shapeId: string, point: Point): CellPosition | null => {
-    const layout = boardLayoutRef.current;
-    const bounds = shapeBoundsFor(shapeId);
-    if (!layout || !bounds) {
-      return null;
+    };
+    // A fixed board size is the existing isolated-test seam. Jest has no native
+    // window measurement, so anchor that synthetic board at the window origin;
+    // production always takes the measured branch below.
+    if (boardSize !== undefined) {
+      captureLayout(0, 0);
+      return;
     }
-    return dragOriginFromFinger(point, bounds, DRAG_LIFT, layout);
-  }, []);
+    boardRef.current?.measureInWindow((x, y, _width, _height) => captureLayout(x, y));
+  }, [boardSize]);
+
+  const originForPoint = useCallback(
+    (
+      shapeId: string,
+      point: Point,
+      visualLift: number,
+      previous: CellPosition | null,
+    ): CellPosition | null => {
+      const layout = boardLayoutRef.current;
+      const bounds = shapeBoundsFor(shapeId);
+      if (!layout || !bounds) {
+        return null;
+      }
+      return stableDragOriginFromFinger(point, bounds, visualLift, layout, previous);
+    },
+    [],
+  );
+
+  const ghostPointForOrigin = useCallback(
+    (shapeId: string, origin: CellPosition, visualLift: number): Point | null => {
+      const layout = boardLayoutRef.current;
+      const bounds = shapeBoundsFor(shapeId);
+      return layout && bounds ? fingerPointForDragOrigin(origin, bounds, visualLift, layout) : null;
+    },
+    [],
+  );
 
   const handleDragStart = useCallback(
     (handId: string, point: Point) => {
-      const piece = state.hand.find((candidate) => candidate.handId === handId);
-      if (inputLocked || !piece || cellSizeRef.current <= 0) {
+      const activeController = controllerRef.current;
+      const piece = activeController.state.hand.find((candidate) => candidate.handId === handId);
+      const intent = activeController.createPlacementIntent(handId);
+      if (
+        inputLocked ||
+        dragRef.current !== null ||
+        !piece ||
+        !intent ||
+        cellSizeRef.current <= 0
+      ) {
         return;
       }
-      controller.clearSelection();
+      activeController.clearSelection();
       setPreviewOrigin(null);
       measureBoard();
       lastDragOriginRef.current = null;
       setDragOrigin(null);
-      setDrag({
+      dragFinalizedRef.current = false;
+      const visualLift = dragLiftForCell(cellSizeRef.current);
+      const nextDrag: DragState = {
+        id: ++dragSequenceRef.current,
         handId,
+        intent,
         shapeId: piece.shapeId,
         colorId: piece.colorId,
         startX: point.x,
         startY: point.y,
-      });
-      haptics.selection();
+        visualLift,
+      };
+      dragRef.current = nextDrag;
+      visibleDragIdRef.current = nextDrag.id;
+      setReturning(false);
+      setDrag(nextDrag);
     },
-    [controller, haptics, inputLocked, measureBoard, state.hand],
+    [inputLocked, measureBoard],
   );
 
   const handleDragMove = useCallback(
     (handId: string, point: Point) => {
-      ghostRef.current?.moveTo(point.x, point.y);
-      const piece = state.hand.find((candidate) => candidate.handId === handId);
-      if (!piece) {
+      const activeDrag = dragRef.current;
+      if (!activeDrag || activeDrag.handId !== handId || dragFinalizedRef.current) {
         return;
       }
-      const origin = originForPoint(piece.shapeId, point);
       const last = lastDragOriginRef.current;
+      const origin = originForPoint(activeDrag.shapeId, point, activeDrag.visualLift, last);
+      const snappedPoint = origin
+        ? ghostPointForOrigin(activeDrag.shapeId, origin, activeDrag.visualLift)
+        : null;
+      ghostRef.current?.moveTo(snappedPoint?.x ?? point.x, snappedPoint?.y ?? point.y);
       const changed =
         (origin === null) !== (last === null) ||
         (origin !== null &&
@@ -349,10 +532,16 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
         setDragOrigin(origin);
       }
     },
-    [originForPoint, state.hand],
+    [ghostPointForOrigin, originForPoint],
   );
 
-  const clearDrag = useCallback(() => {
+  const clearDrag = useCallback((expectedId?: number) => {
+    if (expectedId !== undefined && visibleDragIdRef.current !== expectedId) {
+      return;
+    }
+    visibleDragIdRef.current = null;
+    dragRef.current = null;
+    dragFinalizedRef.current = false;
     setDrag(null);
     setDragOrigin(null);
     setReturning(false);
@@ -361,28 +550,65 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
 
   const handleDragEnd = useCallback(
     (handId: string, point: Point) => {
-      const piece = state.hand.find((candidate) => candidate.handId === handId);
-      const origin = piece ? originForPoint(piece.shapeId, point) : null;
-      // A duplicated finalize is a no-op: the piece is already gone from the
-      // hand, so the domain rejects the second attempt.
-      const placed = origin ? controller.place(handId, origin) : false;
+      const activeDrag = dragRef.current;
+      // Native gesture completion can be delivered twice around cancellation /
+      // unmount edges. Consume the logical finalize synchronously so the second
+      // delivery produces neither a turn nor duplicate imperative feedback.
+      if (!activeDrag || activeDrag.handId !== handId || dragFinalizedRef.current) {
+        return;
+      }
+      dragFinalizedRef.current = true;
+      const origin = originForPoint(
+        activeDrag.shapeId,
+        point,
+        activeDrag.visualLift,
+        lastDragOriginRef.current,
+      );
+      // The pre-clear state ends with the gesture. Any following clear visuals
+      // belong to the committed effect system, including while a rejected
+      // piece animates back to its tray.
+      lastDragOriginRef.current = null;
+      setDragOrigin(null);
+      const placed = origin ? controllerRef.current.place(activeDrag.intent, origin) : false;
       if (placed) {
-        haptics.success();
-        clearDrag();
+        clearDrag(activeDrag.id);
       } else {
         // Dropped outside the board or onto an invalid cell: play the return
         // animation, which clears the drag on completion. A drop onto the board
         // that the domain rejected counts as a rejected placement attempt.
-        haptics.warning();
-        audio.playSfx("invalid");
+        feedback.emit("invalidPlacement");
+        dragRef.current = null;
         setReturning(true);
         if (origin) {
           track({ name: "piece_rejected" });
         }
       }
     },
-    [audio, clearDrag, controller, haptics, originForPoint, state.hand, track],
+    [clearDrag, feedback, originForPoint, track],
   );
+
+  const handleDragCancel = useCallback((handId: string) => {
+    const activeDrag = dragRef.current;
+    if (!activeDrag || activeDrag.handId !== handId || dragFinalizedRef.current) {
+      return;
+    }
+    dragFinalizedRef.current = true;
+    dragRef.current = null;
+    lastDragOriginRef.current = null;
+    setDragOrigin(null);
+    setReturning(true);
+  }, []);
+
+  // A controller state replacement (hydrate/restart/external session swap)
+  // invalidates every captured intent. Clear the matching presentation too, so
+  // an old ghost can never survive into the new authoritative snapshot.
+  useEffect(() => {
+    if (visibleDragIdRef.current !== null) {
+      clearDrag();
+    }
+    // `state` identity changes only at an authoritative controller commit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   const handleFreeze = useCallback(() => {
     // Guard against re-activation while active/exhausted or mid-reward — the
@@ -390,7 +616,7 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
     if (inputLocked || !canActivateFreeze(state)) {
       return;
     }
-    audio.playSfx("button");
+    feedback.emit("uiTap");
     // Offer logged when the ad is actually requested; result logged from the
     // resolution (never inside onEarned, so a reward can't double-log).
     track({ name: "freeze_offer" });
@@ -403,37 +629,35 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
       .run(REWARD_PLACEMENTS.freeze, () => {
         if (controller.activateFreeze()) {
           applied = true;
-          haptics.success();
-          audio.playSfx("freeze");
+          feedback.emit("freezeApplied");
         }
       })
       .then((result) => {
         track({ name: "freeze_result", result: rewardOutcome(result) });
         freezeOutcome.settle(result, applied);
       });
-  }, [audio, controller, freezeOutcome, haptics, inputLocked, reward, state, track]);
+  }, [controller, feedback, freezeOutcome, inputLocked, reward, state, track]);
 
   const handleDefuseOpen = useCallback(() => {
     if (inputLocked || !canApplyRewardedDefuse(state)) {
       return;
     }
-    controller.clearSelection();
+    clearSelection();
     setPreviewOrigin(null);
     setDefuseConfirmOpen(true);
-    haptics.selection();
-    audio.playSfx("button");
-  }, [audio, controller, haptics, inputLocked, state]);
+    feedback.emit("uiTap");
+  }, [clearSelection, feedback, inputLocked, state]);
 
   const handleDefuseCancel = useCallback(() => {
-    audio.playSfx("button");
+    feedback.emit("uiTap");
     setDefuseConfirmOpen(false);
-  }, [audio]);
+  }, [feedback]);
 
   const handleDefuseConfirm = useCallback(() => {
     if (reward.pending) {
       return;
     }
-    audio.playSfx("button");
+    feedback.emit("uiTap");
     track({ name: "defuse_offer" });
     defuseOutcome.begin();
     // The piece the domain will target, read BEFORE the action is applied: once
@@ -447,11 +671,10 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
       .run(REWARD_PLACEMENTS.defuse, () => {
         if (controller.defuse()) {
           applied = true;
-          haptics.success();
-          audio.playSfx("defuse");
+          feedback.emit("defusePowerUpApplied");
           // A rewarded defuse advances no turn, so the turn-keyed animator never
-          // sees it — play it explicitly. It holds no input lock: the board is
-          // already updated and must stay usable.
+          // sees it — play it explicitly. The board is already updated and stays
+          // usable while this presentation runs.
           animator.playCue("rewardedDefuse", targetCells);
         }
       })
@@ -462,112 +685,123 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
       .finally(() => {
         setDefuseConfirmOpen(false);
       });
-  }, [animator, audio, controller, defuseOutcome, haptics, reward, state, track]);
-
-  const clearSecondChance = useCallback(() => {
-    if (secondChanceTimer.current !== null) {
-      clearTimeout(secondChanceTimer.current);
-      secondChanceTimer.current = null;
-    }
-    setSecondChance(false);
-  }, []);
-
-  const handleRevive = useCallback(() => {
-    if (reward.pending || !canRevive(state)) {
-      return;
-    }
-    audio.playSfx("button");
-    track({ name: "revive_offer" });
-    reviveOutcome.begin();
-    // The rubble the revive is about to clear, read before it is applied — the
-    // recovery wave then covers exactly the cells that were restored.
-    const restoredCells = rubbleCellsOf(state.grid);
-    let applied = false;
-    void reward
-      .run(REWARD_PLACEMENTS.revive, () => {
-        if (controller.revive()) {
-          applied = true;
-          haptics.success();
-          audio.playSfx("revive");
-          // Revive advances no turn either, so the wave is played explicitly and
-          // holds no input lock — play resumes the moment the domain allows it.
-          animator.playCue("revive", restoredCells);
-          // "SECOND CHANCE" banner over the repaired board (Stitch 10), then
-          // auto-dismiss. Reduced motion shortens the hold and skips the fade.
-          setSecondChance(true);
-          if (secondChanceTimer.current !== null) {
-            clearTimeout(secondChanceTimer.current);
-          }
-          secondChanceTimer.current = setTimeout(
-            () => {
-              secondChanceTimer.current = null;
-              setSecondChance(false);
-            },
-            reducedMotion ? SECOND_CHANCE_REDUCED_MS : SECOND_CHANCE_MS,
-          );
-        }
-      })
-      .then((result) => {
-        track({ name: "revive_result", result: rewardOutcome(result) });
-        reviveOutcome.settle(result, applied);
-      });
-  }, [animator, audio, controller, haptics, reducedMotion, reward, reviveOutcome, state, track]);
+  }, [animator, controller, defuseOutcome, feedback, reward, state, track]);
 
   const handleEndRun = useCallback(() => {
-    if (reward.pending) {
+    if (reward.pending || resultsTransitionRef.current) {
       return;
     }
-    audio.playSfx("button");
-    clearSecondChance();
+    resultsTransitionRef.current = true;
+    feedback.emit("uiTap");
     onResults?.();
-  }, [audio, clearSecondChance, onResults, reward.pending]);
+  }, [feedback, onResults, reward.pending]);
 
   const handlePause = useCallback(() => {
     // Pausing mid-reward is disallowed so the confirm/overlay stack stays sane.
     if (reward.pending) {
       return;
     }
-    audio.playSfx("button");
+    feedback.emit("uiTap");
+    clearSelection();
+    setPreviewOrigin(null);
+    clearDrag();
     setPaused(true);
-  }, [audio, reward.pending]);
+    void flushActiveRun();
+  }, [clearDrag, clearSelection, feedback, flushActiveRun, reward.pending]);
 
   const handleResume = useCallback(() => {
-    audio.playSfx("button");
+    feedback.emit("uiTap");
+    setRestartConfirmation("closed");
     setPaused(false);
-  }, [audio]);
+  }, [feedback]);
 
   // Drop every transient overlay/selection so a fresh run starts clean. Shared
   // by Restart (pause menu) and leaving to Home.
   const clearPendingUi = useCallback(() => {
     setPaused(false);
+    setRestartConfirmation("closed");
     setDefuseConfirmOpen(false);
+    if (invalidPreviewTimerRef.current) {
+      clearTimeout(invalidPreviewTimerRef.current);
+      invalidPreviewTimerRef.current = null;
+    }
     setPreviewOrigin(null);
-    clearSecondChance();
     clearDrag();
     freezeOutcome.reset();
     defuseOutcome.reset();
-    reviveOutcome.reset();
     animator.reset();
-  }, [animator, clearDrag, clearSecondChance, defuseOutcome, freezeOutcome, reviveOutcome]);
+    resetPraise();
+  }, [animator, clearDrag, defuseOutcome, freezeOutcome, resetPraise]);
 
   const handleRestart = useCallback(() => {
-    audio.playSfx("button");
+    feedback.emit("uiTap");
+    // A previous confirmed restart deliberately leaves its latch closed to
+    // reject stale duplicate events. Reaching this button again proves the new
+    // run is active and the player has opened a new confirmation cycle.
+    restartTransitionRef.current = false;
+    setRestartConfirmation("open");
+  }, [feedback]);
+
+  const handleRestartCancel = useCallback(() => {
+    feedback.emit("uiTap");
+    setRestartConfirmation("closed");
+  }, [feedback]);
+
+  const handleRestartConfirm = useCallback(() => {
+    if (restartTransitionRef.current) {
+      return;
+    }
+    restartTransitionRef.current = true;
+    feedback.emit("uiTap");
     clearPendingUi();
-    controller.restart();
-  }, [audio, clearPendingUi, controller]);
+    (onRestart ?? controller.restart)();
+  }, [clearPendingUi, controller.restart, feedback, onRestart]);
 
   const handleHome = useCallback(() => {
-    audio.playSfx("button");
-    clearPendingUi();
-    onExit?.();
-  }, [audio, clearPendingUi, onExit]);
+    if (homeTransitionRef.current) {
+      return;
+    }
+    homeTransitionRef.current = true;
+    feedback.emit("uiTap");
+    // Stay paused/input-locked until the durability boundary completes so no
+    // move can land after the snapshot we intend Home to resume.
+    void flushActiveRun().then(() => {
+      clearPendingUi();
+      onExit?.();
+    });
+  }, [clearPendingUi, feedback, flushActiveRun, onExit]);
 
-  // Cancel a pending second-chance timer on unmount. Each reward outcome clears
-  // its own timer (useRewardOutcome), and the animator clears its sequence.
-  useEffect(() => () => clearSecondChance(), [clearSecondChance]);
+  // Android Back is a screen-state action, never a route-pop action. Gameplay
+  // opens Pause; Pause closes back to the exact run. A nested restart confirm
+  // first cancels back to Pause, matching the explicit Cancel action.
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (restartConfirmation === "open") {
+        setRestartConfirmation("closed");
+        return true;
+      }
+      if (paused) {
+        handleResume();
+        return true;
+      }
+      if (state.status === "playing") {
+        handlePause();
+      }
+      return true;
+    });
+    return () => subscription.remove();
+  }, [handlePause, handleResume, paused, restartConfirmation, state.status]);
 
   const freezeActive = state.freezeTurnsRemaining > 0;
   const defuseTarget = defuseConfirmOpen ? getRewardedDefuseTarget(state) : null;
+
+  // Which board draws is decided at module scope (see `BoardRenderer` above),
+  // because deciding it here would mean importing both renderers and so
+  // initialising Skia even when the flag is off. Both accept the same props, so
+  // the screen hands over one set of values and never learns which it got — the
+  // flag switches a component, not a data path.
+  const cinematic = CINEMATIC_RENDERER;
+  const boardImpulse = cinematic ? null : animator.boardImpulse;
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.appBackground }]} testID="game-screen">
@@ -580,61 +814,95 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
           score={state.score}
           best={best}
           combo={state.combo}
+          impact={scoreImpact}
           onPause={handlePause}
           reducedMotion={reducedMotion}
         />
-        {/* Zones 2–4 — board / tray / action dock, evenly distributed so the
-            board stays large while the tray and dock never drift far below it
-            and the lower screen is not left empty. */}
-        <View style={styles.content} onLayout={handleContentLayout}>
-          <View style={styles.boardZone}>
+        {/* Zones 2–4 — board / tray / action dock, kept close together so the
+            board stays large and finger travel stays predictable. */}
+        <View style={styles.content} onLayout={handleContentLayout} testID="gameplay-content">
+          <View style={styles.boardZone} testID="gameplay-board-zone">
             {boardSide > 0 ? (
-              <View style={[styles.boardWrapper, { width: boardSide, height: boardSide }]}>
-                <GameBoard
-                  ref={boardRef}
-                  grid={state.grid}
-                  badges={badges}
-                  boardSize={boardSide}
-                  preview={preview}
-                  onCellPress={handleCellPress}
-                  onCellSizeChange={handleCellSizeChange}
-                  placedCells={placement.cells}
-                  placementNonce={placement.nonce}
-                  explosionCount={animator.plan?.explosions.length ?? 0}
-                  effectKey={animator.effectKey}
-                  highlightPieceId={defuseTarget?.id ?? null}
-                  reducedMotion={reducedMotion}
-                  frozen={freezeActive}
-                  placementHints={placementHints}
+              <View
+                ref={boardRef}
+                collapsable={false}
+                style={[styles.boardWrapper, { width: boardSide, height: boardSide }]}
+              >
+                <View
+                  pointerEvents="none"
+                  style={[
+                    styles.boardAmbientFrame,
+                    {
+                      borderColor: `${theme.boardFrameCorner}80`,
+                      backgroundColor: `${theme.boardFrameCorner}08`,
+                      shadowColor: theme.boardFrameCorner,
+                    },
+                  ]}
+                  testID="board-ambient-frame"
                 />
-                {/* Cosmetic overlay, a SIBLING of the board rather than a child:
-                    a new effect plan re-renders only this layer, never the 64
-                    cells. Remounted per sequence so two turns' effects never
-                    interpolate into each other. */}
-                {animator.plan && cellSize > 0 ? (
-                  <EffectsLayer
-                    key={animator.effectKey}
-                    plan={animator.plan}
-                    cellSize={cellSize}
+                <BoardImpulseFrame impulse={boardImpulse} reducedMotion={reducedMotion}>
+                  <BoardRenderer
+                    grid={state.grid}
+                    badges={badges}
+                    danger={danger}
+                    boardSize={boardSide}
+                    preview={preview}
+                    onCellPress={handleCellPress}
+                    onCellPreviewChange={handleCellPreviewChange}
+                    onCellSizeChange={handleCellSizeChange}
+                    placedCells={placement.cells}
+                    placementNonce={placement.nonce}
+                    highlightPieceId={defuseTarget?.id ?? null}
                     reducedMotion={reducedMotion}
+                    frozen={freezeActive}
+                    placementHints={placementHints}
+                    // Only the cinematic renderer reads this: it draws effects
+                    // inside its own canvas, so the sibling overlay below is
+                    // suppressed for it. Handing the sequences to both renderers
+                    // would play every beat twice.
+                    effectSequences={cinematic ? animator.sequences : undefined}
+                    onEffectStarted={animator.startedDrawing}
+                  />
+                  {/* The fallback overlay shares the board impulse wrapper so
+                      cells and their feedback always move as one object. */}
+                  {!cinematic ? (
+                    <EffectStack
+                      sequences={animator.sequences}
+                      cellSize={cellSize}
+                      reducedMotion={reducedMotion}
+                      onStarted={animator.startedDrawing}
+                    />
+                  ) : null}
+                </BoardImpulseFrame>
+                {activePraise ? (
+                  <PraiseOverlay
+                    key={activePraise.id}
+                    praise={activePraise}
+                    reducedMotion={reducedMotion}
+                    onComplete={completePraise}
                   />
                 ) : null}
               </View>
             ) : null}
           </View>
-          <View style={styles.trayZone}>
+          <View style={styles.trayZone} testID="gameplay-tray-zone">
             <PieceTray
               hand={state.hand}
               selectedHandId={controller.selectedHandId}
               onSelect={handleSelect}
+              onPickup={handlePickup}
               onDragStart={handleDragStart}
               onDragMove={handleDragMove}
               onDragEnd={handleDragEnd}
+              onDragCancel={handleDragCancel}
               draggingHandId={drag?.handId ?? null}
               reducedMotion={reducedMotion}
+              boardCellSize={cellSize}
+              availableWidth={contentBox.width || boardSide || 320}
+              refillNonce={refillNonce}
             />
           </View>
-          <View style={styles.actionZone}>
+          <View style={styles.actionZone} testID="gameplay-action-zone">
             <RewardedActionBar
               reducedMotion={reducedMotion}
               freeze={{
@@ -673,7 +941,6 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
             reducedMotion={reducedMotion}
           />
         ) : null}
-        {secondChance ? <SecondChanceBanner reducedMotion={reducedMotion} /> : null}
         {paused ? (
           <PauseOverlay
             onResume={handleResume}
@@ -682,20 +949,28 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
             reducedMotion={reducedMotion}
           />
         ) : null}
+        {restartConfirmation === "open" ? (
+          <RunConfirmationCard
+            kind="restart"
+            title="RESTART THIS RUN?"
+            message="Your current run will be replaced."
+            confirmLabel="RESTART"
+            onConfirm={handleRestartConfirm}
+            onCancel={handleRestartCancel}
+            reducedMotion={reducedMotion}
+          />
+        ) : null}
         {state.status === "gameOver" ? (
           <GameOverOverlay
             score={state.score}
-            reviveAvailable={canRevive(state)}
-            onRevive={handleRevive}
             onEndRun={handleEndRun}
-            busy={reward.pending}
-            revivePhase={reviveOutcome.phase}
             reducedMotion={reducedMotion}
           />
         ) : null}
       </SafeAreaView>
       {drag && cellSize > 0 ? (
         <DragGhost
+          key={drag.id}
           ref={ghostRef}
           shapeId={drag.shapeId}
           colorId={drag.colorId}
@@ -703,9 +978,10 @@ export function GameView({ controller, best = 0, boardSize, onExit, onResults }:
           initialX={drag.startX}
           initialY={drag.startY}
           valid={dragPreview?.valid ?? false}
+          visualLift={drag.visualLift}
           returning={returning}
           reducedMotion={reducedMotion}
-          onReturnComplete={clearDrag}
+          onReturnComplete={() => clearDrag(drag.id)}
         />
       ) : null}
     </View>
@@ -725,6 +1001,7 @@ type GameScreenContentProps = {
   analytics?: AnalyticsService;
   onExit?: () => void;
   onResults?: () => void;
+  onRestart?: () => void;
 };
 
 /** Test entry point: builds a controller from injected options so a crafted
@@ -739,6 +1016,7 @@ export function GameScreenContent({
   analytics,
   onExit,
   onResults,
+  onRestart,
 }: GameScreenContentProps) {
   const controller = useGameController(controllerOptions);
   const storage = useMemo(() => createMemoryStorageService(), []);
@@ -754,6 +1032,7 @@ export function GameScreenContent({
                 boardSize={boardSize}
                 onExit={onExit}
                 onResults={onResults}
+                onRestart={onRestart}
               />
             </AdServiceProvider>
           </AudioServiceProvider>
@@ -772,24 +1051,23 @@ function boardSizeToCell(outerSize: number): number {
 
 export default function GameScreen() {
   const router = useRouter();
-  const { controller } = useGameSession();
+  const { controller, startNewRun, clearActiveRun, flushActiveRun } = useGameSession();
   // Single profile read path for the HUD best score; before load this is the
   // default profile (bestScore 0), which is a safe value to display.
   const { profile } = useProfile();
   const handleExit = useCallback(() => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/");
-    }
+    router.replace("/");
   }, [router]);
   const handleResults = useCallback(() => {
-    router.push("/results");
-  }, [router]);
+    clearActiveRun();
+    router.replace("/results");
+  }, [clearActiveRun, router]);
   return (
     <GameView
       controller={controller}
       best={profile.bestScore}
+      flushActiveRun={flushActiveRun}
+      onRestart={startNewRun}
       onExit={handleExit}
       onResults={handleResults}
     />
@@ -810,9 +1088,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.screenPadding,
     paddingVertical: spacing.sm,
-    // Distribute the three gameplay zones so the board stays large and the
-    // remaining space becomes even breathing room rather than a dead bottom gap.
-    justifyContent: "space-evenly",
+    // Keep board/tray/dock as one compact unit. On tall phones the unit is
+    // centered in the safe-area remainder rather than leaving an accidental
+    // black well below it; internal gaps stay fixed, so drag travel is stable.
+    justifyContent: "center",
     alignItems: "stretch",
   },
   boardZone: {
@@ -822,10 +1101,24 @@ const styles = StyleSheet.create({
   boardWrapper: {
     alignSelf: "center",
   },
+  boardAmbientFrame: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    bottom: -6,
+    left: -6,
+    borderWidth: 1,
+    borderRadius: 13,
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+  },
   trayZone: {
     justifyContent: "center",
+    marginTop: spacing.xs,
   },
   actionZone: {
     justifyContent: "center",
+    marginTop: spacing.sm,
   },
 });

@@ -2,8 +2,8 @@ import { getPulseConfig } from "../../src/ui/timerPulse";
 
 describe("getPulseConfig", () => {
   it("pulses the urgent and warning states when motion is allowed", () => {
-    expect(getPulseConfig("urgent", false)).toEqual({ scaleTo: 1.14, halfCycleMs: 550 });
-    expect(getPulseConfig("warning", false)).toEqual({ scaleTo: 1.06, halfCycleMs: 1000 });
+    expect(getPulseConfig("urgent", false)).toEqual({ scaleTo: 1.18, halfCycleMs: 250 });
+    expect(getPulseConfig("warning", false)).toEqual({ scaleTo: 1.1, halfCycleMs: 400 });
   });
 
   it("keeps the calm states static", () => {

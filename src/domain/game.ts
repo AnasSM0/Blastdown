@@ -146,7 +146,12 @@ export function placePiece(
         const bonus = DEFUSE_BONUS_BASE + DEFUSE_BONUS_PER_REMAINING_TURN * timer.remainingTurns;
         defuseBonusTotal += bonus;
         piecesDefusedThisTurn += 1;
-        events.push({ type: "pieceDefused", pieceId: timer.id, bonus });
+        events.push({
+          type: "pieceDefused",
+          pieceId: timer.id,
+          bonus,
+          remainingTurns: timer.remainingTurns,
+        });
         activeTimers = Object.fromEntries(
           Object.entries(activeTimers).filter(([id]) => id !== timer.id),
         );
@@ -253,7 +258,8 @@ export function activateFreeze(state: GameState, now: number): TurnResult {
   if (
     state.status !== "playing" ||
     state.rewardedFreezeUses >= MAX_REWARDED_FREEZES_PER_RUN ||
-    state.freezeTurnsRemaining > 0
+    state.freezeTurnsRemaining > 0 ||
+    Object.keys(state.activeTimers).length === 0
   ) {
     return reject(state);
   }
@@ -317,7 +323,8 @@ export function applyRewardedDefuse(state: GameState, now: number): TurnResult {
   };
 }
 
-/** Rewarded revive: one per run, only from the game-over state
+/** @deprecated Dormant legacy rule; no V1 route or ad placement invokes it.
+ * Rewarded revive: one per run, only from the game-over state
  *  (BUILD_SPEC.md §6.15). A failed or cancelled reward must simply never
  *  call this — rejected calls return the input state untouched. */
 export function applyRevive(state: GameState, now: number): TurnResult {

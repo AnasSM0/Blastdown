@@ -229,6 +229,7 @@ describe("placement preview selector read-only behavior (P1-10)", () => {
       valid: true,
       cells: [{ row: 0, column: 0 }],
       conflictCells: [],
+      clear: { rows: [], columns: [], cells: [], intersections: [] },
     });
     expect(Object.getPrototypeOf(first)).toBe(Object.prototype);
     expect(typeof first.valid).toBe("boolean");

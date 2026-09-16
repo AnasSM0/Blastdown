@@ -162,7 +162,12 @@ describe("GameBoard", () => {
     grid[4][4] = { kind: "rubble", explosionId: "e-1" };
     const plan = buildEffectPlan(
       [
-        { type: "explosionStarted", explosionId: "e-1", pieceId: "piece-1" },
+        {
+          type: "explosionStarted",
+          explosionId: "e-1",
+          pieceId: "piece-1",
+          sourceCells: [{ row: 0, column: 0 }],
+        },
         { type: "rubbleCreated", explosionId: "e-1", cells: [{ row: 4, column: 4 }] },
         { type: "scoreChanged", delta: -50, score: 0 },
       ],
@@ -173,7 +178,7 @@ describe("GameBoard", () => {
     // the 64 cells), which is exactly how the game screen composes them.
     const result = await render(
       <>
-        <GameBoard grid={grid} badges={[]} boardSize={328} explosionCount={1} effectKey={1} />
+        <GameBoard grid={grid} badges={[]} boardSize={328} />
         <EffectsLayer plan={plan} cellSize={38} reducedMotion={false} />
       </>,
     );

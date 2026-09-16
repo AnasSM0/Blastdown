@@ -279,6 +279,9 @@ describe("partial clear and defuse", () => {
     if (victimDefused?.type === "pieceDefused") {
       // 25 base + 10 * 5 remaining
       expect(victimDefused.bonus).toBe(75);
+      // Presentation receives the exact pre-decrement value from the committed
+      // outcome; it never has to infer urgency from the post-turn board.
+      expect(victimDefused.remainingTurns).toBe(5);
     }
     // Score: placement 1 + line 100 * 1.25 (combo 1) = 126,
     // + victim defuse 75 + filler self-defuse (25 + 10 * 7) = 95 -> 296.
@@ -318,6 +321,7 @@ describe("partial clear and defuse", () => {
     );
     if (defused?.type === "pieceDefused") {
       expect(defused.bonus).toBe(35); // 25 + 10 * 1
+      expect(defused.remainingTurns).toBe(1);
     }
     // No timerChanged or timerWarning for the defused piece.
     expect(eventTypes(result.events)).not.toContain("timerChanged");

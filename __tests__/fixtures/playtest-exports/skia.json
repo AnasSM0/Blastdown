@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "kind": "blastdown-human-playtest",
+  "sessions": [
+    {
+      "sessionId": "fixture-session-skia",
+      "errorCount": 1,
+      "deviceMetadata": { "renderer": "skia" },
+      "runs": [
+        {
+          "turnsSurvived": 30,
+          "finalScore": 800,
+          "firstExplosionTurn": 15,
+          "firstNaturalDefuseTurn": 11,
+          "immediateReplay": false,
+          "freezeUsedCount": 0,
+          "defuseUsedCount": 1,
+          "hands": [{ "hasDuplicate": true }],
+          "gameOverContext": { "occupancy": 0.875 }
+        }
+      ]
+    }
+  ]
+}

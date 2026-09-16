@@ -1,40 +1,71 @@
-import type { AudioService, SfxName } from "./types";
+import type { FeedbackRequest } from "../feedback/types";
+import type { AudioChannelSettings, AudioService } from "./types";
 
 export type RecordingAudioService = AudioService & {
-  /** Effects played, in order — for test assertions. */
-  readonly sfx: SfxName[];
-  /** Music lifecycle calls, in order. */
+  readonly cues: FeedbackRequest[];
   readonly musicCalls: ("start" | "pause" | "resume" | "stop")[];
+  readonly lifecycleCalls: ("preload" | "suspend" | "resume" | "stopAll" | "release")[];
   reset(): void;
 };
 
-/** Records calls instead of touching any native module. Backs tests and any
- *  environment without an audio engine — a fully safe no-op. */
+/** Records calls instead of touching any native module. It retains the same
+ * settings and identity gates as production so tests exercise the semantic
+ * contract rather than a more permissive fake. */
 export function createNoOpAudioService(): RecordingAudioService {
-  const sfx: SfxName[] = [];
+  const cues: FeedbackRequest[] = [];
   const musicCalls: ("start" | "pause" | "resume" | "stop")[] = [];
+  const lifecycleCalls: ("preload" | "suspend" | "resume" | "stopAll" | "release")[] = [];
+  const identities = new Set<string>();
+  let settings: AudioChannelSettings = { soundEnabled: true, musicEnabled: true };
+  let suspended = false;
   return {
-    sfx,
+    cues,
     musicCalls,
+    lifecycleCalls,
     reset() {
-      sfx.length = 0;
+      cues.length = 0;
       musicCalls.length = 0;
+      lifecycleCalls.length = 0;
+      identities.clear();
     },
-    playSfx(name) {
-      sfx.push(name);
+    preload() {
+      lifecycleCalls.push("preload");
+    },
+    configure(next) {
+      settings = next;
+    },
+    play(request) {
+      if (suspended || !settings.soundEnabled || identities.has(request.identity)) return;
+      identities.add(request.identity);
+      cues.push(request);
     },
     startMusic() {
-      musicCalls.push("start");
+      if (settings.musicEnabled && !suspended) musicCalls.push("start");
     },
     pauseMusic() {
       musicCalls.push("pause");
     },
     resumeMusic() {
-      musicCalls.push("resume");
+      if (settings.musicEnabled && !suspended) musicCalls.push("resume");
     },
     stopMusic() {
       musicCalls.push("stop");
     },
-    release() {},
+    suspend() {
+      if (suspended) return;
+      suspended = true;
+      lifecycleCalls.push("suspend");
+    },
+    resume() {
+      if (!suspended) return;
+      suspended = false;
+      lifecycleCalls.push("resume");
+    },
+    stopAll() {
+      lifecycleCalls.push("stopAll");
+    },
+    release() {
+      lifecycleCalls.push("release");
+    },
   };
 }

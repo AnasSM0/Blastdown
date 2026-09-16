@@ -5,6 +5,7 @@ import { createInitialGameState } from "../../src/domain/game";
 import { createMockAdService } from "../../src/services/ads/MockAdService";
 import type { AdService } from "../../src/services/ads/types";
 import type { GameState, GridCell } from "../../src/domain/gameTypes";
+import { createNoOpAudioService, type AudioService } from "../../src/services/audio";
 
 const NOW = 1_752_800_000_000;
 
@@ -31,12 +32,13 @@ function runWithTimer(): GameState {
   };
 }
 
-function renderRun(adService: AdService) {
+function renderRun(adService: AdService, audioService?: AudioService) {
   return render(
     <GameScreenContent
       controllerOptions={{ seed: "reward-seed", now: () => NOW, initialState: runWithTimer() }}
       boardSize={328}
       adService={adService}
+      audioService={audioService}
     />,
   );
 }
@@ -44,7 +46,9 @@ function renderRun(adService: AdService) {
 describe("freeze reward flow", () => {
   it("activates freeze on an earned reward and shows remaining placements", async () => {
     const service = createMockAdService({ rewarded: { rewarded_freeze: "earned" } });
-    const result = await renderRun(service);
+    const audio = createNoOpAudioService();
+    const result = await renderRun(service, audio);
+    await waitFor(() => expect(audio.musicCalls).toContain("start"));
 
     await fireEvent.press(result.getByTestId("freeze-button"));
 
@@ -52,6 +56,8 @@ describe("freeze reward flow", () => {
     expect(service.shown).toEqual(["rewarded_freeze"]);
     // Cannot stack: the freeze button is now disabled while active.
     expect(result.getByTestId("freeze-button").props.accessibilityState?.disabled).toBe(true);
+    expect(audio.cues.some(({ cue }) => cue === "freezeApplied")).toBe(true);
+    expect(audio.lifecycleCalls).toEqual(expect.arrayContaining(["suspend", "resume"]));
   });
 
   it.each(["closed", "error"] as const)(
@@ -72,7 +78,9 @@ describe("freeze reward flow", () => {
 describe("defuse reward flow", () => {
   it("confirms, targets the domain-selected piece, and defuses on earn", async () => {
     const service = createMockAdService({ rewarded: { rewarded_defuse: "earned" } });
-    const result = await renderRun(service);
+    const audio = createNoOpAudioService();
+    const result = await renderRun(service, audio);
+    await waitFor(() => expect(audio.musicCalls).toContain("start"));
 
     await fireEvent.press(result.getByTestId("defuse-button"));
     // Confirm card up and the target piece's cells are highlighted.
@@ -85,6 +93,8 @@ describe("defuse reward flow", () => {
     expect(result.queryByTestId("defuse-confirm")).toBeNull();
     expect(result.queryByTestId("highlight-0-0")).toBeNull();
     expect(service.shown).toEqual(["rewarded_defuse"]);
+    expect(audio.cues.some(({ cue }) => cue === "defusePowerUpApplied")).toBe(true);
+    expect(audio.lifecycleCalls).toEqual(expect.arrayContaining(["suspend", "resume"]));
   });
 
   it("cancel closes the card and shows no ad, no mutation", async () => {

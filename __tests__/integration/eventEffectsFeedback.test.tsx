@@ -3,8 +3,7 @@ import { render, userEvent, waitFor } from "@testing-library/react-native";
 import { GameScreenContent } from "../../app/game";
 import { createInitialGameState } from "../../src/domain/game";
 import type { GameState, GridCell } from "../../src/domain/gameTypes";
-import type { AdService, RewardedPlacement, RewardedResult } from "../../src/services/ads";
-import type { AudioService, SfxName } from "../../src/services/audio";
+import { createNoOpAudioService } from "../../src/services/audio";
 
 const NOW = 1_752_800_000_000;
 
@@ -16,32 +15,6 @@ function makeEmptyGrid(size: number): GridCell[][] {
 
 function options(initialState: GameState) {
   return { seed: "fx-seed", now: () => NOW, nextSeed: () => "restart", initialState };
-}
-
-/** Records every effect played, so a duplicate is visible as a repeated name. */
-function recordingAudio(): AudioService & { played: SfxName[] } {
-  const played: SfxName[] = [];
-  return {
-    played,
-    playSfx: (name: SfxName) => played.push(name),
-    startMusic: () => {},
-    pauseMusic: () => {},
-    resumeMusic: () => {},
-    stopMusic: () => {},
-    release: () => {},
-  };
-}
-
-/** An ad service with a scripted outcome, counting how often it was asked. */
-function scriptedAds(result: RewardedResult): AdService & { calls: RewardedPlacement[] } {
-  const calls: RewardedPlacement[] = [];
-  return {
-    calls,
-    showRewarded: (placement: RewardedPlacement) => {
-      calls.push(placement);
-      return Promise.resolve(result);
-    },
-  } as AdService & { calls: RewardedPlacement[] };
 }
 
 /** One move away from clearing row 0 — the hand's single completes it. */
@@ -57,25 +30,6 @@ function clearingState(): GameState {
       { handId: "h-single", shapeId: "single", colorId: "amber" },
       { handId: "h-spare", shapeId: "single", colorId: "purple" },
     ],
-  };
-}
-
-/** A game-over run with rubble on the board and its revive still available. */
-function reviveState(): GameState {
-  const grid = makeEmptyGrid(8);
-  // Fill the board so no piece fits, leaving two rubble cells to restore.
-  for (let row = 0; row < 8; row++) {
-    for (let column = 0; column < 8; column++) {
-      grid[row][column] = { kind: "normal", colorId: "cyan" };
-    }
-  }
-  grid[3][3] = { kind: "rubble", explosionId: "e-1" };
-  grid[4][4] = { kind: "rubble", explosionId: "e-1" };
-  return {
-    ...createInitialGameState("fx-seed", NOW),
-    grid,
-    status: "gameOver",
-    hand: [{ handId: "h-1", shapeId: "square2", colorId: "cyan" }],
   };
 }
 
@@ -104,9 +58,9 @@ describe("line-clear feedback", () => {
     expect(result.getAllByTestId(/^cell-\d+-\d+$/)).toHaveLength(64);
   });
 
-  it("plays the line-clear cue exactly once for the turn", async () => {
+  it("plays one dominant outcome cue exactly once for a clear-plus-defuse turn", async () => {
     const user = userEvent.setup();
-    const audio = recordingAudio();
+    const audio = createNoOpAudioService();
     const result = await render(
       <GameScreenContent
         controllerOptions={options(clearingState())}
@@ -114,83 +68,17 @@ describe("line-clear feedback", () => {
         boardSize={328}
       />,
     );
+    await waitFor(() => expect(audio.musicCalls).toContain("start"));
 
     await user.press(result.getByTestId("tray-piece-h-single"));
     await user.press(result.getByTestId("cell-0-0"));
 
-    await waitFor(() => expect(audio.played).toContain("lineClear"));
-    expect(audio.played.filter((name) => name === "lineClear")).toHaveLength(1);
-    // The placement cue is also once, never re-fired by the effect replaying.
-    expect(audio.played.filter((name) => name === "placement")).toHaveLength(1);
-  });
-});
-
-describe("revive feedback", () => {
-  it("plays a recovery wave over the restored rubble without duplicating restoration", async () => {
-    const user = userEvent.setup();
-    const ads = scriptedAds("earned");
-    const result = await render(
-      <GameScreenContent
-        controllerOptions={options(reviveState())}
-        adService={ads}
-        boardSize={328}
-      />,
-    );
-
-    await user.press(await result.findByTestId("revive-button"));
-
-    // The wave covers exactly the two cells that held rubble before the revive.
-    await waitFor(() => expect(result.getByTestId("revive-flash-3-3")).toBeTruthy());
-    expect(result.getByTestId("revive-flash-4-4")).toBeTruthy();
-    expect(result.queryByTestId("revive-flash-0-0")).toBeNull();
-
-    // The reward was requested once, and the board is restored exactly once —
-    // the cells are empty, not doubly-processed.
-    expect(ads.calls).toHaveLength(1);
-    expect(result.getByLabelText(/empty cell, row 4, column 4/i)).toBeTruthy();
-
-    // The wave holds no input lock and cleans itself up.
-    await waitFor(() => expect(result.queryByTestId("effects-layer")).toBeNull(), {
-      timeout: 2000,
-    });
-  });
-
-  it("reports a cancelled revive instead of failing silently, and grants nothing", async () => {
-    const user = userEvent.setup();
-    const ads = scriptedAds("closed");
-    const result = await render(
-      <GameScreenContent
-        controllerOptions={options(reviveState())}
-        adService={ads}
-        boardSize={328}
-      />,
-    );
-
-    await user.press(await result.findByTestId("revive-button"));
-
-    const notice = await result.findByTestId("revive-outcome");
-    expect(notice.props.children).toMatch(/cancelled/i);
-    // Rubble is untouched: a dismissed ad grants nothing.
-    expect(result.getByLabelText(/rubble.*row 4, column 4/i)).toBeTruthy();
-    expect(result.queryByTestId("revive-flash-3-3")).toBeNull();
-  });
-
-  it("reports a failed revive as a failure, and still grants nothing", async () => {
-    const user = userEvent.setup();
-    const ads = scriptedAds("unavailable");
-    const result = await render(
-      <GameScreenContent
-        controllerOptions={options(reviveState())}
-        adService={ads}
-        boardSize={328}
-      />,
-    );
-
-    await user.press(await result.findByTestId("revive-button"));
-
-    const notice = await result.findByTestId("revive-outcome");
-    expect(notice.props.children).toMatch(/failed/i);
-    expect(result.getByLabelText(/rubble.*row 4, column 4/i)).toBeTruthy();
+    await waitFor(() => expect(audio.cues.some(({ cue }) => cue === "naturalDefuse")).toBe(true));
+    expect(audio.cues.filter(({ cue }) => cue === "naturalDefuse")).toHaveLength(1);
+    // Defuse outranks the simultaneous clear; neither lower-priority clear nor
+    // placement layers underneath it.
+    expect(audio.cues.some(({ cue }) => cue === "clearSingle")).toBe(false);
+    expect(audio.cues.some(({ cue }) => cue === "validPlacement")).toBe(false);
   });
 });
 

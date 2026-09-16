@@ -53,9 +53,7 @@ describe("event privacy shape", () => {
       piecesDefused: 2,
       explosions: 1,
       rubbleCleared: 3,
-      revived: false,
       durationMs: 90_000,
-      boltsEarned: 6,
     };
     const keys = Object.keys(runEnd).sort();
     expect(keys).toEqual(
@@ -69,9 +67,7 @@ describe("event privacy shape", () => {
         "piecesDefused",
         "explosions",
         "rubbleCleared",
-        "revived",
         "durationMs",
-        "boltsEarned",
       ].sort(),
     );
     // No known-sensitive field names leak through.

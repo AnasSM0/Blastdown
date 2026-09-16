@@ -6,6 +6,7 @@ import { getTimerVisualState } from "../../ui/timerStates";
 import { getPulseConfig } from "../../ui/timerPulse";
 import { getBadgeVisual } from "./timerBadgeStyle";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
+import { motionKey } from "../../ui/motionKey";
 
 /** Value-change tick tuning — brief and within the Phase 2 100–220 ms band. */
 const TICK_SCALE = 1.16;
@@ -101,6 +102,7 @@ export function TimerBadge({
     : { transform: [{ scale: Animated.multiply(scale, tick) }] };
   return (
     <Animated.View
+      key={motionKey(reducedMotion)}
       style={[
         styles.badge,
         {

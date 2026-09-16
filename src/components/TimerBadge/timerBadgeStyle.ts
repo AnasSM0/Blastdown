@@ -22,8 +22,9 @@ export type BadgeVisual = {
 };
 
 const BASE_SIZE = 24;
+const WARNING_SIZE = 25;
 /** Critical badges are visibly larger — a non-color size emphasis (spec P1-5). */
-const URGENT_SIZE = 27;
+const URGENT_SIZE = 28;
 
 /** Resolve a timer badge's look from its countdown state plus whether the run's
  *  freeze is active. Each named state (normal / warning-2 / critical-1 / frozen)
@@ -56,7 +57,7 @@ export function getBadgeVisual(
       return {
         size: URGENT_SIZE,
         ringColor: theme.timerCritical,
-        ringWidth: 2.5,
+        ringWidth: 3,
         dashed: false,
         numeralColor: theme.timerCritical,
         glow: glowFor(theme, theme.timerCritical, "high"),
@@ -65,9 +66,9 @@ export function getBadgeVisual(
     case "warning":
       // Warning (2 moves): restrained amber emphasis — a medium-weight ring.
       return {
-        size: BASE_SIZE,
+        size: WARNING_SIZE,
         ringColor: theme.timerWarning,
-        ringWidth: 1.75,
+        ringWidth: 2.25,
         dashed: false,
         numeralColor: theme.timerWarning,
         glow: glowFor(theme, theme.timerWarning, "high"),

@@ -1,1 +1,1 @@
-export { DragGhost, DRAG_LIFT, type DragGhostHandle } from "./DragGhost";
+export { DragGhost, type DragGhostHandle } from "./DragGhost";

@@ -2,52 +2,23 @@ import { forwardRef, memo, useEffect, useMemo, useState } from "react";
 import { Animated, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 
 import type { GridCell as DomainGridCell } from "../../domain/gameTypes";
-import type { PlacementPreview, TimerBadgePlacement } from "../../domain/selectors";
-import type { CellPosition } from "../../domain/placement";
 import { BOARD_CONTENT_INSET, FRAME_WIDTH } from "../../ui/boardGeometry";
+import {
+  BOARD_CORNER_ACCENT_INSET,
+  BOARD_CORNER_ACCENT_LENGTH,
+  BOARD_CORNER_ACCENT_THICKNESS,
+} from "../../ui/boardChrome";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import { getTimerVisualState } from "../../ui/timerStates";
 import { radius, spacing } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
 import { GridCell, contourMaskOf, type CellEdges, type CellPreviewState } from "../GridCell";
 import { TimerBadge } from "../TimerBadge";
-
-type GameBoardProps = {
-  grid: readonly (readonly DomainGridCell[])[];
-  badges: readonly TimerBadgePlacement[];
-  /** Optional fixed content size (mostly for tests); defaults to measuring. */
-  boardSize?: number;
-  preview?: PlacementPreview | null;
-  onCellPress?: (position: CellPosition) => void;
-  /** Reports the computed cell edge length whenever it changes, so the screen
-   *  can map finger coordinates to board cells during a drag. */
-  onCellSizeChange?: (cellSize: number) => void;
-  /** Cells of the most recently placed piece, flashed with a settle "snap". */
-  placedCells?: readonly CellPosition[];
-  /** Bumped each placement so the snap replays even on the same cells. */
-  placementNonce?: number;
-  /** Number of explosions in the turn currently being animated, paired with
-   *  `effectKey` to retrigger the board's single shake. Deliberately NOT the
-   *  whole effect plan: the cosmetic overlay is a sibling of the board, so a
-   *  plan change must not re-render all 64 cells. */
-  explosionCount?: number;
-  /** Increments per sequence so the shake retriggers on a repeated explosion. */
-  effectKey?: number;
-  /** Timed piece to ring as the rewarded-defuse target (Stitch 07); its cells
-   *  get a solid cyan highlight while the confirm card is open. */
-  highlightPieceId?: string | null;
-  /** Effective reduced-motion (OS combined with the persisted override). When
-   *  omitted, falls back to the OS setting alone. */
-  reducedMotion?: boolean;
-  /** True while the run's rewarded freeze is active — pauses the countdown and
-   *  puts every timer badge into its frozen (icy, static) cue. */
-  frozen?: boolean;
-  /** Per-empty-cell anchor validity for the currently selected piece, keyed
-   *  "row,column", from the domain's placement preview. Null/absent when no
-   *  piece is selected. Drives each empty cell's placement hint for assistive
-   *  tech — read-only presentation data, never a gameplay input. */
-  placementHints?: ReadonlyMap<string, "valid" | "invalid"> | null;
-};
+import { BoardDangerLighting } from "../BoardDangerLighting";
+import { CALM_DANGER_STATE } from "../../ui/dangerState";
+import { PRE_CLEAR_PULSE_MIN, PRE_CLEAR_PULSE_MS, preClearVisual } from "../../ui/preClearPreview";
+import type { GameBoardProps } from "./boardProps";
+import { placementSettlePlan } from "../../ui/pieceInteraction";
 
 /** Boundary sides of a timed cell within its piece: a side is a boundary when
  *  its neighbor is not the same timed piece. Reads only the cells' existing
@@ -75,12 +46,6 @@ function contourEdgesFor(
   };
 }
 
-/** Corner-accent geometry (P1-3). Short, thin brackets inset just inside the
- *  frame; purely decorative and non-interactive. */
-const CORNER_LENGTH = 12;
-const CORNER_THICKNESS = 2;
-const CORNER_INSET = 3;
-
 // FRAME_WIDTH and BOARD_CONTENT_INSET now live in ../../ui/boardGeometry (the
 // neutral module) so EffectsLayer can share them without importing this
 // component's barrel — which formed a require cycle. Re-exported (from the
@@ -91,14 +56,14 @@ function GameBoardImpl(
   {
     grid,
     badges,
+    danger = CALM_DANGER_STATE,
     boardSize,
     preview,
     onCellPress,
+    onCellPreviewChange,
     onCellSizeChange,
     placedCells,
     placementNonce,
-    explosionCount = 0,
-    effectKey,
     highlightPieceId,
     reducedMotion: reducedMotionProp,
     frozen = false,
@@ -110,36 +75,53 @@ function GameBoardImpl(
   const [measured, setMeasured] = useState(0);
   const osReducedMotion = useReducedMotion();
   const reducedMotion = reducedMotionProp ?? osReducedMotion;
-  const [shake] = useState(() => new Animated.Value(0));
+  const [preClearPulse] = useState(() => new Animated.Value(1));
   const rows = grid.length;
   const columns = grid[0]?.length ?? 0;
+  const showPreClear = Boolean(
+    preview?.valid && (preview.clear.rows.length > 0 || preview.clear.columns.length > 0),
+  );
 
-  // Subtle single board shake on an explosion turn (skipped under reduced
-  // motion); keyed on effectKey so it retriggers each explosion sequence.
+  // A single driver animates every predicted lane. It starts/stops only when
+  // prediction presence changes, never for every pointer pixel or board cell.
   useEffect(() => {
-    if (explosionCount === 0 || reducedMotion) {
-      shake.setValue(0);
+    if (!showPreClear || reducedMotion) {
+      preClearPulse.setValue(1);
       return;
     }
-    const animation = Animated.sequence([
-      Animated.timing(shake, { toValue: -4, duration: 45, useNativeDriver: true }),
-      Animated.timing(shake, { toValue: 4, duration: 55, useNativeDriver: true }),
-      Animated.timing(shake, { toValue: -3, duration: 45, useNativeDriver: true }),
-      Animated.timing(shake, { toValue: 0, duration: 55, useNativeDriver: true }),
-    ]);
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(preClearPulse, {
+          toValue: PRE_CLEAR_PULSE_MIN,
+          duration: PRE_CLEAR_PULSE_MS,
+          useNativeDriver: true,
+        }),
+        Animated.timing(preClearPulse, {
+          toValue: 1,
+          duration: PRE_CLEAR_PULSE_MS,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
     animation.start();
     return () => {
       animation.stop();
-      shake.setValue(0);
+      preClearPulse.setValue(1);
     };
-  }, [effectKey, explosionCount, reducedMotion, shake]);
+  }, [preClearPulse, reducedMotion, showPreClear]);
 
   // Derived lookups, each memoized on the one input it actually depends on, so
   // a board re-render for an unrelated reason (a preview change, a freeze
   // toggle) doesn't rebuild all of them.
-  const placedSet = useMemo(
-    () => new Set((placedCells ?? []).map((cell) => `${cell.row},${cell.column}`)),
-    [placedCells],
+  const placementSteps = useMemo(
+    () =>
+      new Map(
+        placementSettlePlan(placedCells ?? [], reducedMotion).map((step) => [
+          `${step.cell.row},${step.cell.column}`,
+          step,
+        ]),
+      ),
+    [placedCells, reducedMotion],
   );
 
   // Pieces whose countdown is urgent, from the badge data already supplied —
@@ -196,6 +178,8 @@ function GameBoardImpl(
     columns > 0 && contentSize > 0
       ? (contentSize - (columns - 1) * spacing.gridGutter) / columns
       : 0;
+  const contentSpan = columns > 0 ? columns * cellSize + (columns - 1) * spacing.gridGutter : 0;
+  const preClear = useMemo(() => preClearVisual(theme), [theme]);
 
   useEffect(() => {
     if (cellSize > 0) {
@@ -210,17 +194,9 @@ function GameBoardImpl(
   };
 
   return (
-    <Animated.View
+    <View
       ref={ref}
-      style={[
-        styles.board,
-        { backgroundColor: theme.boardBg, borderColor: theme.boardFrame },
-        // Only bind the shake transform when motion is allowed. Under reduced
-        // motion the shake never animates, so an identity transform would only
-        // promote this rounded board (and its rounded cell/rubble children) to
-        // an Android hardware layer for no benefit — the black-render trap.
-        reducedMotion ? undefined : { transform: [{ translateX: shake }] },
-      ]}
+      style={[styles.board, { backgroundColor: theme.boardBg, borderColor: theme.boardFrame }]}
       onLayout={handleLayout}
       collapsable={false}
       accessibilityLabel="Game board"
@@ -242,42 +218,94 @@ function GameBoardImpl(
       {cellSize > 0
         ? grid.map((rowCells, row) => (
             <View key={`row-${row}`} style={[styles.row, row < rows - 1 && styles.rowGap]}>
-              {rowCells.map((cell, column) => (
-                <View
-                  key={`cell-${row}-${column}`}
-                  style={column < columns - 1 ? styles.cellGap : undefined}
-                >
-                  <GridCell
-                    cell={cell}
-                    row={row}
-                    column={column}
-                    size={cellSize}
-                    previewState={previewMap.get(`${row},${column}`)}
-                    highlighted={
-                      highlightPieceId != null &&
-                      cell.kind === "timed" &&
-                      cell.pieceInstanceId === highlightPieceId
-                    }
-                    critical={cell.kind === "timed" && criticalPieceIds.has(cell.pieceInstanceId)}
-                    contourMask={contourMasks.get(`${row},${column}`)}
-                    // One shared handler for all 64 cells — each cell reports
-                    // its own position, so no per-cell closure is created.
-                    onPress={onCellPress}
-                    flashNonce={placedSet.has(`${row},${column}`) ? placementNonce : undefined}
-                    reducedMotion={reducedMotion}
-                    placementState={
-                      cell.kind === "empty"
-                        ? (placementHints?.get(`${row},${column}`) ?? undefined)
-                        : undefined
-                    }
-                    remainingTurns={
-                      cell.kind === "timed" ? remainingByPiece.get(cell.pieceInstanceId) : undefined
-                    }
-                    frozen={frozen}
-                  />
-                </View>
-              ))}
+              {rowCells.map((cell, column) => {
+                const placementStep = placementSteps.get(`${row},${column}`);
+                return (
+                  <View
+                    key={`cell-${row}-${column}`}
+                    style={column < columns - 1 ? styles.cellGap : undefined}
+                  >
+                    <GridCell
+                      cell={cell}
+                      row={row}
+                      column={column}
+                      size={cellSize}
+                      previewState={previewMap.get(`${row},${column}`)}
+                      highlighted={
+                        highlightPieceId != null &&
+                        cell.kind === "timed" &&
+                        cell.pieceInstanceId === highlightPieceId
+                      }
+                      critical={cell.kind === "timed" && criticalPieceIds.has(cell.pieceInstanceId)}
+                      contourMask={contourMasks.get(`${row},${column}`)}
+                      // One shared handler for all 64 cells — each cell reports
+                      // its own position, so no per-cell closure is created.
+                      onPress={onCellPress}
+                      onPreviewChange={onCellPreviewChange}
+                      flashNonce={placementStep ? placementNonce : undefined}
+                      settleDelayMs={placementStep?.delayMs}
+                      settleDurationMs={placementStep?.durationMs}
+                      reducedMotion={reducedMotion}
+                      placementState={
+                        cell.kind === "empty"
+                          ? (placementHints?.get(`${row},${column}`) ?? undefined)
+                          : undefined
+                      }
+                      remainingTurns={
+                        cell.kind === "timed"
+                          ? remainingByPiece.get(cell.pieceInstanceId)
+                          : undefined
+                      }
+                      frozen={frozen}
+                    />
+                  </View>
+                );
+              })}
             </View>
+          ))
+        : null}
+      {cellSize > 0 && showPreClear
+        ? preview?.clear.rows.map((row) => (
+            <Animated.View
+              key={`preclear-row-${row}`}
+              pointerEvents="none"
+              testID={`preclear-row-${row}`}
+              style={[
+                styles.preClear,
+                {
+                  left: BOARD_CONTENT_INSET,
+                  top: BOARD_CONTENT_INSET + row * (cellSize + spacing.gridGutter),
+                  width: contentSpan,
+                  height: cellSize,
+                  backgroundColor: preClear.fill,
+                  borderColor: preClear.edge,
+                  borderWidth: preClear.edgeWidth,
+                  opacity: reducedMotion ? 1 : preClearPulse,
+                },
+              ]}
+            />
+          ))
+        : null}
+      {cellSize > 0 && showPreClear
+        ? preview?.clear.columns.map((column) => (
+            <Animated.View
+              key={`preclear-column-${column}`}
+              pointerEvents="none"
+              testID={`preclear-column-${column}`}
+              style={[
+                styles.preClear,
+                {
+                  left: BOARD_CONTENT_INSET + column * (cellSize + spacing.gridGutter),
+                  top: BOARD_CONTENT_INSET,
+                  width: cellSize,
+                  height: contentSpan,
+                  backgroundColor: preClear.fill,
+                  borderColor: preClear.edge,
+                  borderWidth: preClear.edgeWidth,
+                  opacity: reducedMotion ? 1 : preClearPulse,
+                },
+              ]}
+            />
           ))
         : null}
       {/* Small theme-aware corner accents (P1-3), drawn on top at the four
@@ -379,7 +407,8 @@ function GameBoardImpl(
             </View>
           ))
         : null}
-    </Animated.View>
+      <BoardDangerLighting danger={danger} reducedMotion={reducedMotion} />
+    </View>
   );
 }
 
@@ -407,6 +436,11 @@ const styles = StyleSheet.create({
   badgeAnchor: {
     position: "absolute",
     zIndex: 2,
+  },
+  preClear: {
+    position: "absolute",
+    zIndex: 1,
+    borderRadius: radius.cell,
   },
   // A fine inner-border ring sitting just inside the outer frame, within the
   // gutter — draws structure without touching cell geometry.
@@ -441,15 +475,15 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   cornerH: {
-    width: CORNER_LENGTH,
-    height: CORNER_THICKNESS,
+    width: BOARD_CORNER_ACCENT_LENGTH,
+    height: BOARD_CORNER_ACCENT_THICKNESS,
   },
   cornerV: {
-    width: CORNER_THICKNESS,
-    height: CORNER_LENGTH,
+    width: BOARD_CORNER_ACCENT_THICKNESS,
+    height: BOARD_CORNER_ACCENT_LENGTH,
   },
-  cornerTL: { top: CORNER_INSET, left: CORNER_INSET },
-  cornerTR: { top: CORNER_INSET, right: CORNER_INSET },
-  cornerBL: { bottom: CORNER_INSET, left: CORNER_INSET },
-  cornerBR: { bottom: CORNER_INSET, right: CORNER_INSET },
+  cornerTL: { top: BOARD_CORNER_ACCENT_INSET, left: BOARD_CORNER_ACCENT_INSET },
+  cornerTR: { top: BOARD_CORNER_ACCENT_INSET, right: BOARD_CORNER_ACCENT_INSET },
+  cornerBL: { bottom: BOARD_CORNER_ACCENT_INSET, left: BOARD_CORNER_ACCENT_INSET },
+  cornerBR: { bottom: BOARD_CORNER_ACCENT_INSET, right: BOARD_CORNER_ACCENT_INSET },
 });

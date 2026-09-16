@@ -46,10 +46,12 @@ engineering-readiness section; store/submission items land in Phase 9.
 
 ## Store & submission (Phase 9)
 
-- [ ] Production analytics + crash-reporting adapters wired and verified live
+- [x] Initial MVP crash/ANR monitoring uses Android vitals and Play Console
+- [ ] POST-LAUNCH: evaluate and integrate an approved third-party
+      analytics/crash provider if needed
 - [ ] App icon, screenshots, feature graphic
 - [ ] Privacy policy + Play Data Safety form (matches the analytics taxonomy)
 - [ ] Production AAB build
 - [ ] Closed-testing track submission
-- [ ] Crash-monitoring live check
+- [ ] Android vitals / Play Console crash-monitoring live check
 - [ ] Balance validated against the Phase-0 prototype gate

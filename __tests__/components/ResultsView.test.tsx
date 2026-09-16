@@ -13,41 +13,46 @@ const stats: RunStats = {
 };
 
 describe("ResultsView", () => {
-  it("renders the run's real statistics, best score, and Bolts earned", async () => {
+  it("renders the run's V1 statistics and best score without legacy rewards", async () => {
     const result = await render(
-      <ResultsView
-        stats={stats}
-        bestScore={20000}
-        boltsEarned={212}
-        onPlayAgain={jest.fn()}
-        onHome={jest.fn()}
-      />,
+      <ResultsView stats={stats} bestScore={20000} onPlayAgain={jest.fn()} onHome={jest.fn()} />,
     );
     expect(result.getByTestId("results-score").props.children).toBe("14,200");
     expect(result.getByTestId("results-best").props.children).toEqual(["BEST: ", "20,000"]);
-    expect(result.getByText("+212")).toBeTruthy();
+    expect(result.queryByText(/bolts/i)).toBeNull();
+    expect(result.queryByTestId("double-bolts-button")).toBeNull();
     expect(result.getByText("x12")).toBeTruthy();
     expect(result.getByText("48")).toBeTruthy();
     expect(result.getByText("156")).toBeTruthy();
     expect(result.getByText("22")).toBeTruthy();
     expect(result.getByText("89")).toBeTruthy();
+    expect(result.getByTestId("reactor-background")).toBeTruthy();
   });
 
   it("fires Play Again and Home", async () => {
     const onPlayAgain = jest.fn();
     const onHome = jest.fn();
     const result = await render(
-      <ResultsView
-        stats={stats}
-        bestScore={0}
-        boltsEarned={0}
-        onPlayAgain={onPlayAgain}
-        onHome={onHome}
-      />,
+      <ResultsView stats={stats} bestScore={0} onPlayAgain={onPlayAgain} onHome={onHome} />,
     );
     await fireEvent.press(result.getByTestId("play-again-button"));
     await fireEvent.press(result.getByTestId("results-home-button"));
     expect(onPlayAgain).toHaveBeenCalledTimes(1);
     expect(onHome).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps large final and best scores on one stable line", async () => {
+    const result = await render(
+      <ResultsView
+        stats={{ ...stats, score: 999_999 }}
+        bestScore={1_019_999}
+        onPlayAgain={jest.fn()}
+        onHome={jest.fn()}
+      />,
+    );
+    expect(result.getByTestId("results-score")).toHaveTextContent("999,999");
+    expect(result.getByTestId("results-score").props.numberOfLines).toBe(1);
+    expect(result.getByTestId("results-score").props.adjustsFontSizeToFit).toBe(true);
+    expect(result.getByTestId("results-best").props.numberOfLines).toBe(1);
   });
 });

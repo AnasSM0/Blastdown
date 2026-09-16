@@ -4,17 +4,16 @@ Frozen local copy of the 16 Stitch screens approved as BlastDown's visual
 direction, retrieved 2026-07-18 from the Stitch MCP project **BlastDown
 Puzzle UI Design** (`projects/4472195625883229066`).
 
-**Stitch is authoritative only for visual direction — colors, typography,
-spacing, iconography, mood.** `BUILD_SPEC.md` and `docs/GAME_RULES.md` are
-authoritative for gameplay (board size, hand size, timer rules, scoring,
-etc.). Where a screen depicts something that conflicts with the spec, the
-spec wins — see `docs/UI_REFERENCE_AUDIT.md` for the full list of
-discrepancies found in this snapshot.
+**Stitch is a historical visual reference only — colors, typography, spacing,
+iconography, and mood.** Current product and gameplay authority follows the
+hierarchy in `AGENTS.md`. Where a screen conflicts with that hierarchy, the
+approved product documents win; see `docs/UI_REFERENCE_AUDIT.md` for the
+snapshot's original discrepancy audit.
 
 ## Why this snapshot exists
 
 Stitch projects are live and editable. Future edits in Stitch must not
-silently change what Codex/Claude build against mid-implementation. This
+silently change what engineering builds against mid-implementation. This
 directory is the **stable, versioned, point-in-time reference** — implementation
 work reads from here, not from a live Stitch query. If the approved design
 changes, re-run the retrieval, review the diff, and update this snapshot

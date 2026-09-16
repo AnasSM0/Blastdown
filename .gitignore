@@ -44,3 +44,12 @@ coverage/
 /ios
 /android
 export.log
+
+# graphify knowledge graph — generated from source, rebuilt on every commit and
+# branch switch, and different on every branch. Kept local: committing it would
+# conflict on essentially every merge for output no human reads.
+graphify-out/
+graph.json
+
+# Personal Claude Code permission grants, not project configuration.
+.claude/settings.local.json

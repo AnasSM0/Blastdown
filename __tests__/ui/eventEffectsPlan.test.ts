@@ -71,7 +71,7 @@ describe("defuse targeting", () => {
 
     const events: GameEvent[] = [
       { type: "linesCleared", rows: [3], columns: [] },
-      { type: "pieceDefused", pieceId: "piece-9", bonus: 80 },
+      { type: "pieceDefused", pieceId: "piece-9", bonus: 80, remainingTurns: 3 },
       { type: "scoreChanged", delta: 180, score: 180 },
     ];
     const plan = buildEffectPlan(events, false, { previousGrid });
@@ -92,8 +92,8 @@ describe("defuse targeting", () => {
     const plan = buildEffectPlan(
       [
         { type: "linesCleared", rows: [0, 7], columns: [] },
-        { type: "pieceDefused", pieceId: "a", bonus: 40 },
-        { type: "pieceDefused", pieceId: "b", bonus: 60 },
+        { type: "pieceDefused", pieceId: "a", bonus: 40, remainingTurns: 2 },
+        { type: "pieceDefused", pieceId: "b", bonus: 60, remainingTurns: 1 },
       ],
       false,
       { previousGrid },
@@ -106,7 +106,10 @@ describe("defuse targeting", () => {
   });
 
   it("falls back to no cells when the pre-turn grid is unavailable", () => {
-    const plan = buildEffectPlan([{ type: "pieceDefused", pieceId: "gone", bonus: 10 }], false);
+    const plan = buildEffectPlan(
+      [{ type: "pieceDefused", pieceId: "gone", bonus: 10, remainingTurns: 1 }],
+      false,
+    );
     expect(plan.defuses[0].cells).toEqual([]);
   });
 });
@@ -115,7 +118,12 @@ describe("expiry and rubble", () => {
   it("takes rubble from the authoritative event, grouped per explosion", () => {
     const plan = buildEffectPlan(
       [
-        { type: "explosionStarted", explosionId: "e-1", pieceId: "p-1" },
+        {
+          type: "explosionStarted",
+          explosionId: "e-1",
+          pieceId: "p-1",
+          sourceCells: [{ row: 2, column: 2 }],
+        },
         {
           type: "rubbleCreated",
           explosionId: "e-1",
@@ -124,7 +132,12 @@ describe("expiry and rubble", () => {
             { row: 2, column: 3 },
           ],
         },
-        { type: "explosionStarted", explosionId: "e-2", pieceId: "p-2" },
+        {
+          type: "explosionStarted",
+          explosionId: "e-2",
+          pieceId: "p-2",
+          sourceCells: [{ row: 5, column: 5 }],
+        },
         // A cell shared with the first explosion must be drawn once.
         {
           type: "rubbleCreated",
@@ -148,7 +161,12 @@ describe("expiry and rubble", () => {
     const events: GameEvent[] = [];
     // Six simultaneous expiries, six cells each — far past the budget.
     for (let index = 0; index < 6; index++) {
-      events.push({ type: "explosionStarted", explosionId: `e-${index}`, pieceId: `p-${index}` });
+      events.push({
+        type: "explosionStarted",
+        explosionId: `e-${index}`,
+        pieceId: `p-${index}`,
+        sourceCells: [{ row: index, column: 0 }],
+      });
       events.push({
         type: "rubbleCreated",
         explosionId: `e-${index}`,

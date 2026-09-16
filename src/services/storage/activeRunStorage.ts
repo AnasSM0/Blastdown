@@ -1,13 +1,33 @@
 import type { GameState } from "../../domain/gameTypes";
+import { reportCaught } from "../diagnostics/reportError";
 import { STORAGE_KEYS } from "./keys";
-import { ACTIVE_RUN_SCHEMA_VERSION, parseActiveRun, type PersistedActiveRun } from "./schemas";
+import { ACTIVE_RUN_SCHEMA_VERSION, inspectActiveRun, type PersistedActiveRun } from "./schemas";
 import type { StorageService } from "./StorageService";
 
 /** Load and validate the saved run. Returns null on missing/corrupt/
  *  incompatible data (the caller starts fresh). */
 export async function loadActiveRun(storage: StorageService): Promise<PersistedActiveRun | null> {
   const raw = await storage.getItem(STORAGE_KEYS.activeRun);
-  return parseActiveRun(raw);
+  const parsed = inspectActiveRun(raw);
+  if (parsed.kind === "valid") {
+    return parsed.value;
+  }
+  if (parsed.kind === "missing") {
+    return null;
+  }
+
+  reportCaught("persistence", new Error("Invalid active-run payload"), {
+    operation: "load_active_run",
+    reason: parsed.reason,
+  });
+  try {
+    await clearActiveRun(storage);
+  } catch (error) {
+    // Cleanup is best-effort and never blocks hydration. A later valid save
+    // still replaces the corrupt record through the normal writer.
+    reportCaught("persistence", error, { operation: "cleanup_active_run" });
+  }
+  return null;
 }
 
 export async function clearActiveRun(storage: StorageService): Promise<void> {
@@ -41,6 +61,9 @@ export type ActiveRunPersister = {
   clear: () => Promise<void>;
   /** Resolves once the queue is drained — used for background-flush. */
   whenIdle: () => Promise<void>;
+  /** Explicit durability boundary. Resolves/rejects with the current drain,
+   * including the newest operation queued before that drain completes. */
+  flush: () => Promise<void>;
   /** Highest sequence number written so far (diagnostics/tests). */
   readonly seq: number;
 };
@@ -58,17 +81,40 @@ export function createActiveRunPersister(
   let running: Promise<void> | null = null;
 
   async function drain(): Promise<void> {
-    while (pending !== null) {
-      const op = pending;
-      pending = null;
-      if (op.kind === "clear") {
-        await clearActiveRun(storage);
-      } else {
-        seq += 1;
-        await writeActiveRun(storage, op.state, seq, now());
+    let firstFailure: unknown;
+    let failed = false;
+    try {
+      while (pending !== null) {
+        const op = pending;
+        pending = null;
+        try {
+          if (op.kind === "clear") {
+            await clearActiveRun(storage);
+          } else {
+            const nextSeq = seq + 1;
+            await writeActiveRun(storage, op.state, nextSeq, now());
+            seq = nextSeq;
+          }
+        } catch (error) {
+          reportCaught("persistence", error, {
+            operation: op.kind === "clear" ? "clear_active_run" : "save_active_run",
+          });
+          if (!failed) {
+            failed = true;
+            firstFailure = error;
+          }
+          // Do not retry the failed operation. A newer operation that was
+          // queued while it was in flight may still drain once.
+        }
       }
+      if (failed) {
+        throw firstFailure;
+      }
+    } finally {
+      // A rejected set/remove must never leave the persister permanently
+      // attached to a rejected promise. The next enqueue starts a fresh drain.
+      running = null;
     }
-    running = null;
   }
 
   function enqueue(op: Op): Promise<void> {
@@ -85,6 +131,7 @@ export function createActiveRunPersister(
     save: (state) => enqueue({ kind: "save", state }),
     clear: () => enqueue({ kind: "clear" }),
     whenIdle: () => running ?? Promise.resolve(),
+    flush: () => running ?? Promise.resolve(),
     get seq() {
       return seq;
     },

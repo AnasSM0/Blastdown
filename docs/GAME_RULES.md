@@ -1,8 +1,8 @@
 # Game Rules
 
-Derived from `BUILD_SPEC.md` sections 6–9. This is the gameplay contract:
-any UI or engine change that would alter these rules requires Claude Code's
-approval and a `docs/DECISIONS.md` entry.
+This is the current gameplay contract beneath the PRD and Technical Design.
+Any change to these rules must be explicitly surfaced, product-approved, and
+recorded in `docs/DECISIONS.md`; existing legacy code is not authority.
 
 ## Board
 
@@ -109,14 +109,6 @@ appearance.
 Run ends when none of the current-hand pieces can fit anywhere on the board.
 An explosion never ends the game by itself — damage is recoverable.
 
-## Revive (one rewarded use per run)
-
-On earned reward: remove all rubble, add 2 moves to every active timer
-(cap 9), replace hand with three small/medium pieces, reset combo to 0,
-resume the same score, mark revive used. If the ad fails/closes/is
-unavailable: do not change game state, preserve the game-over state, allow
-retry only if the ad service reports a recoverable failure.
-
 ## Freeze power-up (max 2 rewarded uses per run)
 
 "Freeze all timers for the next two successful placements." Newly placed
@@ -130,10 +122,12 @@ doesn't stop UI animation or input.
 removed, cells remain as normal untimed blocks, ties resolved
 deterministically. Don't offer if no active timed pieces exist.
 
-## Repair latest blast (feature-flagged, post-MVP testing only)
+## Deprecated recovery compatibility
 
-Removes rubble created by the most recent explosion only. Not in the initial
-public interface unless testing shows revive opportunities are too rare.
+Older game-state payloads may contain a `reviveUsed` marker, and dormant pure
+helpers for older recovery experiments may remain covered by unit tests. V1
+does not expose rewarded Revive or Repair Latest Blast, and these fields or
+helpers do not alter the canonical Game Over → Results flow.
 
 ## Scoring
 
@@ -150,23 +144,9 @@ All values configurable, never hardcoded in components/reducer.
 - Explosion penalty: reset combo, −50 points, score floor 0.
 - Best score persists locally; no online leaderboard required.
 
-## Bolts currency
-
-`Bolts = floor(score / 250) + successfully defused pieces` per run, earned at
-run end. Double-reward offer at final results: "Watch an ad to double this
-run's Bolts" — only if the player didn't revive through an unfinished ad
-flow, an ad is available, and the reward hasn't already been doubled.
-
-## Themes
-
-Five programmatic themes for MVP: Default, Neon, Ice, Lava, Midnight. They
-change block colors, board background, rubble appearance, particle colors,
-and selected UI accents — never gameplay.
-
 ## Tutorial
 
-Playable, not text-heavy, fixed board and piece sequence, no ads, no
-interstitial after completion, replayable from Settings, skippable after the
+Playable, not text-heavy, fixed board and piece sequence, no ads, replayable from Settings, skippable after the
 first instructional placement. Six scripted steps: place a simple piece →
 complete a row/column → introduce a timer → save a timer at one move → show
 a controlled explosion → clear rubble through a line.

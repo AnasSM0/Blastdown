@@ -1,34 +1,24 @@
+import { useEffect, useRef } from "react";
 import { View, StyleSheet } from "react-native";
 
 import type { CellPosition } from "../../domain/placement";
 import {
-  MAX_BURST_CELLS,
-  MAX_CLEAR_CELLS,
-  sweepDelaysFor,
+  identifyExplosionPresentation,
+  MAX_BOARD_PARTICLES,
   type DefuseEffect,
   type EffectPlan,
+  type IdentifiedExplosionPresentation,
 } from "../../ui/effects/eventEffects";
 import { BOARD_CONTENT_INSET } from "../../ui/boardGeometry";
 import { spacing } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
-import { BurstCell } from "./BurstCell";
 import { CellFlash } from "./CellFlash";
 import { FloatingText } from "./FloatingText";
 import { PulseRing } from "./PulseRing";
+import { ClearPresentationLayer } from "./ClearPresentationLayer";
+import { ExplosionPresentationLayer } from "./ExplosionPresentationLayer";
 
 const GUTTER = spacing.gridGutter;
-
-/** Line-clear sweep pacing: each step along a cleared row/column delays the next
- *  cell's flash, so a clear reads as a direction rather than a simultaneous
- *  blink. Capped so a full-board clear still resolves inside the sequence. */
-const SWEEP_STEP_MS = 14;
-const SWEEP_CAP_MS = 112;
-
-/** Explosion pacing, capped so several simultaneous expiries never stack into
- *  an unbounded overlapping cascade. */
-const BURST_PIECE_STEP_MS = 30;
-const BURST_CELL_STEP_MS = 12;
-const BURST_DELAY_CAP_MS = 120;
 
 /** Revive recovery wave: sweeps top-to-bottom across the restored cells, at a
  *  lower peak than a clear so restoration reads as calm, not as another clear. */
@@ -40,6 +30,13 @@ type EffectsLayerProps = {
   plan: EffectPlan;
   cellSize: number;
   reducedMotion: boolean;
+  /** Identity of the effect being drawn, from the effect queue. */
+  effectId?: string | null;
+  /** Called once when this layer starts drawing `effectId`. See the note on
+   *  the effect below for why this exists. */
+  onStarted?: (id: string, now: number) => void;
+  explosion?: IdentifiedExplosionPresentation | null;
+  explosionFragmentLimit?: number;
 };
 
 function centroid(cells: readonly CellPosition[]): { row: number; column: number } | null {
@@ -69,8 +66,48 @@ function defuseAnchor(
  *  gameplay: clears, defuses, explosions/rubble, and the revive recovery wave.
  *  Rendered as a SIBLING of the board rather than a child, so a change of plan
  *  never re-renders the 64 cells. */
-export function EffectsLayer({ plan, cellSize, reducedMotion }: EffectsLayerProps) {
+export function EffectsLayer({
+  plan,
+  cellSize,
+  reducedMotion,
+  effectId,
+  onStarted,
+  explosion: identifiedExplosion,
+  explosionFragmentLimit = MAX_BOARD_PARTICLES,
+}: EffectsLayerProps) {
   const theme = useTheme();
+
+  // Report to the animator that this layer has begun drawing an effect.
+  //
+  // This call is what makes the renderer-owned start time real. Without it
+  // `startedDrawing` was never invoked in production: `startedAt` stayed null
+  // forever, every effect retired on the watchdog rather than on its own clock,
+  // and the "wait for a slow renderer" branch was unreachable. The unit tests
+  // passed because they called it by hand.
+  //
+  // Mount is the right moment: React has committed the layer, so it paints on
+  // the next frame. Reporting earlier would be a lie about drawing; reporting
+  // later would need a frame callback per effect, which is the per-frame cost
+  // this renderer exists to avoid.
+  // Reported once per effect id, tracked in a ref rather than by effect
+  // dependencies. The callback and the scene both change identity across
+  // ordinary re-renders, so a dependency list would re-report the same effect
+  // repeatedly. The animator ignores a second start, but a renderer that keeps
+  // announcing the same draw is lying about what it did, and the next thing
+  // built on top of it would inherit that.
+  const startedRef = useRef<string | null>(null);
+  const onStartedRef = useRef(onStarted);
+  useEffect(() => {
+    onStartedRef.current = onStarted;
+  });
+  useEffect(() => {
+    if (effectId == null || cellSize <= 0 || startedRef.current === effectId) {
+      return;
+    }
+    startedRef.current = effectId;
+    onStartedRef.current?.(effectId, Date.now());
+  }, [effectId, cellSize]);
+
   if (cellSize <= 0) {
     return null;
   }
@@ -80,28 +117,21 @@ export function EffectsLayer({ plan, cellSize, reducedMotion }: EffectsLayerProp
   const centerX = (column: number) => left(column) + cellSize / 2;
   const centerY = (row: number) => top(row) + cellSize / 2;
 
-  const clearCentroid = centroid(plan.clearedCells);
+  const clearCentroid = centroid(plan.clear?.cells ?? []);
   const rubbleCentroid = centroid(plan.rubbleCells);
-  // Directional per-cell delays: cleared rows sweep left→right, cleared columns
-  // sweep top→bottom, and an intersection takes the earlier of the two so
-  // simultaneous clears stay individually readable.
-  const sweepDelays = sweepDelaysFor(plan.rows, plan.columns, SWEEP_STEP_MS, SWEEP_CAP_MS);
-
+  const explosion =
+    identifiedExplosion ??
+    identifyExplosionPresentation(plan.explosion, effectId ?? "standalone", 0, 0);
   return (
     <View pointerEvents="none" style={styles.layer} testID="effects-layer">
-      {plan.clearedCells.slice(0, MAX_CLEAR_CELLS).map((cell) => (
-        <CellFlash
-          key={`clear-${cell.row}-${cell.column}`}
-          testID={`clear-flash-${cell.row}-${cell.column}`}
-          left={left(cell.column)}
-          top={top(cell.row)}
-          size={cellSize}
+      {plan.clear ? (
+        <ClearPresentationLayer
+          clear={plan.clear}
+          cellSize={cellSize}
           color={theme.accent}
           reducedMotion={reducedMotion}
-          delay={sweepDelays.get(`${cell.row},${cell.column}`) ?? 0}
-          settle
         />
-      ))}
+      ) : null}
 
       {/* A defuse resolves on the piece that was defused — its own cells flash
           and its own centroid carries the ring — so the player can tell which
@@ -142,7 +172,7 @@ export function EffectsLayer({ plan, cellSize, reducedMotion }: EffectsLayerProp
             const bonus = plan.defuses.reduce((sum, defuse) => sum + defuse.bonus, 0);
             return anchor ? (
               <FloatingText
-                text={`DEFUSED +${bonus}`}
+                text={`+${bonus}`}
                 color={theme.accent}
                 centerX={centerX(anchor.column)}
                 top={top(anchor.row) - cellSize}
@@ -162,32 +192,16 @@ export function EffectsLayer({ plan, cellSize, reducedMotion }: EffectsLayerProp
         />
       ) : null}
 
-      {plan.explosions
-        .flatMap((explosion, explosionIndex) =>
-          explosion.cells.map((cell, cellIndex) => ({
-            explosionId: explosion.explosionId,
-            cell,
-            delay: Math.min(
-              explosionIndex * BURST_PIECE_STEP_MS + cellIndex * BURST_CELL_STEP_MS,
-              BURST_DELAY_CAP_MS,
-            ),
-          })),
-        )
-        // Budgeted across ALL explosions, so several simultaneous expiries can't
-        // multiply the view count — the burst is a cue, not a particle system.
-        .slice(0, MAX_BURST_CELLS)
-        .map(({ explosionId, cell, delay }) => (
-          <BurstCell
-            key={`burst-${explosionId}-${cell.row}-${cell.column}`}
-            left={left(cell.column)}
-            top={top(cell.row)}
-            size={cellSize}
-            reducedMotion={reducedMotion}
-            fillColor={theme.score}
-            borderColor={theme.timerCritical}
-            delay={delay}
-          />
-        ))}
+      {explosion ? (
+        <ExplosionPresentationLayer
+          explosion={explosion}
+          cellSize={cellSize}
+          criticalColor={theme.timerCritical}
+          hotColor={theme.score}
+          reducedMotion={reducedMotion}
+          fragmentLimit={explosionFragmentLimit}
+        />
+      ) : null}
 
       {rubbleCentroid && plan.scoreDelta < 0 ? (
         <FloatingText

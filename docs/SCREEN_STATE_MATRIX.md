@@ -1,5 +1,9 @@
 # Screen × Game-State Matrix
 
+> **Historical visual matrix after A-04.** Legacy Revive, Bolts, Themes, and
+> interstitial states shown below are not V1 production requirements. Current
+> screen behavior follows the PRD, App Flow, and UI/UX Brief.
+
 Maps `GameState.status` values and key gameplay moments (per
 `BUILD_SPEC.md` §14's `GameStatus` union and §6.9–6.18's event list) to the
 approved Stitch reference screen(s) that visualize them, so Codex tasks in
@@ -49,8 +53,7 @@ guessing.
 None of these gaps block starting Phase 1/Phase 2 (pure domain engine —
 this snapshot doesn't affect domain work at all) or the parts of Phase 3
 that have full visual coverage (home, normal gameplay, invalid placement,
-pause, results, game-over/revive). They do block writing a _complete_
-Codex task for the explosion effect, rubble rendering, or the
-Settings/Themes screens until either more screens are approved or Claude
-Code signs off on a derived design (as `docs/ANIMATION_SPEC.md` and
+pause, results). They historically blocked complete implementation work for
+the explosion effect, rubble rendering, or Settings until either more screens
+were approved or a derived design was product-approved (as `docs/ANIMATION_SPEC.md` and
 `docs/STYLE_GUIDE.md` already do for the explosion/rubble gaps).

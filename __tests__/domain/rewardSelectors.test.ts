@@ -38,7 +38,8 @@ describe("getRewardedDefuseTarget", () => {
 });
 
 describe("reward capability predicates", () => {
-  it("canActivateFreeze is false while already frozen or at the cap", () => {
+  it("canActivateFreeze needs a timer and is false while frozen or at the cap", () => {
+    expect(canActivateFreeze(withTimers())).toBe(false);
     expect(canActivateFreeze(withTimers(timer("a", 3, 1)))).toBe(true);
     expect(canActivateFreeze({ ...withTimers(timer("a", 3, 1)), freezeTurnsRemaining: 2 })).toBe(
       false,

@@ -1,7 +1,8 @@
 # Test Plan
 
-Derived from `BUILD_SPEC.md` section 21. No task is complete until its
-applicable commands pass.
+Governed by the current product-document hierarchy in `AGENTS.md`. No task is
+complete until its applicable commands pass. Codex owns implementation,
+integration, and verification across all test layers.
 
 ## Required verification commands
 
@@ -14,7 +15,7 @@ npm run format:check
 npx expo-doctor
 ```
 
-## Unit tests (`__tests__/domain/`) — Claude Code owns
+## Unit tests (`__tests__/domain/`)
 
 Required coverage once the domain engine exists (Phase 1–2):
 
@@ -27,18 +28,18 @@ Required coverage once the domain engine exists (Phase 1–2):
 - Partial piece clear; full piece defuse; saving a timer at one
 - Single explosion; multiple simultaneous explosions; adjacent-rubble cap;
   deterministic explosion cells
-- Defuse power-up; revive power-up
+- Defuse power-up; dormant legacy recovery helpers where retained
 - Hand refill
 - Seeded sequence reproducibility
 - Game-over detection
 - Score calculation; combo reset
 - Persistence migration
 
-## Component tests (`__tests__/components/`) — Codex implements first, Claude reviews
+## Component tests (`__tests__/components/`)
 
 Required areas: piece selection, placement preview, invalid-placement
-feedback, timer-badge state, rewarded-action loading state, game-over revive
-state, results screen, settings persistence.
+feedback, timer-badge state, rewarded-action loading state, canonical game-over
+state, results screen, settings persistence, and absence of excluded V1 UI.
 
 Phase 0 seeds this layer with `__tests__/components/HomeScreen.test.tsx`,
 which renders the real home screen and asserts the logo and Play affordance
@@ -49,9 +50,9 @@ before using the returned queries.
 
 Required scenarios: complete a normal row; defuse a timer at one; allow a
 timer to explode; clear rubble after an explosion; freeze timers for two
-placements; defuse the lowest timer; reach game over; earn a rewarded
-revive; resume a saved run; decline revive and finish the run; double
-Bolts; restart without stale state.
+placements; defuse the lowest timer; reach game over; resume a saved run;
+finalize to Results; restart without stale state; preserve deprecated stored
+fields without exposing legacy routes or monetization.
 
 ## Manual device matrix (pre-release)
 

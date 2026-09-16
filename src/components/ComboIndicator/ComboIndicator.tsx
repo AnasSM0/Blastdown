@@ -3,6 +3,7 @@ import { Animated, StyleSheet, Text } from "react-native";
 
 import { radius, spacing } from "../../ui/theme";
 import { useTheme } from "../../ui/ThemeProvider";
+import { motionKey } from "../../ui/motionKey";
 
 type ComboIndicatorProps = {
   combo: number;
@@ -49,6 +50,7 @@ export function ComboIndicator({ combo, reducedMotion = false }: ComboIndicatorP
   // consistent with the score numeral across all five themes.
   return (
     <Animated.View
+      key={motionKey(reducedMotion)}
       style={[
         styles.pill,
         { borderColor: theme.score },

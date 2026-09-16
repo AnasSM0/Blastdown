@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Animated, type ViewStyle } from "react-native";
 
 import { useReducedMotion } from "./useReducedMotion";
+import { motionKey } from "../ui/motionKey";
 
 /** Appear transition duration + rise distance — short, within the Phase 2
  *  100–220 ms band, and a small translate so nothing reads as a big slide. */
@@ -13,7 +14,21 @@ const APPEAR_RISE = 12;
  *  state with NO transform (no identity transform on a rounded panel — the
  *  Android hardware-layer guard). Native-driven; the returned object goes
  *  straight into the panel's `style`. */
-export function useAppearAnimation(reducedMotion?: boolean): Animated.WithAnimatedValue<ViewStyle> {
+export type AppearAnimation = {
+  style: Animated.WithAnimatedValue<ViewStyle>;
+  /** Put this on the panel the style is applied to.
+   *
+   *  The returned style conditionally includes `transform`, so a live
+   *  reduced-motion change would otherwise REMOVE that prop from a view the
+   *  native driver is updating — which crashes Fabric on Android. See
+   *  `src/ui/motionKey.ts`. The key is returned rather than left to the caller
+   *  because this hook resolves the effective reduced-motion value itself: a
+   *  caller passing `undefined` would compute a key from the wrong input and the
+   *  two could disagree. */
+  key: string;
+};
+
+export function useAppearAnimation(reducedMotion?: boolean): AppearAnimation {
   const osReducedMotion = useReducedMotion();
   const reduced = reducedMotion ?? osReducedMotion;
   const [progress] = useState(() => new Animated.Value(reduced ? 1 : 0));
@@ -33,17 +48,20 @@ export function useAppearAnimation(reducedMotion?: boolean): Animated.WithAnimat
   }, [reduced, progress]);
 
   if (reduced) {
-    return { opacity: 1 };
+    return { style: { opacity: 1 }, key: motionKey(reduced) };
   }
   return {
-    opacity: progress,
-    transform: [
-      {
-        translateY: progress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [APPEAR_RISE, 0],
-        }),
-      },
-    ],
+    style: {
+      opacity: progress,
+      transform: [
+        {
+          translateY: progress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [APPEAR_RISE, 0],
+          }),
+        },
+      ],
+    },
+    key: motionKey(reduced),
   };
 }

@@ -5,7 +5,7 @@ import { useAnalytics } from "../services/analytics/AnalyticsServiceProvider";
 import type { AnalyticsEvent } from "../services/analytics/types";
 
 /** Turn-scoped gameplay events derived once per turn from the domain's own
- *  event stream — never inferred from board state. Mirrors `useGameAudio`'s
+ *  event stream — never inferred from board state. Mirrors `useGameFeedback`'s
  *  dedup: each new turn is processed exactly once (keyed on the turn counter),
  *  so a remount or re-render can't re-log a placement. Selection and rejection
  *  are UI moments (no turn bump) and are logged imperatively by the screen, not

@@ -47,12 +47,17 @@ describe("settings screen", () => {
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
-  it("navigates to Themes and to the tutorial replay", async () => {
-    const { getByTestId } = await renderSettings();
-    await fireEvent.press(getByTestId("settings-themes-button"));
-    expect(mockPush).toHaveBeenCalledWith("/themes");
+  it("has no Themes route and navigates to the tutorial replay", async () => {
+    const { getByTestId, queryByTestId } = await renderSettings();
+    expect(queryByTestId("settings-themes-button")).toBeNull();
 
     await fireEvent.press(getByTestId("settings-replay-tutorial-button"));
     expect(mockPush).toHaveBeenCalledWith("/tutorial");
+  });
+
+  it("uses the shared reactor environment", async () => {
+    const { getByTestId } = await renderSettings();
+    expect(getByTestId("reactor-background")).toBeTruthy();
+    expect(getByTestId("settings-content")).toBeTruthy();
   });
 });

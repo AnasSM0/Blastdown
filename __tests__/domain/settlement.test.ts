@@ -29,12 +29,11 @@ describe("computeBoltsEarned", () => {
 });
 
 describe("settleRun", () => {
-  it("banks bolts, raises best score/combo, and accumulates stats", () => {
+  it("preserves legacy fields, raises best score/combo, and accumulates V1 stats", () => {
     const profile = { ...defaultProfile(NOW), bestScore: 4000, bestCombo: 10, bolts: 100 };
-    const { profile: next, boltsEarned } = settleRun(profile, finishedRun(), NOW + 1);
+    const { profile: next } = settleRun(profile, finishedRun(), NOW + 1);
 
-    expect(boltsEarned).toBe(21 + 6);
-    expect(next.bolts).toBe(100 + 27);
+    expect(next.bolts).toBe(100);
     expect(next.bestScore).toBe(5300); // 5300 > 4000
     expect(next.bestCombo).toBe(10); // 10 > 8 kept
     expect(next.totalRuns).toBe(1);
@@ -47,11 +46,11 @@ describe("settleRun", () => {
     expect(next.updatedAt).toBe(NOW + 1);
   });
 
-  it("keeps the higher existing best score and counts a revive", () => {
-    const profile = { ...defaultProfile(NOW), bestScore: 9999 };
+  it("keeps the higher existing best score and preserves the legacy revive count", () => {
+    const profile = { ...defaultProfile(NOW), bestScore: 9999, revivesUsed: 7 };
     const { profile: next } = settleRun(profile, finishedRun({ reviveUsed: true }), NOW);
     expect(next.bestScore).toBe(9999);
-    expect(next.revivesUsed).toBe(1);
+    expect(next.revivesUsed).toBe(7);
   });
 
   it("accumulates across two settled runs", () => {
@@ -59,7 +58,7 @@ describe("settleRun", () => {
     const second = settleRun(first, finishedRun({ score: 1000, piecesDefused: 1 }), NOW).profile;
     expect(second.totalRuns).toBe(2);
     expect(second.piecesPlaced).toBe(80);
-    expect(second.bolts).toBe(27 + (4 + 1));
+    expect(second.bolts).toBe(0);
   });
 });
 

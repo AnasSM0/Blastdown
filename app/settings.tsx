@@ -3,17 +3,18 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 
 import { SettingsView } from "../src/components/SettingsScreen";
+import { isDevelopmentBuild } from "../src/config/environment";
+import { useEffectiveReducedMotion } from "../src/hooks/useEffectiveReducedMotion";
 import { useAnalytics } from "../src/services/analytics";
 import { useSettings } from "../src/state/SettingsProvider";
-import { resolveTheme } from "../src/ui/themes";
 import type { PersistedSettings } from "../src/services/storage/schemas";
 
-/** Settings route: persisted toggles wired to the SettingsProvider, plus
- *  navigation to Themes and tutorial replay. */
+/** Settings route: persisted toggles plus tutorial replay. */
 export default function SettingsScreen() {
   const router = useRouter();
   const { settings, updateSettings } = useSettings();
   const { track } = useAnalytics();
+  const reducedMotion = useEffectiveReducedMotion();
 
   const handleToggle = useCallback(
     (key: "soundEnabled" | "musicEnabled" | "hapticsEnabled" | "reducedMotion", value: boolean) => {
@@ -38,11 +39,15 @@ export default function SettingsScreen() {
     <>
       <SettingsView
         settings={settings}
-        themeName={resolveTheme(settings.themeId).name}
         onToggle={handleToggle}
-        onThemes={() => router.push("/themes")}
         onReplayTutorial={() => router.push("/tutorial")}
+        onPrivacy={() => router.push("/privacy")}
+        // Undefined outside a development build, so the row is absent rather
+        // than present and inert. The route itself renders nothing there too —
+        // see `app/dev-effects.tsx`.
+        onEffectHarness={isDevelopmentBuild() ? () => router.push("/dev-effects") : undefined}
         onBack={handleBack}
+        reducedMotion={reducedMotion}
       />
       <StatusBar style="light" />
     </>
