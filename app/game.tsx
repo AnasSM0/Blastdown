@@ -3,7 +3,6 @@ import { BackHandler, StyleSheet, View, type LayoutChangeEvent } from "react-nat
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
-import { BOARD_CONTENT_INSET } from "../src/components/GameBoard";
 import { BoardImpulseFrame } from "../src/components/BoardImpulseFrame";
 import { EffectStack } from "../src/components/effects/EffectStack";
 import { PraiseOverlay } from "../src/components/PraiseOverlay";
@@ -15,10 +14,9 @@ import { DefuseConfirmCard } from "../src/components/modals/DefuseConfirmCard";
 import { PauseOverlay } from "../src/components/modals/PauseOverlay";
 import { RunConfirmationCard } from "../src/components/modals/RunConfirmationCard";
 import { RewardedActionBar } from "../src/components/RewardedActionButton";
-import { DragGhost, type DragGhostHandle } from "../src/components/DragGhost";
+import { DragGhost } from "../src/components/DragGhost";
 import { BOARD_SIZE } from "../src/domain/board";
 import type { CellPosition } from "../src/domain/placement";
-import { getShapeById } from "../src/domain/shapes";
 import {
   canActivateFreeze,
   canApplyRewardedDefuse,
@@ -28,18 +26,11 @@ import {
 // Resolved behind the build-time flag, so a build with the cinematic renderer
 // off never evaluates Skia at all. See the module's own comment.
 import { BoardRenderer, CINEMATIC_RENDERER } from "../src/rendering/boardRenderer";
-import {
-  fingerPointForDragOrigin,
-  stableDragOriginFromFinger,
-  type BoardLayout,
-  type Point,
-} from "../src/ui/boardGeometry";
 import { cellsOfPiece } from "../src/ui/effects/eventEffects";
 import {
   useGameController,
   type GameController,
   type GameControllerOptions,
-  type PlacementIntent,
 } from "../src/hooks/useGameController";
 import { useEffectiveReducedMotion } from "../src/hooks/useEffectiveReducedMotion";
 import { useEventAnimator } from "../src/hooks/useEventAnimator";
@@ -48,6 +39,7 @@ import { useGameAnalytics } from "../src/hooks/useGameAnalytics";
 import { useGameFeedback } from "../src/hooks/useGameFeedback";
 import { useRewardedAction } from "../src/hooks/useRewardedAction";
 import { useRewardOutcome } from "../src/hooks/useRewardOutcome";
+import { usePieceDragInteraction } from "../src/hooks/usePieceDragInteraction";
 import { AudioServiceProvider } from "../src/services/audio";
 import type { AudioService } from "../src/services/audio";
 import { StorageServiceProvider, createMemoryStorageService } from "../src/services/storage";
@@ -62,58 +54,7 @@ import { spacing } from "../src/ui/theme";
 import { useTheme } from "../src/ui/ThemeProvider";
 import { resolveDangerState } from "../src/ui/dangerState";
 import { resolveScoreImpactForTurn } from "../src/ui/scoreImpact";
-import { INVALID_RETURN_MS, dragLiftForCell } from "../src/ui/pieceInteraction";
-
-type DragState = {
-  id: number;
-  handId: string;
-  intent: PlacementIntent;
-  shapeId: string;
-  colorId: string;
-  startX: number;
-  startY: number;
-  visualLift: number;
-};
-
-type ShapeBounds = { maxRow: number; maxColumn: number };
-
-/** Cached shape bounds.
- *
- *  A shape's bounds never change — the catalogue is static — but this ran on
- *  every pointer move of every drag, allocating two intermediate arrays (from
- *  the two `map`s) plus the bounds object each time, and spreading them into
- *  `Math.max`. That is roughly sixty allocations a second of values that were
- *  identical every time, on the one code path that has to stay ahead of a
- *  finger. There are about twelve shapes, so the cache is bounded by the
- *  catalogue and never needs clearing.
- *
- *  A plain loop rather than `map` + spread: no intermediate arrays, and no
- *  argument-count limit if a larger shape is ever added. */
-const shapeBoundsCache = new Map<string, ShapeBounds | null>();
-
-function shapeBoundsFor(shapeId: string): ShapeBounds | null {
-  const cached = shapeBoundsCache.get(shapeId);
-  if (cached !== undefined) {
-    return cached;
-  }
-  const shape = getShapeById(shapeId);
-  let bounds: ShapeBounds | null = null;
-  if (shape) {
-    let maxRow = 0;
-    let maxColumn = 0;
-    for (const cell of shape.cells) {
-      if (cell.row > maxRow) {
-        maxRow = cell.row;
-      }
-      if (cell.column > maxColumn) {
-        maxColumn = cell.column;
-      }
-    }
-    bounds = { maxRow, maxColumn };
-  }
-  shapeBoundsCache.set(shapeId, bounds);
-  return bounds;
-}
+import { INVALID_RETURN_MS } from "../src/ui/pieceInteraction";
 
 type GameViewProps = {
   controller: GameController;
@@ -249,33 +190,46 @@ export function GameView({
   const freezeOutcome = useRewardOutcome(reducedMotion);
   const defuseOutcome = useRewardOutcome(reducedMotion);
   const [previewOrigin, setPreviewOrigin] = useState<CellPosition | null>(null);
-  const [drag, setDrag] = useState<DragState | null>(null);
-  const [dragOrigin, setDragOrigin] = useState<CellPosition | null>(null);
-  const [returning, setReturning] = useState(false);
-  const [cellSize, setCellSize] = useState(boardSize ? boardSizeToCell(boardSize) : 0);
 
   // Only authoritative interaction states block a new action. Presentation
   // effects intentionally do not participate: their queue can remain active
-  // across later turns. A live drag blocks every new action except its own
-  // move/finalize callbacks.
-  const inputLocked =
+  // across later turns.
+  const authoritativeInputLocked =
     reward.pending ||
     paused ||
     defuseConfirmOpen ||
     restartConfirmation === "open" ||
-    state.status !== "playing" ||
-    (drag !== null && !returning);
+    state.status !== "playing";
 
-  const boardRef = useRef<View>(null);
-  const ghostRef = useRef<DragGhostHandle>(null);
-  const boardLayoutRef = useRef<BoardLayout | null>(null);
-  const cellSizeRef = useRef(cellSize);
-  const lastDragOriginRef = useRef<CellPosition | null>(null);
-  const dragRef = useRef<DragState | null>(null);
-  const visibleDragIdRef = useRef<number | null>(null);
-  const dragSequenceRef = useRef(0);
-  const dragFinalizedRef = useRef(false);
   const invalidPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const {
+    boardRef,
+    ghostRef,
+    cellSize,
+    drag,
+    dragPreview,
+    returning,
+    handleCellSizeChange,
+    handleDragStart,
+    handleDragMove,
+    handleDragEnd,
+    handleDragCancel,
+    clearDrag,
+  } = usePieceDragInteraction({
+    controller,
+    boardSize,
+    inputLocked: authoritativeInputLocked,
+    onDragStarted: () => setPreviewOrigin(null),
+    onInvalidDrop: (origin) => {
+      feedback.emit("invalidPlacement");
+      if (origin) {
+        track({ name: "piece_rejected" });
+      }
+    },
+  });
+  // A live drag blocks every new action except its own move/finalize callbacks.
+  const inputLocked = authoritativeInputLocked || (drag !== null && !returning);
+
   // The board's press handler must keep a stable identity: `controller` is a
   // fresh object every render and `inputLocked` flips on pause, modal, drag,
   // and reward transitions — depending on either would change the prop on each
@@ -301,12 +255,7 @@ export function GameView({
   const refillNonce = controller.lastEvents.some((event) => event.type === "handRefilled")
     ? state.handRefills
     : undefined;
-  const { clearSelection, previewAt, previewFor, selectedHandId } = controller;
-
-  const dragPreview = useMemo(
-    () => (drag && dragOrigin ? previewFor(drag.intent, dragOrigin) : null),
-    [drag, dragOrigin, previewFor],
-  );
+  const { clearSelection, previewAt, selectedHandId } = controller;
   const tapPreview = useMemo(
     () => (previewOrigin ? previewAt(previewOrigin) : null),
     [previewAt, previewOrigin],
@@ -340,11 +289,6 @@ export function GameView({
     }
     return hints;
   }, [previewAt, selectedHandId, state.grid]);
-
-  const handleCellSizeChange = useCallback((size: number) => {
-    cellSizeRef.current = size;
-    setCellSize(size);
-  }, []);
 
   const handleSelect = useCallback(
     (handId: string) => {
@@ -419,196 +363,6 @@ export function GameView({
     },
     [],
   );
-
-  const measureBoard = useCallback(() => {
-    const captureLayout = (x: number, y: number) => {
-      const size = cellSizeRef.current;
-      if (size <= 0) {
-        boardLayoutRef.current = null;
-        return;
-      }
-      boardLayoutRef.current = {
-        contentLeft: x + BOARD_CONTENT_INSET,
-        contentTop: y + BOARD_CONTENT_INSET,
-        cellSize: size,
-        pitch: size + spacing.gridGutter,
-        size: BOARD_SIZE,
-      };
-    };
-    // A fixed board size is the existing isolated-test seam. Jest has no native
-    // window measurement, so anchor that synthetic board at the window origin;
-    // production always takes the measured branch below.
-    if (boardSize !== undefined) {
-      captureLayout(0, 0);
-      return;
-    }
-    boardRef.current?.measureInWindow((x, y, _width, _height) => captureLayout(x, y));
-  }, [boardSize]);
-
-  const originForPoint = useCallback(
-    (
-      shapeId: string,
-      point: Point,
-      visualLift: number,
-      previous: CellPosition | null,
-    ): CellPosition | null => {
-      const layout = boardLayoutRef.current;
-      const bounds = shapeBoundsFor(shapeId);
-      if (!layout || !bounds) {
-        return null;
-      }
-      return stableDragOriginFromFinger(point, bounds, visualLift, layout, previous);
-    },
-    [],
-  );
-
-  const ghostPointForOrigin = useCallback(
-    (shapeId: string, origin: CellPosition, visualLift: number): Point | null => {
-      const layout = boardLayoutRef.current;
-      const bounds = shapeBoundsFor(shapeId);
-      return layout && bounds ? fingerPointForDragOrigin(origin, bounds, visualLift, layout) : null;
-    },
-    [],
-  );
-
-  const handleDragStart = useCallback(
-    (handId: string, point: Point) => {
-      const activeController = controllerRef.current;
-      const piece = activeController.state.hand.find((candidate) => candidate.handId === handId);
-      const intent = activeController.createPlacementIntent(handId);
-      if (
-        inputLocked ||
-        dragRef.current !== null ||
-        !piece ||
-        !intent ||
-        cellSizeRef.current <= 0
-      ) {
-        return;
-      }
-      activeController.clearSelection();
-      setPreviewOrigin(null);
-      measureBoard();
-      lastDragOriginRef.current = null;
-      setDragOrigin(null);
-      dragFinalizedRef.current = false;
-      const visualLift = dragLiftForCell(cellSizeRef.current);
-      const nextDrag: DragState = {
-        id: ++dragSequenceRef.current,
-        handId,
-        intent,
-        shapeId: piece.shapeId,
-        colorId: piece.colorId,
-        startX: point.x,
-        startY: point.y,
-        visualLift,
-      };
-      dragRef.current = nextDrag;
-      visibleDragIdRef.current = nextDrag.id;
-      setReturning(false);
-      setDrag(nextDrag);
-    },
-    [inputLocked, measureBoard],
-  );
-
-  const handleDragMove = useCallback(
-    (handId: string, point: Point) => {
-      const activeDrag = dragRef.current;
-      if (!activeDrag || activeDrag.handId !== handId || dragFinalizedRef.current) {
-        return;
-      }
-      const last = lastDragOriginRef.current;
-      const origin = originForPoint(activeDrag.shapeId, point, activeDrag.visualLift, last);
-      const snappedPoint = origin
-        ? ghostPointForOrigin(activeDrag.shapeId, origin, activeDrag.visualLift)
-        : null;
-      ghostRef.current?.moveTo(snappedPoint?.x ?? point.x, snappedPoint?.y ?? point.y);
-      const changed =
-        (origin === null) !== (last === null) ||
-        (origin !== null &&
-          last !== null &&
-          (origin.row !== last.row || origin.column !== last.column));
-      if (changed) {
-        lastDragOriginRef.current = origin;
-        setDragOrigin(origin);
-      }
-    },
-    [ghostPointForOrigin, originForPoint],
-  );
-
-  const clearDrag = useCallback((expectedId?: number) => {
-    if (expectedId !== undefined && visibleDragIdRef.current !== expectedId) {
-      return;
-    }
-    visibleDragIdRef.current = null;
-    dragRef.current = null;
-    dragFinalizedRef.current = false;
-    setDrag(null);
-    setDragOrigin(null);
-    setReturning(false);
-    lastDragOriginRef.current = null;
-  }, []);
-
-  const handleDragEnd = useCallback(
-    (handId: string, point: Point) => {
-      const activeDrag = dragRef.current;
-      // Native gesture completion can be delivered twice around cancellation /
-      // unmount edges. Consume the logical finalize synchronously so the second
-      // delivery produces neither a turn nor duplicate imperative feedback.
-      if (!activeDrag || activeDrag.handId !== handId || dragFinalizedRef.current) {
-        return;
-      }
-      dragFinalizedRef.current = true;
-      const origin = originForPoint(
-        activeDrag.shapeId,
-        point,
-        activeDrag.visualLift,
-        lastDragOriginRef.current,
-      );
-      // The pre-clear state ends with the gesture. Any following clear visuals
-      // belong to the committed effect system, including while a rejected
-      // piece animates back to its tray.
-      lastDragOriginRef.current = null;
-      setDragOrigin(null);
-      const placed = origin ? controllerRef.current.place(activeDrag.intent, origin) : false;
-      if (placed) {
-        clearDrag(activeDrag.id);
-      } else {
-        // Dropped outside the board or onto an invalid cell: play the return
-        // animation, which clears the drag on completion. A drop onto the board
-        // that the domain rejected counts as a rejected placement attempt.
-        feedback.emit("invalidPlacement");
-        dragRef.current = null;
-        setReturning(true);
-        if (origin) {
-          track({ name: "piece_rejected" });
-        }
-      }
-    },
-    [clearDrag, feedback, originForPoint, track],
-  );
-
-  const handleDragCancel = useCallback((handId: string) => {
-    const activeDrag = dragRef.current;
-    if (!activeDrag || activeDrag.handId !== handId || dragFinalizedRef.current) {
-      return;
-    }
-    dragFinalizedRef.current = true;
-    dragRef.current = null;
-    lastDragOriginRef.current = null;
-    setDragOrigin(null);
-    setReturning(true);
-  }, []);
-
-  // A controller state replacement (hydrate/restart/external session swap)
-  // invalidates every captured intent. Clear the matching presentation too, so
-  // an old ghost can never survive into the new authoritative snapshot.
-  useEffect(() => {
-    if (visibleDragIdRef.current !== null) {
-      clearDrag();
-    }
-    // `state` identity changes only at an authoritative controller commit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
 
   const handleFreeze = useCallback(() => {
     // Guard against re-activation while active/exhausted or mid-reward — the
@@ -1040,13 +794,6 @@ export function GameScreenContent({
       </AnalyticsServiceProvider>
     </StorageServiceProvider>
   );
-}
-
-/** Content cell size implied by a fixed outer board size (test seam parity
- *  with GameBoard's own computation). */
-function boardSizeToCell(outerSize: number): number {
-  const contentSize = outerSize - 2 * BOARD_CONTENT_INSET;
-  return (contentSize - (BOARD_SIZE - 1) * spacing.gridGutter) / BOARD_SIZE;
 }
 
 export default function GameScreen() {

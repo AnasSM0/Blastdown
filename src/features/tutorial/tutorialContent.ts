@@ -3,7 +3,7 @@ import type { CellPosition } from "../../domain/placement";
 import type { TimerBadgePlacement } from "../../domain/selectors";
 
 /** A fixed, scripted tutorial step. The board is a crafted illustration (or an
- *  interactive placement for step 1); the messages are the exact copy from
+ *  interactive placement for steps 1 and 2); the messages are the exact copy from
  *  BUILD_SPEC.md §9 and must not be paraphrased. */
 export type TutorialStep = {
   id: number;
@@ -16,8 +16,8 @@ export type TutorialStep = {
   badges: TimerBadgePlacement[];
   /** Cells to highlight as the focus of this step (nothing else is emphasized). */
   highlightCells: CellPosition[];
-  /** When set, the player must place this hand onto the board to proceed
-   *  (the one "instructional placement"); otherwise the step is explanatory. */
+  /** When set, the player must place this hand onto the board to proceed.
+   *  Highlight cells, when present, are the permitted tutorial origins. */
   interactiveHand?: HandPiece[];
 };
 
@@ -57,7 +57,7 @@ function step1(): TutorialStep {
   };
 }
 
-/** Step 2 — a row one cell from clearing. */
+/** Step 2 — interactive: complete the row with the supplied single block. */
 function step2(): TutorialStep {
   const grid = emptyGrid();
   fillRow(grid, 3, range(0, 6), "amber");
@@ -68,6 +68,7 @@ function step2(): TutorialStep {
     grid,
     badges: [],
     highlightCells: [{ row: 3, column: 7 }],
+    interactiveHand: [{ handId: "tut-2", shapeId: "single", colorId: "cyan" }],
   };
 }
 

@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 import type { ExpoConfig } from "expo/config";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 
 const ENV_NAMES = [
   "EXPO_PUBLIC_APP_ENV",
@@ -132,5 +134,28 @@ describe("platform-scoped production AdMob config", () => {
       rewarded_freeze: null,
       rewarded_defuse: null,
     });
+  });
+
+  it("resolves the v6 Android identity and production icon assets", () => {
+    const config = loadConfig({});
+
+    expect(config.version).toBe("1.0.0");
+    expect(config.icon).toBe("./assets/icon.png");
+    expect(config.android).toMatchObject({
+      package: "com.blastdown.app",
+      versionCode: 6,
+      adaptiveIcon: {
+        backgroundColor: "#061426",
+        foregroundImage: "./assets/android-icon-foreground.png",
+      },
+    });
+    for (const asset of [
+      "assets/blastdown-icon-source.png",
+      "assets/icon.png",
+      "assets/android-icon-foreground.png",
+      "assets/store/play-icon-512.png",
+    ]) {
+      expect(existsSync(resolve(__dirname, "../..", asset))).toBe(true);
+    }
   });
 });

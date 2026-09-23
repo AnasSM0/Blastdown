@@ -90,6 +90,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: "com.blastdown.app",
+    versionCode: 6,
     // BlastDown only plays packaged audio. These permissions are contributed
     // by broad Expo library manifests but are not used by the release app.
     blockedPermissions: [
@@ -100,10 +101,8 @@ const config: ExpoConfig = {
       "android.permission.WRITE_EXTERNAL_STORAGE",
     ],
     adaptiveIcon: {
-      backgroundColor: "#E6F4FE",
+      backgroundColor: "#061426",
       foregroundImage: "./assets/android-icon-foreground.png",
-      backgroundImage: "./assets/android-icon-background.png",
-      monochromeImage: "./assets/android-icon-monochrome.png",
     },
     predictiveBackGestureEnabled: false,
   },
