@@ -2,7 +2,7 @@
 
 The source-of-truth hierarchy is defined in `AGENTS.md`; `BUILD_SPEC.md` is
 historical where superseded. This document is a practical, code-facing
-reference maintained by Codex, the sole engineering agent. Architecture
+reference maintained by Claude Code, the sole engineering agent. Architecture
 changes must be surfaced explicitly and recorded when approved.
 
 ## Stack
@@ -10,8 +10,9 @@ changes must be surfaced explicitly and recorded when approved.
 - Expo SDK 57 (latest stable at project creation — see `docs/DECISIONS.md`
   for resolved versions), React Native, TypeScript strict mode
 - Expo Router for navigation
-- React Native Reanimated + React Native Gesture Handler for game-feel
-  animation and drag interaction
+- React Native `Animated` for the production board's effects; React Native
+  Reanimated is imported only by the optional cinematic renderer.
+  React Native Gesture Handler provides drag interaction.
 - AsyncStorage for local persistence
 - Expo Haptics, `expo-audio` (not the deprecated `expo-av` audio API)
 - React Native Google Mobile Ads, behind an `AdService` interface
@@ -20,16 +21,35 @@ changes must be surfaced explicitly and recorded when approved.
 - Jest (`jest-expo` preset) + React Native Testing Library
 - ESLint + Prettier
 
-No backend. No Redux/MobX/Zustand. No Skia (an 8×8 grid of Views is enough;
-add Skia only if profiling proves a rendering bottleneck).
+No backend. No Redux/MobX/Zustand. `@shopify/react-native-skia` is installed
+for the optional, default-OFF cinematic renderer only; the production board
+does not depend on it.
 
 ## Rendering decision
 
-- Standard React Native Views: grid cells, pieces, timer badges, rubble, UI
-  chrome.
-- Reanimated: placement feedback, timer pulse, line-clear sweep, combo pop,
-  explosion shake, result-screen transitions. Runs on the UI thread so it
-  stays responsive even while JS is busy.
+Verified against `src/config/renderer.ts`, `react-native.config.js`, and the
+code under `src/components/` and `src/rendering/` at the time of this entry.
+
+- **Production board (default):** React Native Views for cells, pieces, timer
+  badges, rubble, and chrome, animated with React Native `Animated`. This is
+  the `views` renderer and the approved production path.
+- **Optional cinematic renderer:** a single Skia canvas under
+  `src/rendering/cinematic/`, selected only by
+  `EXPO_PUBLIC_CINEMATIC_BOARD` (`1`, `true`, or `skia`). It is default OFF.
+  It is the only code that imports Reanimated. No physical-device
+  qualification evidence for it is recorded in the repository, so it must not
+  be treated as production-qualified.
+- **Production native linking:** when `EXPO_PUBLIC_APP_ENV=production` and the
+  cinematic flag is off, `react-native.config.js` sets
+  `platforms.android = null` for Skia, Reanimated, and Worklets so they are not
+  autolinked into the production Android build. Development clients keep all
+  three.
+- **Effects:** gameplay events flow through the event-driven effects pipeline
+  (`src/ui/effects/`), which both renderers consume. Preserve this
+  architecture; presentation must not re-derive gameplay results.
+- **Changes:** any renderer change, including promoting Skia or adding a
+  rendering library, needs a separate evaluation (production configuration,
+  alternatives, on-device performance) and explicit owner approval.
 
 ## Repository layout
 
@@ -59,7 +79,7 @@ blastdown/
 │   │   ├── reducer.ts
 │   │   └── selectors.ts
 │   │
-│   ├── components/             # Codex-owned presentation layer
+│   ├── components/             # Presentation layer
 │   │   ├── GameBoard/
 │   │   ├── GridCell/
 │   │   ├── PieceTray/
