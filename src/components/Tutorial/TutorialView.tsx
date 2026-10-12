@@ -3,13 +3,19 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { GameBoard } from "../GameBoard";
+import { DragGhost } from "../DragGhost";
 import { PieceTray } from "../PieceTray";
 import { createInitialGameState } from "../../domain/game";
 import type { GameState } from "../../domain/gameTypes";
 import type { CellPosition } from "../../domain/placement";
 import { getTimerBadgePlacements, type PlacementPreview } from "../../domain/selectors";
 import { useGameController } from "../../hooks/useGameController";
-import { tutorialSteps, TUTORIAL_STEP_COUNT } from "../../features/tutorial/tutorialContent";
+import { usePieceDragInteraction } from "../../hooks/usePieceDragInteraction";
+import {
+  tutorialSteps,
+  TUTORIAL_STEP_COUNT,
+  type TutorialStep,
+} from "../../features/tutorial/tutorialContent";
 import { colors, radius, spacing, typography } from "../../ui/theme";
 import { ReactorBackground } from "../ReactorBackground";
 
@@ -39,14 +45,133 @@ function highlightPreview(cells: readonly CellPosition[]): PlacementPreview | nu
   };
 }
 
+function TutorialPlacement({
+  step,
+  boardSize,
+  onPlaced,
+}: {
+  step: TutorialStep;
+  boardSize?: number;
+  onPlaced: () => void;
+}) {
+  const initialState = useMemo<GameState>(
+    () => ({
+      ...createInitialGameState(`tutorial-${step.id}`, 0),
+      grid: step.grid,
+      hand: step.interactiveHand ?? [],
+    }),
+    [step],
+  );
+  const controller = useGameController({ initialState, now: () => 0 });
+  const isOriginAllowed = useCallback(
+    (origin: CellPosition) =>
+      step.highlightCells.length === 0 ||
+      step.highlightCells.some(
+        (allowed) => allowed.row === origin.row && allowed.column === origin.column,
+      ),
+    [step.highlightCells],
+  );
+  const {
+    boardRef,
+    ghostRef,
+    cellSize,
+    drag,
+    dragPreview,
+    returning,
+    handleCellSizeChange,
+    handleDragStart,
+    handleDragMove,
+    handleDragEnd,
+    handleDragCancel,
+    clearDrag,
+  } = usePieceDragInteraction({
+    controller,
+    boardSize,
+    isOriginAllowed,
+    onPlaced,
+  });
+
+  const handleCellPress = useCallback(
+    (origin: CellPosition) => {
+      const handId = controller.selectedHandId;
+      if (handId === null || !isOriginAllowed(origin)) {
+        return;
+      }
+      const intent = controller.createPlacementIntent(handId);
+      if (intent && controller.place(intent, origin)) {
+        onPlaced();
+      }
+    },
+    [controller, isOriginAllowed, onPlaced],
+  );
+
+  const boardPreview = useMemo(
+    () =>
+      dragPreview
+        ? {
+            ...dragPreview,
+            cells: [],
+            conflictCells: [],
+          }
+        : highlightPreview(step.highlightCells),
+    [dragPreview, step.highlightCells],
+  );
+  const badges = useMemo(() => getTimerBadgePlacements(controller.state), [controller.state]);
+
+  return (
+    <>
+      <View style={styles.boardWrap}>
+        <GameBoard
+          ref={boardRef}
+          grid={controller.state.grid}
+          badges={badges}
+          preview={boardPreview}
+          boardSize={boardSize}
+          onCellPress={handleCellPress}
+          onCellSizeChange={handleCellSizeChange}
+        />
+      </View>
+      <PieceTray
+        hand={controller.state.hand}
+        selectedHandId={controller.selectedHandId}
+        onSelect={controller.selectPiece}
+        onDragStart={handleDragStart}
+        onDragMove={handleDragMove}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+        draggingHandId={drag?.handId ?? null}
+        boardCellSize={cellSize}
+        availableWidth={boardSize ?? 320}
+      />
+      {drag && cellSize > 0 ? (
+        <DragGhost
+          key={drag.id}
+          ref={ghostRef}
+          shapeId={drag.shapeId}
+          colorId={drag.colorId}
+          cellSize={cellSize}
+          initialX={drag.startX}
+          initialY={drag.startY}
+          valid={dragPreview?.valid ?? false}
+          visualLift={drag.visualLift}
+          returning={returning}
+          onReturnComplete={() => clearDrag(drag.id)}
+        />
+      ) : null}
+    </>
+  );
+}
+
 /** First-run onboarding over the real board and components (never screenshots).
- *  Uses its own isolated controller for the interactive step, so it can never
+ *  Uses isolated controllers for interactive steps, so it can never
  *  touch the persisted active run. Persistence of completion is the caller's
  *  responsibility (onComplete / onSkip). */
 export function TutorialView({ onComplete, onSkip, onStepChange, boardSize }: TutorialViewProps) {
   const steps = useMemo(() => tutorialSteps(), []);
   const [index, setIndex] = useState(0);
-  const [placed, setPlaced] = useState(false);
+  const [completedInteractiveSteps, setCompletedInteractiveSteps] = useState<ReadonlySet<number>>(
+    () => new Set(),
+  );
 
   const step = steps[index];
 
@@ -66,40 +191,17 @@ export function TutorialView({ onComplete, onSkip, onStepChange, boardSize }: Tu
   }, [index, steps]);
   const isInteractive = step.interactiveHand !== undefined;
   const isLast = index === steps.length - 1;
+  const canAdvance = !isInteractive || completedInteractiveSteps.has(step.id);
+  const canSkip = index > 0 || completedInteractiveSteps.has(1);
 
-  // Isolated controller for the interactive first step (never the session one).
-  const interactiveInitial = useMemo<GameState>(
-    () => ({
-      ...createInitialGameState("tutorial", 0),
-      grid: steps[0].grid,
-      hand: steps[0].interactiveHand ?? [],
-    }),
-    [steps],
-  );
-  const controller = useGameController({ initialState: interactiveInitial, now: () => 0 });
-
-  const interactivePlaced = controller.state.turn > 0;
-  const canAdvance = !isInteractive || placed || interactivePlaced;
-  const canSkip = index > 0 || placed || interactivePlaced;
-
-  const handleSelect = useCallback(
-    (handId: string) => {
-      controller.selectPiece(handId);
-    },
-    [controller],
-  );
-
-  const handleCellPress = useCallback(
-    (position: CellPosition) => {
-      if (controller.selectedHandId === null) {
-        return;
+  const handlePlaced = useCallback(() => {
+    setCompletedInteractiveSteps((current) => {
+      if (current.has(step.id)) {
+        return current;
       }
-      if (controller.placeAt(position)) {
-        setPlaced(true);
-      }
-    },
-    [controller],
-  );
+      return new Set([...current, step.id]);
+    });
+  }, [step.id]);
 
   const handleNext = useCallback(() => {
     if (!canAdvance) {
@@ -115,15 +217,6 @@ export function TutorialView({ onComplete, onSkip, onStepChange, boardSize }: Tu
   const handleBack = useCallback(() => {
     setIndex((value) => Math.max(value - 1, 0));
   }, []);
-
-  const interactiveBadges = useMemo(
-    () => getTimerBadgePlacements(controller.state),
-    [controller.state],
-  );
-
-  const boardGrid = isInteractive ? controller.state.grid : step.grid;
-  const boardBadges = isInteractive ? interactiveBadges : step.badges;
-  const boardPreview = isInteractive ? null : highlightPreview(step.highlightCells);
 
   return (
     <View style={styles.screen} testID="tutorial-screen">
@@ -152,23 +245,23 @@ export function TutorialView({ onComplete, onSkip, onStepChange, boardSize }: Tu
           )}
         </View>
 
-        <View style={styles.boardWrap}>
-          <GameBoard
-            grid={boardGrid}
-            badges={boardBadges}
-            preview={boardPreview}
-            boardSize={boardSize}
-            onCellPress={isInteractive ? handleCellPress : undefined}
-          />
-        </View>
-
         {isInteractive ? (
-          <PieceTray
-            hand={controller.state.hand}
-            selectedHandId={controller.selectedHandId}
-            onSelect={handleSelect}
+          <TutorialPlacement
+            key={step.id}
+            step={step}
+            boardSize={boardSize}
+            onPlaced={handlePlaced}
           />
-        ) : null}
+        ) : (
+          <View style={styles.boardWrap}>
+            <GameBoard
+              grid={step.grid}
+              badges={step.badges}
+              preview={highlightPreview(step.highlightCells)}
+              boardSize={boardSize}
+            />
+          </View>
+        )}
 
         <View style={styles.panel}>
           <View style={styles.panelAccent} />

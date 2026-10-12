@@ -53,3 +53,7 @@ graph.json
 
 # Personal Claude Code permission grants, not project configuration.
 .claude/settings.local.json
+
+# Third-party gameplay reference media (competitor video and screenshots).
+# Kept on the local machine for visual analysis only; never redistributed.
+blastdown reference/
