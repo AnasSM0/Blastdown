@@ -2242,3 +2242,59 @@ code, dependencies, gameplay, UI, Android configuration, AdMob/UMP, privacy
 behavior, AAB configuration, package/version values, or the already-qualified
 AAB whose SHA-256 is
 `EF2A5706EE13E2AF926761DE3C8DBFF09A23635B3C09FF8C2F595944B17EF158`.
+
+---
+
+## 2026-10-12 — BD2-CL-002 hands engineering to Claude Code and adopts a live-validation policy
+
+Claude Code replaces Codex as the sole engineering agent. `AGENTS.md` remains
+the authoritative rule set and `CLAUDE.md` is a concise operating summary that
+defers to it. Present-tense authority statements in `AGENTS.md`, `CLAUDE.md`,
+`docs/ARCHITECTURE.md` and the repository-governance test were updated;
+archived plans and earlier decision entries that mention Codex are history and
+are intentionally unchanged.
+
+The owner retains final approval over gameplay rules, product scope,
+monetization, new production dependencies, significant architecture, release
+configuration, Google Play publication, and production analytics or
+privacy-sensitive integrations. One bounded task is completed, verified, and
+reviewed before the next major task begins. The handover transfers engineering
+responsibility only; the document hierarchy, V1 scope lock, gameplay rules,
+persistence, offline play, AdMob/UMP behavior, and the Google Play
+Closed-testing release protections are unchanged.
+
+The owner's permanent live-validation directive is recorded in `AGENTS.md`
+and summarized in `CLAUDE.md`: MEDIUM reasoning effort by default with HIGH
+only on the owner's request; for application changes, real Android runs,
+screenshots and recordings, a full gameplay regression, runtime-log review,
+and evidence kept outside tracked source; fabricated evidence is never
+acceptable; work that cannot be live-tested is reported as `IMPLEMENTED —
+LIVE VALIDATION PENDING`, and only fully verified work is `FULLY VALIDATED`.
+Docs-only tasks skip the Android build but still run governance and automated
+checks.
+
+`docs/ARCHITECTURE.md` now describes the verified rendering stack: the
+production board uses React Native Views with `Animated`; the optional,
+default-OFF cinematic renderer uses Skia and Reanimated; production Android
+builds exclude Skia, Reanimated, and Worklets when the cinematic flag is off;
+Skia has no recorded physical-device qualification. No code changed.
+
+---
+
+## 2026-10-12 — BlastDown 2.0 is an approved post-V1 direction
+
+BlastDown 2.0 is an approved post-V1 product direction. Its primary initial
+priority is graphics, animation, visual polish, and gameplay feel. Later
+phases will introduce Campaign, Daily Challenges, progression, rewards, and
+other approved systems in controlled phases.
+
+V1 exclusions in `AGENTS.md` and earlier entries remain accurate for the
+shipped V1 release and are not automatically applicable to approved future V2
+features. Every implementation task still requires explicit authorization. The
+existing Google Play Closed-testing release remains protected, and historical
+gameplay and release specifications are not silently rewritten; full Design
+2.0 requirements will be reconciled with the authoritative documents in a
+separate, approved specification task.
+
+This decision does not activate, route, or implement any V2 feature and
+changes no gameplay, persistence, dependency, or release configuration.
