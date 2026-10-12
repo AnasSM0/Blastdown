@@ -54,8 +54,35 @@ describe("V1 scope and repository governance", () => {
       expect(position).toBeGreaterThan(previous);
       previous = position;
     }
-    expect(agents).toMatch(/Codex is the sole engineering agent/i);
+    expect(agents).toMatch(/Claude Code is the sole engineering agent/i);
+    expect(agents).not.toMatch(/Codex is the sole engineering agent/i);
     expect(agents).not.toMatch(/Claude.+lead engineer|Claude.+orchestrat/i);
+  });
+
+  it("keeps CLAUDE.md subordinate to AGENTS.md and names the same engineer", () => {
+    const claude = read("CLAUDE.md");
+    expect(claude).toMatch(/Claude Code is the sole engineering agent/i);
+    expect(claude).toMatch(/`AGENTS\.md` is the authoritative rule set/i);
+    expect(claude).not.toMatch(/Codex is the sole engineering agent/i);
+  });
+
+  it("encodes the permanent live-validation policy in both instruction files", () => {
+    const agents = read("AGENTS.md");
+    const claude = read("CLAUDE.md");
+    const required = [
+      /MEDIUM/,
+      /HIGH/,
+      /Code completion is not product completion/i,
+      /FULLY VALIDATED/,
+      /IMPLEMENTED — LIVE VALIDATION PENDING/,
+      /Never fabricate/i,
+    ];
+    for (const pattern of required) {
+      expect(agents).toMatch(pattern);
+      expect(claude).toMatch(pattern);
+    }
+    expect(agents).toMatch(/Never publish, upload, replace, or alter the Google\s+Play Closed-testing release/i);
+    expect(agents).toMatch(/Locked V1 scope/);
   });
 
   it("tracks every canonical product document", () => {

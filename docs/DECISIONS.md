@@ -2242,3 +2242,30 @@ code, dependencies, gameplay, UI, Android configuration, AdMob/UMP, privacy
 behavior, AAB configuration, package/version values, or the already-qualified
 AAB whose SHA-256 is
 `EF2A5706EE13E2AF926761DE3C8DBFF09A23635B3C09FF8C2F595944B17EF158`.
+
+---
+
+## 2026-10-12 — BD2-CL-002 hands engineering to Claude Code and adopts a live-validation policy
+
+Claude Code replaces Codex as the sole engineering agent. `AGENTS.md` remains
+the authoritative rule set and `CLAUDE.md` is now a concise operating summary
+that defers to it. Present-tense authority statements in `AGENTS.md`,
+`CLAUDE.md`, `docs/ARCHITECTURE.md` and the repository-governance test were
+updated; archived plans and earlier decision entries that mention Codex are
+history and are intentionally unchanged.
+
+The handover transfers engineering responsibility only. The document
+hierarchy, the locked V1 scope, gameplay rules, persistence, offline play,
+AdMob/UMP behavior, and the Google Play Closed-testing release protections are
+unchanged, and no package, version, dependency, or release configuration was
+touched.
+
+The owner's permanent live-validation directive is recorded in `AGENTS.md`
+and summarized in `CLAUDE.md`: MEDIUM reasoning effort by default with HIGH
+only on the owner's request; for application changes, real Android runs,
+screenshots and recordings, a full gameplay regression, runtime-log review,
+and evidence kept outside tracked source; fabricated evidence is never
+acceptable; work that cannot be live-tested is reported as `IMPLEMENTED —
+LIVE VALIDATION PENDING`, and only fully verified work is `FULLY VALIDATED`.
+Docs-only tasks skip the Android build but still run governance and automated
+checks.

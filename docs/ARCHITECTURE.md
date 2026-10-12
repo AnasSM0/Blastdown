@@ -2,7 +2,7 @@
 
 The source-of-truth hierarchy is defined in `AGENTS.md`; `BUILD_SPEC.md` is
 historical where superseded. This document is a practical, code-facing
-reference maintained by Codex, the sole engineering agent. Architecture
+reference maintained by Claude Code, the sole engineering agent. Architecture
 changes must be surfaced explicitly and recorded when approved.
 
 ## Stack
@@ -59,7 +59,7 @@ blastdown/
 │   │   ├── reducer.ts
 │   │   └── selectors.ts
 │   │
-│   ├── components/             # Codex-owned presentation layer
+│   ├── components/             # Presentation layer
 │   │   ├── GameBoard/
 │   │   ├── GridCell/
 │   │   ├── PieceTray/
