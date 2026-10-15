@@ -4,12 +4,12 @@ Repository-wide rules for engineering work in BlastDown.
 
 ## Authority and governance
 
-Codex is the sole engineering agent for the current build. Product direction
-comes from the approved product documents, not from an agent. If a requested
-change affects architecture, gameplay rules, persistence, monetization,
-analytics, dependencies, or the source-of-truth documents, Codex must surface
-that impact explicitly and record an approved decision. No agent may silently
-change product direction or architecture.
+Claude Code is the sole engineering agent for the current build. Product
+direction comes from the approved product documents, not from an agent. If a
+requested change affects architecture, gameplay rules, persistence,
+monetization, analytics, dependencies, or the source-of-truth documents, Claude
+Code must surface that impact explicitly and record an approved decision. No
+agent may silently change product direction or architecture.
 
 When documents conflict, use this order:
 
@@ -69,8 +69,28 @@ parseable for backward compatibility.
 - Return exact verification commands and results.
 - Do not merge automatically unless explicitly instructed.
 
+## Project location and outputs
+
+- The canonical checkout and working directory is `D:\blastdown`.
+- Save all project-created files under this root, including QA evidence,
+  screenshots, recordings, reports, archives, exports, logs, and scratch files.
+- Use `qa-evidence/` for QA artifacts, `.local/tmp/` for temporary work, and
+  `.local/logs/` for project tool logs. These directories are ignored by Git.
+- Do not create project outputs in the previous C: checkout or in the user-level
+  Codex QA/visualization folders. Historical C: paths in frozen evidence are
+  provenance only and must not be reused as output destinations.
+- Installed tools and system-managed application data may remain in their
+  existing locations; project output must use the directories above.
+- After reinstalling project Git hooks, check their log/output destinations.
+  Graphify rebuild logs for this checkout belong in `.local/logs/`.
+
 ## Git
 
 - Use task branches and the commit format `type(scope): summary`.
 - Inspect the complete diff and repository status before committing.
-- Push only when the task asks for it.
+- The owner authorizes routine commits and pushes of reviewed, scoped source,
+  configuration, and documentation changes to `origin` task branches at
+  completed work checkpoints, so the source remains backed up on GitHub.
+- Keep secrets, dependencies, local evidence/media, IDE files, and duplicate
+  checkouts out of commits unless explicitly requested.
+- Do not force-push or merge automatically unless explicitly instructed.

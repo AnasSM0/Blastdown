@@ -53,3 +53,7 @@ graph.json
 
 # Personal Claude Code permission grants, not project configuration.
 .claude/settings.local.json
+
+# Local project evidence and working files; keep large artifacts out of commits.
+/qa-evidence/
+/.local/
