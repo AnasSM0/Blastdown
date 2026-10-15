@@ -2242,3 +2242,56 @@ code, dependencies, gameplay, UI, Android configuration, AdMob/UMP, privacy
 behavior, AAB configuration, package/version values, or the already-qualified
 AAB whose SHA-256 is
 `EF2A5706EE13E2AF926761DE3C8DBFF09A23635B3C09FF8C2F595944B17EF158`.
+
+---
+
+## 2026-10-12 — BD2-CL-002 hands the sole engineering role from Codex to Claude Code
+
+The owner moved BlastDown development from Codex to Claude Code. `AGENTS.md`
+now names Claude Code as the sole engineering agent, root `CLAUDE.md` points at
+`AGENTS.md` as the governing rules, and `docs/ARCHITECTURE.md` no longer
+attributes maintenance or the presentation layer to Codex. The governance test
+in `__tests__/tooling/v1ScopeGovernance.test.ts` asserts the new statement.
+
+This changes who performs the work and nothing else. The document authority
+order, the locked V1 scope and its exclusion list, the architecture boundaries,
+the dependency rule, and the git process are unchanged. It does not adopt any
+Design 2.0 scope: `BlastDown_Design_2_0/` remains owner-approved direction
+pending a separate, explicitly approved scope amendment. Earlier entries that
+name Codex or Claude describe how that work was performed and are left as
+written. Application code, dependencies, gameplay, persistence, ads, and
+release configuration are untouched.
+
+---
+
+## 2026-10-16 — Owner moves project work and evidence to D:
+
+The owner explicitly directed that future BlastDown changes and generated
+project artifacts be saved under `D:\blastdown`. This is the canonical checkout.
+QA captures, recordings, reports, archives, and helpers live in `qa-evidence/`;
+temporary work and project tool logs use `.local/tmp/` and `.local/logs/`.
+These local output directories are excluded from Git, formatting, linting, and
+the generated knowledge graph.
+
+The existing BD2-VQL-002 evidence was moved from the user-level C: Codex QA
+folder into this checkout and verified by SHA-256 before path updates. Frozen
+captures, diagnostic records, and original archives retain historical paths as
+provenance. Runnable helper output paths and current report commands use D:.
+Installed SDKs, runtimes, and system-managed Codex data keep their existing
+locations. This storage decision does not change gameplay, architecture,
+dependencies, persistence behavior, releases, or engineering ownership.
+
+---
+
+## 2026-10-16 — Owner authorizes ongoing GitHub source backups
+
+The owner requested that changes continue to be committed and pushed to GitHub
+to preserve the source code. Reviewed, scoped source, configuration, and
+documentation changes should be committed and pushed to the current task branch
+at completed work checkpoints. This is standing authorization for those pushes;
+it does not authorize automatic merges or force-pushes.
+
+Large QA captures, reference media, dependencies, IDE files, secrets, and
+duplicate local checkouts remain local. Compact QA findings can be versioned as
+documentation while their recordings and detailed evidence remain under
+`D:\blastdown\qa-evidence`. Project work continues from the D: checkout.

@@ -104,7 +104,7 @@ patched. There are no tracked symlinks; reassess this setting if any are added.
 Run in **Windows CMD** from a clean checkout of the frozen commit:
 
 ```bat
-cd /d "C:\Users\Anas SM\Desktop\blastdown"
+cd /d "D:\blastdown"
 git status --short
 git rev-parse HEAD
 npm ci
@@ -201,7 +201,7 @@ configured A-05 sizes. None measure device FPS.
    phone; if no device appears, check the cable and OEM USB driver.
 
 ```bat
-cd /d "C:\Users\Anas SM\Desktop\blastdown"
+cd /d "D:\blastdown"
 set "PATH=%LOCALAPPDATA%\Android\platform-tools;%PATH%"
 adb version
 adb devices

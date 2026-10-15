@@ -3,6 +3,8 @@ node_modules
 dist
 web-build
 coverage
+qa-evidence/
+.local/
 package-lock.json
 
 # Generated knowledge graph (graphify). Machine-written JSON and reports that are

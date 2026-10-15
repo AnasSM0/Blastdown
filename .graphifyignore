@@ -12,5 +12,7 @@ ios/Pods/
 ios/build/
 
 graphify-out/
+qa-evidence/
+.local/
 *.log
 *.map
